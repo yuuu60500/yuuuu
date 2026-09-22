@@ -90,3 +90,55 @@ Compile Status:
 Replay Status:
   NOT VERIFIED
 ```
+
+---
+
+## v1.00 — Implementation (Phase 3) + Audit Round 1
+
+```
+Version:  v1.00 (Implementation)
+Date:     2026-09-22
+
+Changed Functions:
+  新建全部实现（约 2560 行）：
+    H4M5_Identification.mq5 : OnInit / OnCalculate / OnDeinit
+                              ProcessClosedM5Bar (Phase 0-7 含 Phase 5b)
+                              H4ProcessBar / ResetEngine / BuildHistory / LogPhase7
+    HMI_SwingEngine         : SwingDetect / SwingLastUnswept
+    HMI_FVGEngine           : FvgDetect / ConnectionValid
+    HMI_H4StructureEngine   : H4DetectBreak / H4ConsumeSwing
+    HMI_H4ContextEngine     : H4ContextOnBar / CtxEnter / CtxDirection
+    HMI_H4RangeEngine       : TRNewVersion / TRExtendOnSwing / LiqOnBar
+    HMI_H4POIEngine         : POIOnBar / POIInvalidateOnBar / POITouchedBy
+    HMI_M5BlockEngine       : SessionStart / SessionMaintain / M5BlocksOnFVG /
+                              M5BlockInvalidate
+    HMI_CycleManager        : Cycle_FreezeCISDReference / Cycle_FreezeMSSReference /
+                              CycCreate / CycCloseActive / M5TouchArbitrate / ModelConfirm
+    HMI_CISDEngine          : CISD_Check
+    HMI_MSSEngine           : MSS_Check
+    HMI_BPREngine           : BPR_Check / BPRLifecycle
+    HMI_PriceActionEngine   : PA_Engulf / PA_Reject / PA_CheckBreakRetest +
+                              ARMED-bar 入口（D-4）
+    HMI_ObjectManager       : OM_ClaimInstance / OM_SyncAll / OM_Preview / OM_Trim
+    HMI_AlertManager        : AlertFlush
+
+Changed States:
+  新增 M5Block.counter_dir（审计 A-01）
+  新增 IdentificationCycle.logged_mask（Phase 7 CSV 日志去重）
+  删除死字段 armed_drawn / 死变量 g_ctx_flipped_this_bar / g_last_bar0（审计 A-04）
+
+Affected Modules:
+  全部新建；docs/06 记录第一轮审计（A-01..A-10）
+
+Reason:
+  Phase 3 实现 + Rule 66 第一轮审计。
+
+Trading Logic Changed:
+  NO（相对已签字的 v1.00 spec revision 2；审计修复全部是显示 / 对象管理 / 死代码）
+
+Compile Status:
+  NOT COMPILE VERIFIED
+
+Replay Status:
+  NOT VERIFIED
+```
