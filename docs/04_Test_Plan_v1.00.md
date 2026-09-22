@@ -35,7 +35,8 @@
 |------|------|
 | MOB-01 Formation | 仅在 Session 开始后（POI TOUCHED 之后）才可能出现 |
 | MOB-02 FVG Connection | Touch / Overlap → 有效；正空隙 → **无效**（Rule 10） |
-| MOB-03 Pre-Touch Reject | Session 开始之前形成的 OB **不被登记**（Rule 7，`InpM5BlockLookbackFromTouch = 0`） |
+| MOB-03 Lookback 边界（D-3） | OB 起源 K 线可早于 Session 起点最多 2 根；第 3 根及更早**必须**被拒绝 |
+| MOB-03b Confirm 硬约束 | 任何 Block 的 `confirm_time` **必须** ≥ `session.start_bar_time`，无一例外 |
 | MOB-04 Touch → ARMED | 触碰 K 线收盘时出现 `M5 OB ARMED` 标签 |
 | MOB-05 Invalidation | 收盘击穿 → INVALIDATED 样式；历史标记保留 |
 
@@ -79,6 +80,7 @@
 | BPR-01 First Only | 一个 Cycle 内只出现一个 `▲ BPR`，后续重叠不再标记（Rule 33） |
 | BPR-02 Real Overlap | 两条方向相反的 FVG 必须**真实重叠**；相切（0 point）不算 |
 | BPR-03 时序 | ARMED 之前已完整存在的 BPR **不被采用**（Rule 32） |
+| BPR-03b 早腿边界（D-2） | 早腿 `confirm_time` 早于 Session 起点 → **不采用**；晚于 Session 起点但早于 ARMED → 采用 |
 | BPR-04 Touch | 价格进入 BPR zone → 状态 TOUCHED，样式改变 |
 | BPR-05 Invalidation | 收盘穿透 → INVALIDATED，**Rectangle 必须立即改样式**（Rule 36） |
 | BPR-06 No Second | First BPR 失效后**不**寻找第二个（CONF-10） |
@@ -91,7 +93,9 @@
 | PA-02 Rejection | 影线比例满足且与 Block 有交互；bar 0 不作最终确认 |
 | PA-03 Break-Retest | Reference 来自 ARMED 之后确认的局部结构；超时未 Hold → 作废 |
 | PA-04 Setup Window | 所有 PA 参考不得超出 `InpSetupWindowBars` |
-| PA-05 ARMED 当根 | 确认 ARMED 当根**不产生** PA 标记（Rule 18 / CONF-01 的可见后果） |
+| PA-05 ARMED 当根（D-4） | `InpPAAllowArmedBarConfirm = true` 时，ARMED 当根的 REJECTION / ENGULFING **必须**被标记；CISD / MSS / BPR / BREAK-RETEST 在当根**必须不**被标记 |
+| PA-06 ARMED 当根开关 | 设为 false 后重跑同一区间 → 仅 PA-05 的两类标记消失，其余逐行完全相同 |
+| PA-07 ARMED 当根可重放 | PA-05 产生的标记在 Reload 后时间 / 价格 / Cycle 归属完全一致（D-4 论证的实测证据） |
 
 ### 2.8 Cycle 管理
 
@@ -142,6 +146,7 @@
 | 同一图表加载两个实例（不同参数） | 验证 Rule 55：互不删除对象；移除其中一个，另一个完好 |
 | 周末 / 节假日跳空区间 | 验证 H4/M5 时间映射（Rule 50）与缺口 FVG 处理 |
 | 换品种（EURUSD → XAUUSD） | 验证 pip / margin 退化（BRI-03）与对象命名冲突 |
+| 三种 margin 模式切换（D-6） | `MARGIN_PIPS` 在 EURUSD 上与原结果逐行一致；XAUUSD 上 `MARGIN_PIPS` 应打印 0-point WARNING，`MARGIN_ATR_FRAC` 应给出非零 margin |
 
 ---
 

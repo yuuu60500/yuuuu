@@ -50,10 +50,11 @@ Rule 18 自带例外条款——"除非能够严格证明事件顺序在实时�
 若允许同根确认，Historical Build 与 Live 会在这一点上产生不可调和的差异，
 直接违反 Rule 51 / 52。
 
-**v1.00 处置：** 严格遵守 Rule 18。
-**影响：** 部分真实 PA 形态不会被标记（漏标，不是错标）。
-**交易逻辑改变：** NO（只是更保守）。
-**→ 见 BRI-01（可选方案，待裁决）。**
+**v1.00 最终处置（D-4，2026-09-22）：**
+对 **PA ENGULFING / PA REJECTION** 开放 ARMED 当根确认，因为这两者的确认事件就是
+bar A 自身的收盘，而触碰是该 K 线数据的子集 —— 顺序由定义保证，落入 Rule 18 的例外条款。
+**CISD / MSS / BPR / PA BREAK-RETEST 仍严格 `n > A`。**
+**交易逻辑改变：YES（已获用户批准）。**
 
 ---
 
@@ -94,7 +95,7 @@ Cycle 继续运行直到被新的 ARMED 结束。
     注意：TRANSITION 不等于方向翻转，只有 BULLISH↔BEARISH 才算翻转。
 ```
 **交易逻辑改变：NO（这是对现有规则的字面实现）。**
-**需用户确认：** 见 Part D / D-1。
+**已裁决：** D-1 —— 继续（维持 Rule 15 字面）。
 
 ---
 
@@ -115,7 +116,7 @@ BPR 由一条 Bullish FVG + 一条 Bearish FVG 重叠构成。若较早的一条
 **v1.00 处置：** 默认读法 A，并提供 `InpBPRRequireBothLegsAfterArmed`（default false）
 可切换到读法 B。两条腿都必须落在 `InpSetupWindowBars` 窗口内（bounded）。
 **交易逻辑改变：** 取决于用户选择；默认值按字面最贴近的读法 A。
-**需用户确认：** 见 Part D / D-2。
+**已裁决：** D-2 —— 允许早腿早于 ARMED，但须 ≥ Session 起点。
 
 ---
 
@@ -170,7 +171,7 @@ Breaker 要求"先有一个有效 OB，再被突破"。
 **v1.00 处置：** 保持严格（default 0），因为这是 Rule 7 的字面要求。
 参数 `InpM5BlockLookbackFromTouch` 保留（可设 >0），但**默认 0**。
 **交易逻辑改变：NO。**
-**需用户确认：** 见 Part D / D-3。
+**已裁决：** D-3 —— `InpM5BlockLookbackFromTouch = 2`（见 docs/01 §5.2 漏标场景）。
 
 ---
 
@@ -310,7 +311,9 @@ Would Trading Logic Change:
 YES
 ```
 
-**当前状态：未实施。v1.00 按 Rule 18 严格执行。**
+**当前状态：D-4 裁决（2026-09-22）—— 窄范围启用。**
+`InpPAAllowArmedBarConfirm = true`，仅适用 PA ENGULFING / PA REJECTION；
+CISD / MSS / BPR / PA BREAK-RETEST 仍严格 `n > A`。设为 false 可退回 Rule 18 字面行为。
 
 ---
 
@@ -343,7 +346,9 @@ Would Trading Logic Change:
 YES
 ```
 
-**当前状态：参数已在规格中预留，默认 false = 完全遵守 Rule 15 字面。**
+**当前状态：D-5 裁决（2026-09-22）—— 不启用。**
+`InpStopIdentificationOnBlockInvalidation = false`，完全遵守 Rule 15 字面。
+附加诊断显示 `ANCHOR INVALIDATED`（不改逻辑）。
 
 ---
 
@@ -380,7 +385,7 @@ Would Trading Logic Change:
 YES（仅当用户主动切换模式时）
 ```
 
-**当前状态：未实施。v1.00 只实现 PIPS 模式 + 启动日志提示。**
+**当前状态：D-6 裁决（2026-09-22）—— 实施三模式，默认 `MARGIN_PIPS`（行为不变）+ 强制启动日志。**
 
 ---
 
@@ -413,21 +418,48 @@ Would Trading Logic Change:
 NO（纯诊断显示，不改变任何标记逻辑）
 ```
 
-**当前状态：建议实施诊断计数（不改业务逻辑）。等待用户确认。**
+**当前状态：D-7 裁决（2026-09-22）—— 实施诊断计数。** `InpShowRejectedOB` 仍 default false。
 
 ---
 
 ## Part D — 需要用户签字的决策点
 
-| ID | 决策点 | v1.00 默认（按规则字面） | 是否需要改变交易逻辑 |
-|----|--------|------------------------|-------------------|
-| **D-1** | Context 变 TRANSITION / RANGE 时，既有 ARMED Cycle 是否继续？ | **继续**（Rule 15 字面） | 若改为"立即结束" → YES |
-| **D-2** | BPR 的较早那条 FVG 是否允许形成于 ARMED 之前？ | **允许**（`InpBPRRequireBothLegsAfterArmed = false`） | 若改为 true → YES |
-| **D-3** | M5 Block 搜索是否允许向 POI 触碰点之前回溯？ | **不允许**（`InpM5BlockLookbackFromTouch = 0`） | 若 > 0 → YES |
-| **D-4** | 是否启用 BRI-01（允许 PA 在 ARMED 当根确认）？ | **否** | YES |
-| **D-5** | 是否启用 BRI-02（Block 失效即结束 Cycle）？ | **否** | YES |
-| **D-6** | 是否启用 BRI-03（Break Margin 增加 POINTS / ATR 模式）？ | **否**（仅 PIPS + 日志提示） | 仅当切换模式时 YES |
-| **D-7** | 是否实施 BRI-04 的诊断计数显示？ | **建议是** | NO |
+**裁决日期：2026-09-22 — 用户已签字批准以下全部决定。**
 
-> **在 D-1 … D-7 未得到答复之前，Phase 3（MQL5 实现）将完全按"v1.00 默认"列执行。**
-> 全部默认值都指向同一个方向：**严格遵守现有规则字面、宁可漏标不可错标。**
+| ID | 决策点 | 初始默认 | **最终裁决** | 交易逻辑改变 |
+|----|--------|---------|-------------|-------------|
+| **D-1** | Context 变 TRANSITION / RANGE 时，既有 ARMED Cycle 是否继续？ | 继续 | **继续**（维持 Rule 15 字面） | NO |
+| **D-2** | BPR 较早那条 FVG 是否允许形成于 ARMED 之前？ | 允许 | **允许**，且新增约束：早腿须 ≥ Session 起点（`InpBPREarlyLegFromSessionStart = true`） | YES（小幅收紧） |
+| **D-3** | M5 Block 搜索是否允许向 POI 触碰点之前回溯？ | 0 | **`InpM5BlockLookbackFromTouch = 2`** | YES |
+| **D-4** | 是否启用 BRI-01（PA 在 ARMED 当根确认）？ | 否 | **是，但窄范围**：仅 PA ENGULFING / PA REJECTION（`InpPAAllowArmedBarConfirm = true`）；CISD / MSS / BPR / BREAK-RETEST 仍 `n > A` | YES |
+| **D-5** | 是否启用 BRI-02（Block 失效即结束 Cycle）？ | 否 | **否**（维持 Rule 15 字面） | NO |
+| **D-6** | 是否启用 BRI-03（Break Margin 模式）？ | 否 | **是**：实施三模式，**默认仍 PIPS**（行为不变）+ 强制启动日志 | NO（默认下） |
+| **D-7** | 是否实施 BRI-04 诊断计数？ | 建议是 | **是** | NO |
+
+### 裁决理由摘要
+
+**D-1 —— 继续。** TRANSITION ≠ 方向翻转。实务上 H4 CHOCH 往往**就是**把价格打进 H4 POI 的那一段下跌；
+此时杀掉 Cycle 等于系统性杀掉深回撤型顺势 Setup。且全方向翻转已经会结束 Refinement Session，
+Cycle 会自然走到尽头。附加诊断：Cycle 面板标注 `CTX CHANGED DURING CYCLE`（不改逻辑）。
+
+**D-2 —— 允许，但收紧。** BPR 的经典形态是"下跌进 Block 时留下的 Bearish FVG 被反转上涨的
+Bullish FVG 反噬重叠"，该 Bearish FVG 几乎总是形成于 ARMED 之前。要求两腿都在 ARMED 之后
+等于废掉模型。但 60 根窗口对早腿过宽 → 收紧到 Session 起点（POI 触碰之后）。
+
+**D-3 —— 0 改为 2。** 见 `docs/01` §5.2 的漏标场景（OB 是触碰前一根阴线）。
+`confirm_time >= session.start_bar_time` 的硬约束保证无未来函数。
+
+**D-4 —— 窄范围启用（修正）。** 原先"OHLC 无法证明事件顺序"的理由对**单根 PA 形态不成立**：
+PA REJECTION 的确认事件就是 bar A 自身的收盘，而刺入 Block 的下影本身就是那次触碰，
+顺序由定义保证。CISD / MSS 则确实需要 `close[A−1]` 作为**确认输入**（突破可能整段发生在触碰之前，
+且 CISD Reference run 可能包含 bar A → 语义循环），故仍禁止。
+
+**D-5 —— 不启用。** "Block 被击穿 → 随后 CISD 反夺回"本身是高质量形态（扫 OB 下方流动性后反手），
+杀掉 Cycle 会把 sweep-and-reclaim 全部过滤掉。且每模型每 Cycle 上限 1 次，
+"僵尸 Cycle"最多产出 6 个标记，影响面有界。附加诊断：面板标注 `ANCHOR INVALIDATED`。
+
+**D-6 —— 实施选项 + 强制日志。** 默认 PIPS 模式下行为与原规格**逐条相同**，零风险；
+非外汇品种（如 `_Digits == 2` 的 XAUUSD，0.3 pip = 0.003 → 0 points）可切 ATR 模式。
+不采用"最小 1 point 下限"，因为那会在用户不知情下改变黄金上的判定。
+
+**D-7 —— 实施。** 纯诊断，区分"规则否决了它"与"指标坏了"。

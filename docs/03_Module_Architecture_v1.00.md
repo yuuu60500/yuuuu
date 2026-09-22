@@ -81,6 +81,8 @@ enum ModelType    { MDL_CISD, MDL_MSS, MDL_BPR,
 enum ModelResult  { MR_PENDING, MR_CONFIRMED, MR_PASS, MR_NA };     // NA = 无 Reference
 
 enum SessionEnd   { SE_NONE, SE_POI_INVALID, SE_CONTEXT_FLIP, SE_TIMEOUT, SE_NEW_SESSION };
+
+enum MarginMode   { MARGIN_PIPS, MARGIN_POINTS, MARGIN_ATR_FRAC };   // D-6
 ```
 
 ---
@@ -272,6 +274,7 @@ void Phase2_InvalidationPass(const int n);
 void Phase3_MaintainSession(const int n);
 void Phase4_Identification(const int n);      // 只处理 active cycle，要求 n > armed_bar_index
 void Phase5_TouchAndArm(const int n);         // 仲裁 + Cycle 切换
+void Phase5b_ArmedBarPA(const int n);         // D-4：仅 PA ENGULFING / REJECTION，仅 n == A
 void Phase6_PostLifecycle(const int n);
 void Phase7_DrawAndAlert(const int n);
 
@@ -282,6 +285,9 @@ bool BPR_Check  (IdentificationCycle &cy, const int n);
 bool PA_CheckEngulfing   (IdentificationCycle &cy, const int n);
 bool PA_CheckRejection   (IdentificationCycle &cy, const int n);
 bool PA_CheckBreakRetest (IdentificationCycle &cy, const int n);
+// D-4：ARMED 当根专用入口，内部只允许读 bar n(=A) 与 n-1
+bool PA_CheckEngulfingArmedBar(IdentificationCycle &cy, const int n);
+bool PA_CheckRejectionArmedBar(IdentificationCycle &cy, const int n);
 
 // Reference 冻结（仅在 ARMED 瞬间调用一次）
 void Cycle_FreezeCISDReference(IdentificationCycle &cy, const int armed_idx);

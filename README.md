@@ -69,8 +69,8 @@ H4 Context
 | 项目 | 状态 |
 |------|------|
 | Phase 1 — Architecture & Logic Specification | **COMPLETE** |
-| Phase 2 — Conflict Resolution / Business Rule Sign-off | **WAITING FOR USER DECISION** |
-| Phase 3 — MQL5 Implementation | **NOT STARTED** |
+| Phase 2 — Conflict Resolution / Business Rule Sign-off | **COMPLETE** (D-1..D-7 signed off 2026-09-22) |
+| Phase 3 — MQL5 Implementation | **IN PROGRESS** |
 | Phase 4 — Audit (P0–P3) | **NOT STARTED** |
 | Phase 5 — MetaEditor Compile | **NOT COMPILE VERIFIED** |
 | Phase 6 — Visual Replay / Repaint Test | **NOT VERIFIED** |

@@ -429,10 +429,29 @@ RefinementSession {
 
 ```
 候选 OB 的 origin bar index  >=  session.start_bar_index − InpM5BlockLookbackFromTouch
-InpM5BlockLookbackFromTouch  default = 0   (严格：不向触碰点之前回溯)
+InpM5BlockLookbackFromTouch  default = 2   (D-3 裁决，2026-09-22)
+
+硬约束（不受该参数影响）：
+   block.confirm_time >= session.start_bar_time
 ```
 
 这条直接禁止了"扫描整个 M5 历史，把任意 M5 Block 关联到未来才触碰的 H4 POI"。
+
+**D-3 裁决说明（default 0 → 2）：**
+`lookback = 0` 会系统性漏掉下面这个常见形态：
+
+```
+bar N-1 : 阴线，收在 POI 上沿之上（尚未触碰）
+bar N   : 下影刺入 POI（触碰，Session 起点），强阳收高（位移）
+bar N+2 : Bullish FVG 完成
+```
+
+按定义，这里的 Bullish OB 是 **bar N-1**（位移前最后一根反方向 K 线），
+而它早于 Session 起点 1 根 → 被 `lookback = 0` 排除，整个 M5 OB 消失。
+
+回溯 2 根**不引入未来函数**：Block 的 `confirm_time` 仍然必须 ≥ Session 起点
+（FVG 只能在触碰之后完成），只是几何来源的 K 线可以早 1–2 根。
+Rule 7 禁止的是"扫描整个 M5 历史关联未来才触碰的 POI"，与有界 2 根回溯无关。
 
 ### 5.3 M5 OB 定义 (Rule 9 — FROZEN)
 
@@ -742,9 +761,33 @@ Identification Confirmation 只在 已关闭 K 线 n > A 上进行
 在历史 K 线上更不可判定（只有 OHLC，没有 tick 顺序）。
 因此 bar A 一律不参与确认。
 
-> 这条与 Rule 39 / 40（PA 必须与 Block 有触碰关系）之间存在真实张力，
-> 见 **CONF-01 / BRI-01**。v1.00 **遵守 Rule 18**（Rule 18 有"除非能够严格证明事件顺序
-> 在实时数据中当时已经可知"的例外条款，而 OHLC 历史数据无法提供该证明）。
+### 9.5.1 ARMED-Bar PA 例外 (D-4 裁决，2026-09-22)
+
+Rule 18 自带例外条款："除非能够严格证明事件顺序在实时数据中当时已经可知"。
+对**单根/双根 PA 形态**，该证明是成立的：
+
+```
+PA REJECTION 的确认事件 = bar A 自身的收盘。
+而"下影刺入 Block"本身就是那次触碰 ⇒ 触碰必然发生在收盘之前或当时。
+顺序由定义保证，不需要 tick 数据。
+Historical 重建读同一根已关闭 K 线 ⇒ 结果完全相同，无 Live/Historical 分歧。
+```
+
+因此 v1.00 采用**窄范围例外**（`InpPAAllowArmedBarConfirm`，default **true**）：
+
+| 模型 | ARMED 当根 (n == A) | 理由 |
+|------|--------------------|------|
+| PA REJECTION | **允许** | 确认数据 = bar A 自身，触碰是其子集 |
+| PA ENGULFING | **允许** | 确认数据 = {A−1, A}；A−1 属 Reference（AX-3） |
+| CISD | **禁止** | 需要 `close[A−1]` 作为**确认输入**；该突破可能整段发生在触碰之前，且 Reference run 可能包含 bar A → 语义循环 |
+| MSS | **禁止** | 同上 |
+| BPR | **禁止** | 定义上要求 ARMED 之后形成 |
+| PA BREAK-RETEST | **禁止** | 定义上要求 ARMED 之后的新局部结构 |
+
+实现落点：新增 **Phase 5b**（§17.2），在 Cycle 建立之后、仅用 bar A / A−1 评估这两个 PA 模型。
+`InpPAAllowArmedBarConfirm = false` 时退回 Rule 18 的字面行为（全部 `n > A`）。
+
+> 其余模型仍严格遵守 Rule 18。见 CONF-01 / BRI-01。
 
 ### 9.6 Cycle 切换与同根冲突的相位顺序 (AX-5)
 
@@ -912,6 +955,11 @@ BPR 的「形成时刻」 = 两条 FVG 中**较晚**那条的 confirm_time
 - 默认允许"较早那条 FVG"形成于 ARMED 之前（因为此时 BPR 本身尚不存在）
 - 参数 `InpBPRRequireBothLegsAfterArmed`（default **false**）可切换为更严格解释
 - 两条 FVG 的 `confirm_time` 都必须落在 `[A − InpSetupWindowBars, now]` 内（bounded）
+- **D-2 裁决（2026-09-22）附加约束：** 较早那条腿必须满足
+  `early_leg.confirm_time >= session.start_bar_time`
+  （即形成于当前 H4 POI 被触碰之后），参数 `InpBPREarlyLegFromSessionStart`（default **true**）。
+  理由：BPR 的业务含义是"进入 Block 路上的反方向 FVG 被反噬"，
+  该腿必然属于本次 Setup；60 根窗口对早腿过宽，收紧到 Session 起点更贴合 Rule 7 的链路语义。
 
 ### 12.3 First Valid Only (Rule 33 / 43)
 
@@ -982,6 +1030,8 @@ PA 与 CISD / MSS / BPR **完全并列**（Rule 38），不是任何 SMC 模型�
 ```
 P1  Cycle 处于 CYCLE_ACTIVE
 P2  确认 K 线 n > A （Rule 18）
+    例外：PA ENGULFING / PA REJECTION 在 InpPAAllowArmedBarConfirm = true 时
+          允许 n == A（§9.5.1，D-4 裁决）
 P3  方向 == Cycle 方向（Rule 2）
 P4  使用已关闭 K 线（Rule 40 / 49），bar 0 不做最终确认
 P5  参考窗口 bounded：所有参考结构取自 [A, n] ⊂ setup window（Rule 41）
@@ -1349,6 +1399,10 @@ ProcessClosedM5Bar(n):
            新 Cycle 的 Reference 在此刻冻结（10.1 / 11.1）
            新 Cycle 的确认从 n+1 开始（Rule 18）
 
+  Phase 5b ARMED-Bar PA（仅当 InpPAAllowArmedBarConfirm = true，且本根刚建立新 Cycle）
+           仅用 bar A / A−1 评估 PA ENGULFING 与 PA REJECTION
+           CISD / MSS / BPR / PA BREAK-RETEST **不**在此阶段评估
+
   Phase 6  Post Lifecycle
            BPR 状态更新（TOUCHED / INVALIDATED）、对象数量裁剪、Cycle 归档
 
@@ -1356,6 +1410,7 @@ ProcessClosedM5Bar(n):
            读取 State → 绘制 / 更新对象；新确认模型触发一次去重 Alert
 ```
 
+**Phase 5b 必须在 Phase 5 之后**：Cycle 必须先存在，PA 结果才有归属。
 **Phase 4 先于 Phase 5** 是 9.6 的实现落点，也是 Rule 15 与 Rule 45 能同时成立的唯一顺序。
 
 ### 17.3 Alert 去重 (Rule 66 P2)
@@ -1512,7 +1567,10 @@ ChartRedraw() 每次 OnCalculate 最多调用一次
 
 | 参数 | 默认 | 说明 |
 |------|------|------|
+| `InpBreakMarginMode` | **MARGIN_PIPS** | D-6 裁决：`MARGIN_PIPS` / `MARGIN_POINTS` / `MARGIN_ATR_FRAC`。默认模式下行为与原规格完全一致 |
 | `InpBreakMarginPips` | **0.3** | 全局 Break Margin（CISD / MSS / BOS / CHOCH / Block 突破 / 失效） |
+| `InpBreakMarginPoints` | 3 | 仅 `MARGIN_POINTS` 模式使用 |
+| `InpBreakMarginATRFrac` | 0.05 | 仅 `MARGIN_ATR_FRAC` 模式使用，ATR(M5,14) |
 | `InpH4ConnectTolerancePips` | 0.0 | H4 OB↔FVG 连接容差 |
 | `InpM5ConnectTolerancePips` | 0.0 | M5 OB↔FVG 连接容差 |
 | `InpPARetestTolerancePips` | 0.5 | Break-Retest 回踩容差 |
@@ -1534,7 +1592,7 @@ ChartRedraw() 每次 OnCalculate 最多调用一次
 | `InpM5SwingLeft` / `InpM5SwingRight` | 2 / 2 |
 | `InpM5OBtoFVGMaxBars` | 3 |
 | `InpM5RefinementMaxBars` | 288 |
-| `InpM5BlockLookbackFromTouch` | 0 |
+| `InpM5BlockLookbackFromTouch` | **2** (D-3) |
 | `InpM5MaxBlocks` | 64 |
 
 ### A.5 Identification
@@ -1543,7 +1601,9 @@ ChartRedraw() 每次 OnCalculate 最多调用一次
 |------|------|---------|
 | `InpCISDLookbackBars` | **12** | Rule 19 |
 | `InpSetupWindowBars` | 60 | Rule 29 / 41 |
-| `InpBPRRequireBothLegsAfterArmed` | false | Rule 32（见 CONF-04） |
+| `InpBPRRequireBothLegsAfterArmed` | false | Rule 32（见 CONF-04 / D-2） |
+| `InpBPREarlyLegFromSessionStart` | **true** | D-2 裁决：早腿须在 Session 起点之后 |
+| `InpPAAllowArmedBarConfirm` | **true** | D-4 裁决：PA ENGULFING / REJECTION 允许 n == A（§9.5.1） |
 | `InpStopIdentificationOnBlockInvalidation` | false | Rule 15（见 BRI-02） |
 | `InpPAEngulfMinBodyRatio` | 1.0 | Rule 39 |
 | `InpPARejWickToBody` | 2.0 | Rule 40 |
@@ -1584,8 +1644,22 @@ ChartRedraw() 每次 OnCalculate 最多调用一次
 double PipSize() {
    return ((_Digits == 3 || _Digits == 5) ? 10.0 * _Point : _Point);
 }
-double BreakMargin() { return InpBreakMarginPips * PipSize(); }
+double BreakMargin() {                       // D-6 裁决
+   switch(InpBreakMarginMode) {
+      case MARGIN_POINTS:   return InpBreakMarginPoints * _Point;
+      case MARGIN_ATR_FRAC: return InpBreakMarginATRFrac * ATR_M5_14();
+      default:              return InpBreakMarginPips * PipSize();   // MARGIN_PIPS
+   }
+}
 ```
+
+**D-6 强制诊断（无条件执行，不改变逻辑）：** `OnInit` 在 Experts 日志打印
+
+```
+HMI: effective break margin = 0.00300 price / 0 points   <-- 若为 0 points 追加 WARNING
+```
+
+这样用户可以一眼看出 margin 是否在本品种上退化为 0。
 
 > **注意（见 BRI-03）：** 对 `_Digits == 2` 的品种（如 XAUUSD 部分经纪商），
 > `PipSize = 0.01`，`0.3 pip = 0.003` 小于最小报价单位 → Break Margin 实际退化为 0。
