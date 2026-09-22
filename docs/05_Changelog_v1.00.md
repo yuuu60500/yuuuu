@@ -542,3 +542,37 @@ Compile Status:
 Replay Status:
   NOT VERIFIED
 ```
+
+---
+
+## v2.04 — 撤销 v2.03（A-17 系误判）
+
+```
+Version:  v2.04
+Date:     2026-09-22
+
+Changed Functions:
+  PanelPush        删除
+  OM_DrawPanel     恢复为直接写入行数组（等同 v2.02）
+
+Changed States:
+  无
+
+Reason:
+  A-17 的前提不成立：面板文字**从未**被截断，是截图没把右侧截进去。
+  用户直接确认。既然 63 字符上限这个前提是错的，
+  折行反而会把本来一行显示得下的 Cycle 行拆成两行，更占地方。
+
+  代码回到 v2.02 状态。docs/06 中 A-17 改为 WITHDRAWN 并保留，
+  作为「截图不构成证据」的反面记录（Rule 67）。
+
+  注意：v2.03 提交里**关于 Round 3 目视验证的表格仍然有效**
+  （break margin / ADR / Kill Zone / 完整名称 / ARMED / Level 线 / Cycle 隔离），
+  那部分不撤销。
+
+Trading Logic Changed:
+  NO
+
+Compile Status:
+  PASS 于 v2.02；v2.04 与其等价，但仍需你重新编译确认。
+```

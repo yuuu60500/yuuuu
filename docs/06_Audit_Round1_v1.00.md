@@ -450,32 +450,27 @@ Rule 30 / 44（模型不互相 Consume）。这条原则是对的，但它把「
 
 ## Audit Round 3 —— 首次实盘挂载反馈（2026-09-22，USDJPY M5）
 
-### A-17
+### A-17 —— **撤回：不是 Bug（误判）**
 ```
 ID:                      A-17
-Severity:                P2
+Severity:                （已撤回）
 Module:                  HMI_ObjectManager
-Function:                OM_DrawPanel / OM_PanelRow
-Location:                面板行文字
-Trigger:                 一个 Cycle 内确认的模型较多时（本例 5 个）
-Expected Behavior:       整行文字完整显示
-Actual Behavior:         文字在第 62-63 个字符处被硬截断，断在词中间：
-                           "#2940 BULL  CISD OK  MSS OK  BPR OK  PA ENGULFING OK  PA REJE"
-                         同一面板上 57 字符的 ADR 行与 49 字符的 Context 行完整显示，
-                         定位出原因是 **MT5 的 OBJPROP_TEXT 在 63 字符处截断**。
-                         PANEL_FULL 的诊断行（约 68 字符）同样受影响。
-Impact:                  信息丢失且无提示。最容易被截掉的恰恰是排在后面的
-                         PA REJECTION / PA BREAK-RETEST 状态
-Historical Repaint:      NO
-Future Leak:             NO
-Business Logic Impact:   NO（纯显示）
-Recommended Fix:         PanelPush()：超过 58 字符按**词边界**折行，
-                         长行变成两行可读文本而不是被静默切断
-Status:                  FIXED — v2.03
-Confidence:              HIGH（两张独立截图断在同一位置，且同面板短行正常）
+Claim:                   面板行文字被 MT5 在 63 字符处截断
+Evidence Used:           两张截图中 Cycle 行都停在 "PA REJE"，
+                         数得约 62-63 字符；同面板 57 与 49 字符的行完整显示
+Actual:                  **文字没有被截断。** 两张截图都只是没把面板右侧截进画面。
+                         用户于 2026-09-22 直接确认。
+Root Cause of the Error: 我用截图里的字符数做推断，而不是先向用户求证。
+                         上一轮我本来已经标注「这个我不确定，不想瞎改」，
+                         下一轮却因为第二张截图停在同一位置就当成了证据 ——
+                         两张图其实是同一种截图习惯，不是两个独立证据。
+Status:                  **WITHDRAWN — NOT A BUG。v2.03 的折行已于 v2.04 撤销。**
+Confidence:              —
 ```
 
-**这条只能靠实跑发现。** 静态阅读无法得知 MT5 对 `OBJPROP_TEXT` 有长度上限。
+> **记录这条的意义：** `docs/06` 是审计轨迹，一条错误的 `FIXED` 会污染它。
+> 按 Rule 67 的精神，没有证据不能写 Confirmed —— 而"截图里看起来是这样"
+> 不构成证据。这条留在文档里作为反面样本，不删除。
 
 ### 本轮同时验证通过的项目（首次获得实测证据）
 
