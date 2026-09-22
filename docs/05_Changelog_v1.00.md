@@ -509,3 +509,36 @@ Replay Status:
   NOT VERIFIED —— 编译通过只证明语法与类型正确，
   不证明任何一条业务规则被正确实现。docs/04 全部用例仍未执行。
 ```
+
+---
+
+## v2.03 — 修复 A-17：面板文字被 MT5 截断在 63 字符
+
+```
+Version:  v2.03
+Date:     2026-09-22
+
+Changed Functions:
+  PanelPush        新增：超过 58 字符按词边界折行
+  OM_DrawPanel     全部行改为经 PanelPush 写入（含 ATR / ADR 行）
+
+Changed States:
+  无
+
+Reason:
+  首次实盘挂载（USDJPY M5）发现 Cycle 行被截断在 "PA REJE"。
+  同一面板上 57 字符的 ADR 行与 49 字符的 Context 行完整显示，
+  定位出 MT5 的 OBJPROP_TEXT 存在 63 字符上限。
+  PANEL_FULL 的诊断行（约 68 字符）同样受影响。
+
+  静态阅读无法发现这一条 —— 它属于平台行为，只有真跑才看得见。
+
+Trading Logic Changed:
+  NO —— 纯显示层。
+
+Compile Status:
+  PASS 于 v2.02；本次改动尚未编译验证。
+
+Replay Status:
+  NOT VERIFIED
+```

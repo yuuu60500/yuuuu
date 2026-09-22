@@ -201,6 +201,37 @@ void OM_PanelRow(const int row, const string text, const int ypix, const color c
 
 #define MAX_PANEL_ROWS 12
 
+// MT5 clips OBJPROP_TEXT at 63 characters - the cycle row was being cut
+// mid-word at "PA REJE" (A-17). Rows are wrapped at a word boundary so a
+// long row becomes two readable rows instead of a silently truncated one.
+#define PANEL_MAX_CHARS 58
+
+void PanelPush(string &L[], color &C[], int &n, const string text, const color clr)
+  {
+   string rest = text;
+   while(n < MAX_PANEL_ROWS)
+     {
+      if(StringLen(rest) <= PANEL_MAX_CHARS)
+        {
+         C[n] = clr;
+         L[n] = rest;
+         n++;
+         return;
+        }
+      int cut = PANEL_MAX_CHARS;
+      int k = cut;
+      while(k > 12 && StringGetCharacter(rest, k) != ' ') k--;   // back off to a space
+      if(k > 12) cut = k;
+      C[n] = clr;
+      L[n] = StringSubstr(rest, 0, cut);
+      n++;
+      rest = StringSubstr(rest, cut);
+      while(StringLen(rest) > 0 && StringGetCharacter(rest, 0) == ' ')
+         rest = StringSubstr(rest, 1);
+      if(StringLen(rest) == 0) return;
+     }
+  }
+
 //================== kill zone levels (display only) =================
 #define MAX_KZ_DRAWN 64
 int      g_kzd_zone[MAX_KZ_DRAWN];
@@ -340,37 +371,33 @@ void OM_DrawPanel()
 
    if(InpPanelMode == PANEL_FULL)
      {
-      C[n] = base;
-      L[n++] = "HMI v" + HMI_VERSION + "  MARK ONLY - NO ENTRY DECISION";
-      C[n] = CtxPanelColor(base);
-      L[n++] = "H4 CONTEXT: " + ctx +
-               "   strength " + IntegerToString(g_ctx_strength) +
-               (g_ctx_messy ? "   quality MESSY" : "   quality CLEAN");
-      C[n] = base;
-      L[n++] = "H4 POI: " + IntegerToString(poi_active) + " ACTIVE / " +
-               IntegerToString(g_diag_poi_rejected_gap) + " REJECTED-BY-GAP" +
-               "   |   M5 BLOCK GAP-REJECTED: " + IntegerToString(g_diag_blk_rejected_gap);
-      C[n] = base;
-      L[n++] = "SESSION: " + (g_sess.active ? "ACTIVE since " +
-               TimeToString(g_sess.start_time, TIME_DATE|TIME_MINUTES) : "none");
-      C[n] = base;
-      L[n++] = "CYCLE " + OM_PanelCycleLine();
+      PanelPush(L, C, n, "HMI v" + HMI_VERSION + "  MARK ONLY - NO ENTRY DECISION", base);
+      PanelPush(L, C, n, "H4 CONTEXT: " + ctx +
+                "   strength " + IntegerToString(g_ctx_strength) +
+                (g_ctx_messy ? "   quality MESSY" : "   quality CLEAN"),
+                CtxPanelColor(base));
+      PanelPush(L, C, n, "H4 POI: " + IntegerToString(poi_active) + " ACTIVE / " +
+                IntegerToString(g_diag_poi_rejected_gap) + " REJECTED-BY-GAP" +
+                "   |   M5 BLOCK GAP-REJECTED: " + IntegerToString(g_diag_blk_rejected_gap),
+                base);
+      PanelPush(L, C, n, "SESSION: " + (g_sess.active ? "ACTIVE since " +
+                TimeToString(g_sess.start_time, TIME_DATE|TIME_MINUTES) : "none"), base);
+      PanelPush(L, C, n, "CYCLE " + OM_PanelCycleLine(), base);
      }
    else   // PANEL_COMPACT
      {
-      C[n] = CtxPanelColor(base);
-      L[n++] = ctx +
-               "   str " + IntegerToString(g_ctx_strength) +
-               (g_ctx_messy ? " MESSY" : " CLEAN") +
-               "   |   POI " + IntegerToString(poi_active) +
-               "   |   " + (g_sess.active ? "SESSION " +
-               TimeToString(g_sess.start_time, TIME_MINUTES) : "no session");
-      C[n] = base;
-      L[n++] = OM_PanelCycleLine();
+      PanelPush(L, C, n, ctx +
+                "   str " + IntegerToString(g_ctx_strength) +
+                (g_ctx_messy ? " MESSY" : " CLEAN") +
+                "   |   POI " + IntegerToString(poi_active) +
+                "   |   " + (g_sess.active ? "SESSION " +
+                TimeToString(g_sess.start_time, TIME_MINUTES) : "no session"),
+                CtxPanelColor(base));
+      PanelPush(L, C, n, OM_PanelCycleLine(), base);
      }
 
-   if(InpShowATR && n < MAX_PANEL_ROWS) { C[n] = base;                   L[n++] = RangesATRText(); }
-   if(InpShowADR && n < MAX_PANEL_ROWS) { C[n] = RangesADRColor(base);   L[n++] = RangesADRText(); }
+   if(InpShowATR) PanelPush(L, C, n, RangesATRText(), base);
+   if(InpShowADR) PanelPush(L, C, n, RangesADRText(), RangesADRColor(base));
 
    //--- draw; bottom corners stack upward so reading order is kept ---
    int  step  = TS_PANEL.size + 6;

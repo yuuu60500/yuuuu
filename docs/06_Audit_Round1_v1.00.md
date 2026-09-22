@@ -445,3 +445,51 @@ Confidence:              HIGH（编译器输出为证）
 **教训（值得写进流程）：** `docs/03` 用「引擎互不 include」来在编译期保证
 Rule 30 / 44（模型不互相 Consume）。这条原则是对的，但它把「谁来 include 引擎」
 的责任推给了调用方 —— 而这一点当初没有写进架构文档。已在 docs/03 补充。
+
+---
+
+## Audit Round 3 —— 首次实盘挂载反馈（2026-09-22，USDJPY M5）
+
+### A-17
+```
+ID:                      A-17
+Severity:                P2
+Module:                  HMI_ObjectManager
+Function:                OM_DrawPanel / OM_PanelRow
+Location:                面板行文字
+Trigger:                 一个 Cycle 内确认的模型较多时（本例 5 个）
+Expected Behavior:       整行文字完整显示
+Actual Behavior:         文字在第 62-63 个字符处被硬截断，断在词中间：
+                           "#2940 BULL  CISD OK  MSS OK  BPR OK  PA ENGULFING OK  PA REJE"
+                         同一面板上 57 字符的 ADR 行与 49 字符的 Context 行完整显示，
+                         定位出原因是 **MT5 的 OBJPROP_TEXT 在 63 字符处截断**。
+                         PANEL_FULL 的诊断行（约 68 字符）同样受影响。
+Impact:                  信息丢失且无提示。最容易被截掉的恰恰是排在后面的
+                         PA REJECTION / PA BREAK-RETEST 状态
+Historical Repaint:      NO
+Future Leak:             NO
+Business Logic Impact:   NO（纯显示）
+Recommended Fix:         PanelPush()：超过 58 字符按**词边界**折行，
+                         长行变成两行可读文本而不是被静默切断
+Status:                  FIXED — v2.03
+Confidence:              HIGH（两张独立截图断在同一位置，且同面板短行正常）
+```
+
+**这条只能靠实跑发现。** 静态阅读无法得知 MT5 对 `OBJPROP_TEXT` 有长度上限。
+
+### 本轮同时验证通过的项目（首次获得实测证据）
+
+| 项目 | 证据 |
+|------|------|
+| Break margin（BRI-03 / D-6） | USDJPY 3 位报价：`0.003 price / 3 points`，未退化为 0 |
+| ADR（D-9） | `ADR(20): 134.6 pip / today 95.0 pip (71%) / left 39.6 pip`；首次显示 n/a 是 D1 历史未下载，属预期 |
+| Kill Zone（D-8） | ASIA / LONDON / NY AM 三组 HIGH+LOW 全部绘制，带标签，**无时段矩形** |
+| 完整名称（Rule 61） | `▲ CISD` / `▲ BPR` / `▲ PA REJECTION` / `▲ PA BREAK-RETEST`，无 C/M/B 缩写 |
+| ▲▼ 字形 | `\x25B2` 转义在 Arial 下渲染正常 |
+| ARMED（Rule 13） | 多个 `M5 OB ARMED` 标签，各自对应一个 M5 Block 矩形 |
+| Level 线（Rule 24 / 62） | 多条 `CISD Level`，自 reference 时间画至确认后 |
+| Cycle 隔离（Rule 14 / 43） | 每个 ARMED 之后跟随其自身的 `▲ CISD`，未见单 Cycle 重复同模型 |
+
+> 以上属于**目视确认**，不等于 `docs/04` 的用例通过。
+> Rule 71 / 72 要求的逐根 Replay 与 Reload 对比仍未执行，
+> 因此验收表中相关项仍为 NOT VERIFIED。
