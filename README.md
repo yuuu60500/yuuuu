@@ -77,7 +77,7 @@ H4 Context
 | Phase 2 — Conflict Resolution / Business Rule Sign-off | **COMPLETE** (D-1..D-7 signed off 2026-09-22) |
 | Phase 3 — MQL5 Implementation | **COMPLETE** (v1.00, ~2560 lines) |
 | Phase 4 — Audit (P0–P3) | **ROUND 2** (7 fixed, 5 potential risks, 1 confirmed bug A-16) |
-| Phase 5 — MetaEditor Compile | **NOT COMPILE VERIFIED** |
+| Phase 5 — MetaEditor Compile | **PASS** — 0 errors / 0 warnings (v2.02, 2026-09-22) |
 | Phase 6 — Visual Replay / Repaint Test | **NOT VERIFIED** |
 
 ## 源码
@@ -111,6 +111,7 @@ MQL5/Indicators/HMI/             <- 整个指标就这一个文件夹
 安装：把 `MQL5/Indicators/HMI` **整个文件夹**复制到 MT5 数据文件夹的 `MQL5\Indicators\` 下，
 挂在 **M5** 图表上。**不需要动 `Include` 目录。**
 
-> **NOT COMPILE VERIFIED** —— 本仓库的代码从未经过 MetaEditor 编译，
-> 也从未在 MT5 上跑过 Replay。任何"0 Errors / 0 Warnings"或"Replay PASS"的说法
-> 都必须由真实运行结果支撑（Rule 70 / 71 / 72）。
+> **编译状态：PASS**（v2.02，2026-09-22，MetaEditor 实测 0 errors / 0 warnings）。
+> **Replay 状态：NOT VERIFIED** —— 编译通过只证明语法与类型正确，
+> 不证明任何一条业务规则被正确实现。`docs/04` 的全部用例仍未执行，
+> 任何"Replay PASS"的说法都必须由真实运行结果支撑（Rule 71 / 72）。

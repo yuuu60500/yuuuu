@@ -501,5 +501,11 @@ Trading Logic Changed:
   NO —— 缺的是编译可见性，不是实现。CISD / MSS 的代码本身一行未动。
 
 Compile Status:
-  NOT COMPILE VERIFIED（本次修复后尚未由用户实际编译验证）
+  **PASS —— 2026-09-22 用户在 MetaEditor 实测 0 errors, 0 warnings。**
+  这是本项目第一次达成 Rule 70 的目标，A-09 就此关闭。
+  达成路径：v2.01 修打包（两目录 -> 单目录）、v2.02 修 A-16（缺 include）。
+
+Replay Status:
+  NOT VERIFIED —— 编译通过只证明语法与类型正确，
+  不证明任何一条业务规则被正确实现。docs/04 全部用例仍未执行。
 ```

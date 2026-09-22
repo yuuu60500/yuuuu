@@ -251,8 +251,12 @@ Future Leak:             N/A
 Business Logic Impact:   NO
 Recommended Fix:         用户在 MetaEditor 编译并回报完整错误/告警列表，
                          按 Rule 68（一次一个）修复
-Status:                  NOT COMPILE VERIFIED
-Confidence:              HIGH（对"未验证"这一事实本身）
+Status:                  **RESOLVED — 2026-09-22，v2.02 在 MetaEditor 编译通过
+                         0 errors, 0 warnings（用户实测）**
+                         过程中共暴露 2 个真实缺陷：
+                           - 打包问题（v2.01：尖括号 include 需要拆两个目录）
+                           - A-16（v2.02：CISD / MSS 引擎从未进入编译单元）
+Confidence:              HIGH（编译器输出为证）
 ```
 
 ### A-10
@@ -320,9 +324,10 @@ MSS:                   NOT VERIFIED
 BPR:                   NOT VERIFIED
 PA:                    NOT VERIFIED
 Object Management:     PASS (static) / NOT VERIFIED (replay)
+                       注：编译通过只证明语法与类型，不证明任何行为
 Multi-instance:        PASS (static) / NOT VERIFIED (replay)
 Historical vs Live:    NOT VERIFIED
-MetaEditor:            NOT COMPILE VERIFIED
+MetaEditor:            PASS          (v2.02, 0 errors / 0 warnings, 2026-09-22)
 Replay:                NOT VERIFIED
 ```
 
