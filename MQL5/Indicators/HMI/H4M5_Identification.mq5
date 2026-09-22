@@ -9,7 +9,7 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "2.04"
+#property version   "2.10"
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window

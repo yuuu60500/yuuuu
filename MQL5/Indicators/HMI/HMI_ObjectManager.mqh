@@ -132,7 +132,8 @@ void OM_Trim()
 
 //--- primitives -----------------------------------------------------
 void OM_Rect(const string name, const datetime t1, const double p1,
-             const datetime t2, const double p2, const StyleZone &st)
+             const datetime t2, const double p2, const StyleZone &st,
+             const int tf_mask = OBJ_ALL_PERIODS)
   {
    if(!ObjectCreate(0, name, OBJ_RECTANGLE, 0, t1, p1, t2, p2))
      {
@@ -145,12 +146,14 @@ void OM_Rect(const string name, const datetime t1, const double p1,
    ObjectSetInteger(0, name, OBJPROP_STYLE, st.style);
    ObjectSetInteger(0, name, OBJPROP_WIDTH, st.width);
    ObjectSetInteger(0, name, OBJPROP_BACK, true);
+   ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, tf_mask);
    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
   }
 
 void OM_Text(const string name, const datetime t, const double p,
-             const string text, const StyleText &st, const ENUM_ANCHOR_POINT anchor)
+             const string text, const StyleText &st, const ENUM_ANCHOR_POINT anchor,
+             const int tf_mask = OBJ_ALL_PERIODS)
   {
    if(!ObjectCreate(0, name, OBJ_TEXT, 0, t, p))
       ObjectMove(0, name, 0, t, p);
@@ -160,12 +163,14 @@ void OM_Text(const string name, const datetime t, const double p,
    ObjectSetInteger(0, name, OBJPROP_FONTSIZE, st.size);
    ObjectSetInteger(0, name, OBJPROP_COLOR, st.clr);
    ObjectSetInteger(0, name, OBJPROP_ANCHOR, anchor);
+   ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, tf_mask);
    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
   }
 
 void OM_Level(const string name, const datetime t1, const datetime t2,
-              const double price, const StyleZone &st)
+              const double price, const StyleZone &st,
+              const int tf_mask = OBJ_ALL_PERIODS)
   {
    if(!ObjectCreate(0, name, OBJ_TREND, 0, t1, price, t2, price))
      {
@@ -177,6 +182,7 @@ void OM_Level(const string name, const datetime t1, const datetime t2,
    ObjectSetInteger(0, name, OBJPROP_STYLE, st.style);
    ObjectSetInteger(0, name, OBJPROP_RAY_RIGHT, false);
    ObjectSetInteger(0, name, OBJPROP_WIDTH, st.width);
+   ObjectSetInteger(0, name, OBJPROP_TIMEFRAMES, tf_mask);
    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
   }
@@ -447,7 +453,7 @@ void OM_SyncAll()
         }
 
    //--- M5 blocks ---------------------------------------------------
-   if(InpShowM5Blocks)
+   if(InpShowM5Blocks && M5LayerOn())
       for(int i = 0; i < g_blk_n; i++)
         {
          if(!InpShowCounterDirBlocks && g_blk[i].counter_dir) continue;
@@ -457,12 +463,13 @@ void OM_SyncAll()
          StyleZone bst = BlockStyleOf(g_blk[i]);
          datetime t2 = dead ? (g_blk[i].invalid_time > 0 ? g_blk[i].invalid_time : redge) : redge;
          OM_Rect(OM_Name(TT_BLK, g_blk[i].id, 0), g_blk[i].origin_time, g_blk[i].hi,
-                 t2, g_blk[i].lo, bst);
+                 t2, g_blk[i].lo, bst, M5LayerMask());
          g_blk[i].vis = vis;
         }
 
    //--- cycles: ARMED label, models, levels -------------------------
-   for(int ci = 0; ci < g_cyc_n; ci++)
+   int m5mask = M5LayerMask();
+   for(int ci = 0; ci < g_cyc_n && M5LayerOn(); ci++)
      {
       IdentificationCycle cy = g_cyc[ci];
       double off = InpLabelStackOffsetPips * PipSize();
@@ -472,7 +479,7 @@ void OM_SyncAll()
          string txt = (cy.anchor_type == BT_M5_OB ? "M5 OB ARMED" : "M5 BREAKER ARMED");
          double p   = (cy.dir == DIR_BULL ? cy.anchor_lo - off : cy.anchor_hi + off);
          OM_Text(OM_Name(TT_ARM, cy.cycle_id, 0), cy.armed_time, p, txt, TS_ARMED,
-                 cy.dir == DIR_BULL ? ANCHOR_UPPER : ANCHOR_LOWER);
+                 cy.dir == DIR_BULL ? ANCHOR_UPPER : ANCHOR_LOWER, m5mask);
          cy.drawn_mask |= (1 << 6);
         }
 
@@ -494,7 +501,7 @@ void OM_SyncAll()
          OM_Text(OM_Name(TT_MDL, cy.cycle_id, m), cy.cfm_time[m], p,
                  DirGlyph(cy.dir) + " " + ModelName(m),
                  ModelStyleOf(m, cy.dir),
-                 cy.dir == DIR_BULL ? ANCHOR_UPPER : ANCHOR_LOWER);
+                 cy.dir == DIR_BULL ? ANCHOR_UPPER : ANCHOR_LOWER, m5mask);
          cy.drawn_mask |= (1 << m);
         }
 
@@ -503,9 +510,9 @@ void OM_SyncAll()
         {
          datetime t2 = cy.cfm_time[MDL_CISD] + (datetime)((long)InpLevelLineExtendBars * PeriodSeconds(PERIOD_M5));
          OM_Level(OM_Name(TT_LVL, cy.cycle_id, 0), cy.cisd_ref_time, t2, cy.cisd_level,
-                  ZS_CISD_LINE);
+                  ZS_CISD_LINE, m5mask);
          OM_Text(OM_Name(TT_LVL, cy.cycle_id, 1), t2, cy.cisd_level, "CISD Level",
-                 TS_LEVEL, ANCHOR_LEFT);
+                 TS_LEVEL, ANCHOR_LEFT, m5mask);
          cy.drawn_mask |= (1 << 7);
         }
       if(InpShowLevelLines && InpShowMSS && cy.result[MDL_MSS] == MR_CONFIRMED &&
@@ -513,16 +520,16 @@ void OM_SyncAll()
         {
          datetime t2 = cy.cfm_time[MDL_MSS] + (datetime)((long)InpLevelLineExtendBars * PeriodSeconds(PERIOD_M5));
          OM_Level(OM_Name(TT_LVL, cy.cycle_id, 2), cy.mss_ref_time, t2, cy.mss_level,
-                  ZS_MSS_LINE);
+                  ZS_MSS_LINE, m5mask);
          OM_Text(OM_Name(TT_LVL, cy.cycle_id, 3), t2, cy.mss_level, "MSS Break Level",
-                 TS_LEVEL, ANCHOR_LEFT);
+                 TS_LEVEL, ANCHOR_LEFT, m5mask);
          cy.drawn_mask |= (1 << 8);
         }
       g_cyc[ci] = cy;
      }
 
    //--- BPR zones ---------------------------------------------------
-   if(InpShowBPR)
+   if(InpShowBPR && M5LayerOn())
       for(int i = 0; i < g_bpr_n; i++)
         {
          int vis = (g_bpr[i].state == ZS_INVALID ? 2 : (g_bpr[i].state == ZS_TOUCHED ? 1 : 0));
@@ -530,7 +537,7 @@ void OM_SyncAll()
          StyleZone pst = BPRStyleOf(g_bpr[i]);
          datetime t2 = (vis == 2 && g_bpr[i].invalid_time > 0 ? g_bpr[i].invalid_time : redge);
          OM_Rect(OM_Name(TT_BPR, g_bpr[i].id, 0), g_bpr[i].formation_time, g_bpr[i].hi,
-                 t2, g_bpr[i].lo, pst);
+                 t2, g_bpr[i].lo, pst, m5mask);
          g_bpr[i].vis = vis;
         }
   }
@@ -540,7 +547,7 @@ void OM_Preview()
   {
    string nm = OM_Name(TT_PRV, 0, 0);
    ObjectDelete(0, nm);
-   if(!g_sess.active) return;
+   if(!g_sess.active || !M5LayerOn()) return;
    double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    if(bid <= 0.0) return;
    for(int i = 0; i < g_blk_n; i++)
@@ -551,7 +558,7 @@ void OM_Preview()
       datetime t0 = iTime(_Symbol, PERIOD_M5, 0);
       OM_Text(nm, t0, (g_blk[i].dir == DIR_BULL ? g_blk[i].lo - off : g_blk[i].hi + off),
               "PENDING TOUCH", TS_PREVIEW,
-              g_blk[i].dir == DIR_BULL ? ANCHOR_UPPER : ANCHOR_LOWER);
+              g_blk[i].dir == DIR_BULL ? ANCHOR_UPPER : ANCHOR_LOWER, M5LayerMask());
       return;
      }
   }

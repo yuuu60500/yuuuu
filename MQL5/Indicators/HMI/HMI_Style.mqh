@@ -12,6 +12,11 @@
 #include "HMI_Defs.mqh"
 
 //================== fonts / panel ==================================
+input group "=== Display layers ==="
+input M5LayerVis InpM5Layer = M5LAYER_UPTO_M15;   // M5 blocks / ARMED / CISD / MSS / BPR / PA
+                                                  // H4 POI, trading range, liquidity and kill
+                                                  // zones are never hidden by this
+
 input group "=== Style: font & panel ==="
 input string InpFontName          = "Arial";       // font for every text object
 input PanelMode       InpPanelMode   = PANEL_COMPACT;      // OFF / COMPACT / FULL
@@ -208,6 +213,19 @@ void StylesInit()
    SetT(TS_LEVEL,   InpLevelTextColor, InpLevelTextSize);
    SetT(TS_PANEL,   InpPanelColor,     InpPanelFontSize);
    SetT(TS_PREVIEW, InpPreviewColor,   InpPreviewTextSize);
+  }
+
+bool M5LayerOn() { return(InpM5Layer != M5LAYER_OFF); }
+
+int M5LayerMask()
+  {
+   switch(InpM5Layer)
+     {
+      case M5LAYER_M5_ONLY:  return(OBJ_PERIOD_M5);
+      case M5LAYER_UPTO_M15: return(OBJ_PERIOD_M1 | OBJ_PERIOD_M5 | OBJ_PERIOD_M15);
+      case M5LAYER_ALWAYS:   return(OBJ_ALL_PERIODS);
+     }
+   return(OBJ_NO_PERIODS);
   }
 
 // the context row reads as a direction at a glance, without parsing text

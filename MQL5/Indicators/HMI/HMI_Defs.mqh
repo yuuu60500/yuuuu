@@ -6,7 +6,7 @@
 #ifndef HMI_DEFS_MQH
 #define HMI_DEFS_MQH
 
-#define HMI_VERSION      "2.04"
+#define HMI_VERSION      "2.10"
 #define HMI_PREFIX       "HMI"
 
 //--- direction ------------------------------------------------------
@@ -78,6 +78,17 @@ enum SessionEnd
   };
 
 enum MarginMode { MARGIN_PIPS, MARGIN_POINTS, MARGIN_ATR_FRAC };   // D-6
+
+// Which chart periods the M5 detail layer is visible on. Uses MT5's own
+// OBJPROP_TIMEFRAMES, so one instance stays readable on an H4 chart without
+// touching a single display switch.
+enum M5LayerVis
+  {
+   M5LAYER_OFF,       // never drawn
+   M5LAYER_M5_ONLY,   // only on an M5 chart
+   M5LAYER_UPTO_M15,  // M1 / M5 / M15
+   M5LAYER_ALWAYS     // every period (pre-v2.10 behaviour)
+  };
 
 enum PanelMode
   {

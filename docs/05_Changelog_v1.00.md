@@ -576,3 +576,46 @@ Trading Logic Changed:
 Compile Status:
   PASS 于 v2.02；v2.04 与其等价，但仍需你重新编译确认。
 ```
+
+---
+
+## v2.10 — Minor Feature：M5 层按图表周期自动隐藏
+
+```
+Version:  v2.10
+Date:     2026-09-22
+
+Changed Functions:
+  M5LayerOn / M5LayerMask   新增（HMI_Style.mqh）
+  OM_Rect / OM_Text / OM_Level
+                            新增可选参数 tf_mask，写入 OBJPROP_TIMEFRAMES
+                            默认 OBJ_ALL_PERIODS，行为不变
+  OM_SyncAll / OM_Preview   M5 层的绘制点传入 M5LayerMask()
+
+New input:
+  InpM5Layer = M5LAYER_UPTO_M15    （默认值改变了显示行为）
+     M5LAYER_OFF        完全不画
+     M5LAYER_M5_ONLY    只在 M5 图上显示
+     M5LAYER_UPTO_M15   M1 / M5 / M15 显示   ← 默认
+     M5LAYER_ALWAYS     所有周期（v2.04 及之前的行为）
+
+属于 M5 层的对象：
+  M5 Block 矩形 / M5 OB ARMED 标签 / 六个模型标记 /
+  CISD Level 与 MSS Break Level 线 / BPR 矩形 / PENDING TOUCH 预览
+
+不受影响、任何周期都显示：
+  H4 POI / Trading Range / Liquidity / Kill Zone HIGH-LOW / 面板
+
+Reason:
+  用户把指标挂到 H4 图上，M5 标记全部压成一团不可读
+  （H4 每根 4 小时宽，数天的 M5 标记挤进几十根 K 线）。
+  用 MT5 原生的 OBJPROP_TIMEFRAMES 解决，比再加一堆开关好：
+  同一个实例挂在 H4 上自动只剩 POI + Kill Zone + 面板，
+  切回 M5 细节层自动回来，不需要手动切换任何开关。
+
+Trading Logic Changed:
+  NO —— 纯显示层。对象是否绘制不影响任何内部状态或标记记录。
+
+Compile Status:
+  PASS 于 v2.02；v2.10 尚未编译验证。
+```

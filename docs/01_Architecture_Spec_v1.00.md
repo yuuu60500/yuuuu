@@ -1614,6 +1614,7 @@ ChartRedraw() 每次 OnCalculate 最多调用一次
 
 | 参数 | 默认 |
 |------|------|
+| `InpM5Layer` | **M5LAYER_UPTO_M15**（v2.10）：M5 细节层只在 M1/M5/M15 图表显示 |
 | `InpPanelMode` / `InpPanelCorner` | **PANEL_COMPACT** / CORNER_LEFT_UPPER（v1.31） |
 | `InpShowH4POI` / `InpShowTradingRange` / `InpShowLiquidity` | true / true / **true** |
 | `InpShowM5Blocks` / `InpShowArmedLabel` | true / true |
