@@ -181,14 +181,16 @@ void OM_Level(const string name, const datetime t1, const datetime t2,
    ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
   }
 
-void OM_Panel(const int line, const string text)
+void OM_PanelRow(const int row, const string text, const int ypix)
   {
-   string name = OM_Name(TT_CTX, 0, line);
+   string name = OM_Name(TT_CTX, 0, row);
    if(!ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0)) { }
    else OM_Register(name);
-   ObjectSetInteger(0, name, OBJPROP_CORNER, CORNER_LEFT_UPPER);
+   bool right = (InpPanelCorner == CORNER_RIGHT_UPPER || InpPanelCorner == CORNER_RIGHT_LOWER);
+   ObjectSetInteger(0, name, OBJPROP_CORNER, InpPanelCorner);
+   ObjectSetInteger(0, name, OBJPROP_ANCHOR, right ? ANCHOR_RIGHT_UPPER : ANCHOR_LEFT_UPPER);
    ObjectSetInteger(0, name, OBJPROP_XDISTANCE, InpPanelX);
-   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, InpPanelY + line * (TS_PANEL.size + 6));
+   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, ypix);
    ObjectSetString(0, name, OBJPROP_TEXT, text);
    ObjectSetString(0, name, OBJPROP_FONT, InpFontName);
    ObjectSetInteger(0, name, OBJPROP_FONTSIZE, TS_PANEL.size);
@@ -197,7 +199,7 @@ void OM_Panel(const int line, const string text)
    ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
   }
 
-int g_panel_line = 0;         // running panel row, so any block can be off
+#define MAX_PANEL_ROWS 12
 
 //================== kill zone levels (display only) =================
 #define MAX_KZ_DRAWN 64
@@ -293,6 +295,89 @@ int BlkVis(const M5Block &b)
    return(1);
   }
 
+//--- panel text ----------------------------------------------------
+// COMPACT keeps only what you cannot read off the chart:
+//   - the context direction (and therefore whether anything can appear)
+//   - which models in this cycle have fired, and which are N/A
+//     (N/A means "no reference was frozen, it will never fire" - that is
+//      invisible on the chart, so it is the one thing worth the pixels)
+// Everything else is diagnostics and lives in FULL.
+string OM_PanelCycleLine()
+  {
+   if(!SafeIdx(g_active_cyc, g_cyc_n)) return("CYCLE: none");
+
+   IdentificationCycle cy = g_cyc[g_active_cyc];
+   string s = "#" + IntegerToString(cy.cycle_id) + " " +
+              (cy.dir == DIR_BULL ? "BULL" : "BEAR");
+   string done = "", na = "";
+   for(int m = 0; m < MDL_COUNT; m++)
+     {
+      if(cy.result[m] == MR_CONFIRMED) done += "  " + ModelName(m) + " OK";
+      if(cy.result[m] == MR_NA)        na   += "  " + ModelName(m) + " N/A";
+     }
+   if(done == "" && na == "") s += "   (watching)";
+   else                       s += "  " + done + na;
+   if(cy.anchor_invalidated) s += "   [ANCHOR INVALIDATED]";
+   if(cy.ctx_changed)        s += "   [CTX CHANGED]";
+   return(s);
+  }
+
+void OM_DrawPanel()
+  {
+   if(InpPanelMode == PANEL_OFF) return;
+
+   string L[MAX_PANEL_ROWS];
+   int n = 0;
+
+   int poi_active = 0;
+   for(int i = 0; i < g_poi_n; i++) if(g_poi[i].state == POI_ACTIVE) poi_active++;
+
+   string ctx = CtxName(g_ctx);
+   if(g_ctx == CTX_TRANSITION)
+      ctx += " (pending " + (g_ctx_pending == DIR_BULL ? "UP" : "DOWN") + ")";
+
+   if(InpPanelMode == PANEL_FULL)
+     {
+      L[n++] = "HMI v" + HMI_VERSION + "  MARK ONLY - NO ENTRY DECISION";
+      L[n++] = "H4 CONTEXT: " + ctx +
+               "   strength " + IntegerToString(g_ctx_strength) +
+               (g_ctx_messy ? "   quality MESSY" : "   quality CLEAN");
+      L[n++] = "H4 POI: " + IntegerToString(poi_active) + " ACTIVE / " +
+               IntegerToString(g_diag_poi_rejected_gap) + " REJECTED-BY-GAP" +
+               "   |   M5 BLOCK GAP-REJECTED: " + IntegerToString(g_diag_blk_rejected_gap);
+      L[n++] = "SESSION: " + (g_sess.active ? "ACTIVE since " +
+               TimeToString(g_sess.start_time, TIME_DATE|TIME_MINUTES) : "none");
+      L[n++] = "CYCLE " + OM_PanelCycleLine();
+     }
+   else   // PANEL_COMPACT
+     {
+      L[n++] = ctx +
+               "   str " + IntegerToString(g_ctx_strength) +
+               (g_ctx_messy ? " MESSY" : " CLEAN") +
+               "   |   POI " + IntegerToString(poi_active) +
+               "   |   " + (g_sess.active ? "SESSION " +
+               TimeToString(g_sess.start_time, TIME_MINUTES) : "no session");
+      L[n++] = OM_PanelCycleLine();
+     }
+
+   if(InpShowATR && n < MAX_PANEL_ROWS) L[n++] = RangesATRText();
+   if(InpShowADR && n < MAX_PANEL_ROWS) L[n++] = RangesADRText();
+
+   //--- draw; bottom corners stack upward so reading order is kept ---
+   int  step  = TS_PANEL.size + 6;
+   bool lower = (InpPanelCorner == CORNER_LEFT_LOWER || InpPanelCorner == CORNER_RIGHT_LOWER);
+   for(int i = 0; i < n; i++)
+      OM_PanelRow(i, L[i], InpPanelY + (lower ? (n - 1 - i) : i) * step);
+
+   //--- drop rows left over from a longer panel ---------------------
+   for(int i = n; i < MAX_PANEL_ROWS; i++)
+     {
+      string nm = OM_Name(TT_CTX, 0, i);
+      ObjectDelete(0, nm);
+      OM_Unregister(nm);
+     }
+  }
+
 //====================== full sync ===================================
 void OM_SyncAll()
   {
@@ -301,49 +386,7 @@ void OM_SyncAll()
    OM_SyncKillZones();
    RangesUpdate();                       // panel metrics only (ATR / ADR)
 
-   //--- context panel ----------------------------------------------
-   g_panel_line = 0;
-   if(InpShowH4Context)
-     {
-      string s1 = "H4 CONTEXT: " + CtxName(g_ctx) +
-                  (g_ctx == CTX_TRANSITION ? " (pending " + (g_ctx_pending == DIR_BULL ? "UP" : "DOWN") + ")" : "") +
-                  "   strength " + IntegerToString(g_ctx_strength) +
-                  (g_ctx_messy ? "   quality MESSY" : "   quality CLEAN");
-      int act = 0;
-      for(int i = 0; i < g_poi_n; i++) if(g_poi[i].state == POI_ACTIVE) act++;
-      string s2 = "H4 POI: " + IntegerToString(act) + " ACTIVE / " +
-                  IntegerToString(g_diag_poi_rejected_gap) + " REJECTED-BY-GAP" +
-                  "   |   M5 BLOCK GAP-REJECTED: " + IntegerToString(g_diag_blk_rejected_gap);
-      string s3 = "SESSION: " + (g_sess.active ? "ACTIVE since " +
-                  TimeToString(g_sess.start_time, TIME_DATE|TIME_MINUTES) : "none");
-      string s4 = "CYCLE: none";
-      if(SafeIdx(g_active_cyc, g_cyc_n))
-        {
-         IdentificationCycle cy = g_cyc[g_active_cyc];
-         string st = "";
-         for(int m = 0; m < MDL_COUNT; m++)
-           {
-            string tagm = ModelName(m) + "=";
-            if(cy.result[m] == MR_CONFIRMED) tagm += "OK";
-            else if(cy.result[m] == MR_NA)   tagm += "N/A";
-            else if(cy.result[m] == MR_PASS) tagm += "PASS";
-            else                             tagm += "-";
-            st += tagm + " ";
-           }
-         s4 = "CYCLE #" + IntegerToString(cy.cycle_id) + " " +
-              (cy.dir == DIR_BULL ? "BULL" : "BEAR") + "  " + st +
-              (cy.anchor_invalidated ? " [ANCHOR INVALIDATED]" : "") +
-              (cy.ctx_changed ? " [CTX CHANGED DURING CYCLE]" : "");
-        }
-      OM_Panel(g_panel_line++, "HMI v" + HMI_VERSION + "  MARK ONLY - NO ENTRY DECISION");
-      OM_Panel(g_panel_line++, s1);
-      OM_Panel(g_panel_line++, s2);
-      OM_Panel(g_panel_line++, s3);
-      OM_Panel(g_panel_line++, s4);
-     }
-
-   if(InpShowATR) OM_Panel(g_panel_line++, RangesATRText());
-   if(InpShowADR) OM_Panel(g_panel_line++, RangesADRText());
+   OM_DrawPanel();
 
    //--- trading range ----------------------------------------------
    if(InpShowTradingRange && g_tr_n > 0)

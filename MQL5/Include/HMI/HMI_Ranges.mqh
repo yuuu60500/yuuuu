@@ -16,7 +16,7 @@
 #include "HMI_Series.mqh"
 
 input group "=== Panel: ATR / ADR ==="
-input bool InpShowATR    = true;
+input bool InpShowATR    = false;  // ambient info; off by default to keep the panel short
 input bool InpShowADR    = true;
 input int  InpADRDays    = 20;    // closed days averaged for ADR
 

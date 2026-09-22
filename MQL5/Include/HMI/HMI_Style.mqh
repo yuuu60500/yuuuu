@@ -14,6 +14,8 @@
 //================== fonts / panel ==================================
 input group "=== Style: font & panel ==="
 input string InpFontName          = "Arial";       // font for every text object
+input PanelMode       InpPanelMode   = PANEL_COMPACT;      // OFF / COMPACT / FULL
+input ENUM_BASE_CORNER InpPanelCorner = CORNER_LEFT_UPPER;
 input int    InpPanelX            = 10;
 input int    InpPanelY            = 18;
 input color  InpPanelColor        = clrWhite;

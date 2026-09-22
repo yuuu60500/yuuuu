@@ -6,7 +6,7 @@
 #ifndef HMI_DEFS_MQH
 #define HMI_DEFS_MQH
 
-#define HMI_VERSION      "1.30"
+#define HMI_VERSION      "1.31"
 #define HMI_PREFIX       "HMI"
 
 //--- direction ------------------------------------------------------
@@ -78,6 +78,13 @@ enum SessionEnd
   };
 
 enum MarginMode { MARGIN_PIPS, MARGIN_POINTS, MARGIN_ATR_FRAC };   // D-6
+
+enum PanelMode
+  {
+   PANEL_OFF,        // no panel at all
+   PANEL_COMPACT,    // 2 lines (+ ADR / ATR if enabled)
+   PANEL_FULL        // every diagnostic line
+  };
 
 //--- structs --------------------------------------------------------
 struct HSwing

@@ -312,3 +312,44 @@ Compile Status:
 Replay Status:
   NOT VERIFIED
 ```
+
+---
+
+## v1.31 — 面板瘦身（COMPACT 模式）
+
+```
+Version:  v1.31
+Date:     2026-09-22
+
+Changed Functions:
+  OM_Panel            -> OM_PanelRow   改为接收显式 y 像素 + 支持四个角
+  OM_DrawPanel        新增：先把行收集进数组，再按角落方向决定绘制顺序
+  OM_PanelCycleLine   新增：只列「已成立」与「N/A」的模型，pending 不占字
+  OM_SyncAll          面板段整体抽出，只剩一行 OM_DrawPanel()
+
+Changed States:
+  无。删除绘图层变量 g_panel_line（被行数组取代）
+
+New / changed inputs:
+  InpPanelMode      新增  PANEL_OFF / PANEL_COMPACT / PANEL_FULL，默认 COMPACT
+  InpPanelCorner    新增  四个角可选，默认左上
+  InpShowATR        默认 true -> false
+  InpShowH4Context  删除（被 InpPanelMode 取代，否则会变成第二个死参数）
+
+Reason:
+  用户反馈 7 行面板太占图。COMPACT 只保留两样东西：
+    1) Context 方向（决定当下是否可能出现任何东西）
+    2) 当前 Cycle 里哪些模型已成立、哪些是 N/A
+  其中 N/A 是唯一无法从图上读出的信息（没有冻结到参考 = 该模型本轮永不会出现），
+  所以它最值得占像素。其余（标题行、POI/Gap 诊断行、SESSION 行）属于诊断，
+  移入 PANEL_FULL。
+
+Trading Logic Changed:
+  NO —— 纯显示层。
+
+Compile Status:
+  NOT COMPILE VERIFIED
+
+Replay Status:
+  NOT VERIFIED
+```

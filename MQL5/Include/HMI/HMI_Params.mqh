@@ -52,7 +52,6 @@ input int    InpPABreakRetestMaxBars  = 12;
 input double InpPARetestTolerancePips = 0.5;
 
 input group "=== Display ==="
-input bool   InpShowH4Context         = true;
 input bool   InpShowH4POI             = true;
 input bool   InpShowTradingRange      = true;
 input bool   InpShowLiquidity         = true;

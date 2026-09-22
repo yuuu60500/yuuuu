@@ -1614,7 +1614,8 @@ ChartRedraw() 每次 OnCalculate 最多调用一次
 
 | 参数 | 默认 |
 |------|------|
-| `InpShowH4Context` / `InpShowH4POI` / `InpShowTradingRange` / `InpShowLiquidity` | true / true / true / false |
+| `InpPanelMode` / `InpPanelCorner` | **PANEL_COMPACT** / CORNER_LEFT_UPPER（v1.31） |
+| `InpShowH4POI` / `InpShowTradingRange` / `InpShowLiquidity` | true / true / **true** |
 | `InpShowM5Blocks` / `InpShowArmedLabel` | true / true |
 | `InpShowCounterDirBlocks` | false |  <!-- Breaker 原料（逆势 OB），见 CONF-06 -->
 | `InpShowRejectedOB` | false |  <!-- 被 Gap 否决的 OB 诊断显示，见 BRI-04 -->
