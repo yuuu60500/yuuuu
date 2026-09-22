@@ -327,7 +327,8 @@ Object Management:     PASS (static) / NOT VERIFIED (replay)
                        注：编译通过只证明语法与类型，不证明任何行为
 Multi-instance:        PASS (static) / NOT VERIFIED (replay)
 Historical vs Live:    NOT VERIFIED
-MetaEditor:            PASS          (v2.02, 0 errors / 0 warnings, 2026-09-22)
+MetaEditor:            PASS          (v2.11, 0 errors / 0 warnings, 2026-09-22)
+                       注：v2.04 / v2.10 因 A-19 实际不可编译，已于 v2.11 修复并复验
 Replay:                NOT VERIFIED
 ```
 
@@ -539,7 +540,9 @@ Historical Repaint:      NO
 Future Leak:             NO
 Business Logic Impact:   NO
 Recommended Fix:         恢复四行声明
-Status:                  FIXED — v2.11
+Status:                  **FIXED & VERIFIED — v2.11 编译通过 0 errors / 0 warnings
+                         （用户实测，编译清单中 HMI_CISDEngine.mqh 与
+                         HMI_MSSEngine.mqh 均在列，同时复核了 A-16 的修复有效）**
 Confidence:              HIGH
 ```
 

@@ -76,8 +76,8 @@ H4 Context
 | Phase 1 — Architecture & Logic Specification | **COMPLETE** |
 | Phase 2 — Conflict Resolution / Business Rule Sign-off | **COMPLETE** (D-1..D-7 signed off 2026-09-22) |
 | Phase 3 — MQL5 Implementation | **COMPLETE** (v1.00, ~2560 lines) |
-| Phase 4 — Audit (P0–P3) | **ROUND 3** (7 fixed, 5 potential risks, 1 withdrawn; A-16 为实测确认) |
-| Phase 5 — MetaEditor Compile | **PASS at v2.02**；v2.04 / v2.10 因 A-19 实际编译不过，v2.11 已修但**待重新验证** |
+| Phase 4 — Audit (P0–P3) | **ROUND 4** (10 fixed, 5 potential risks, 1 withdrawn) |
+| Phase 5 — MetaEditor Compile | **PASS** — v2.11, 0 errors / 0 warnings (2026-09-22) |
 | Phase 6 — Visual Replay / Repaint Test | **NOT VERIFIED**（已完成首次目视挂载确认，见 docs/06 Round 3） |
 
 ## 源码

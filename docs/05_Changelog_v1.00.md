@@ -654,6 +654,7 @@ Trading Logic Changed:
   NO
 
 Compile Status:
-  NOT COMPILE VERIFIED —— v2.04 与 v2.10 实际上是坏的，
-  本版修复后必须重新 F7 确认。
+  **PASS —— 2026-09-22 用户实测 0 errors, 0 warnings（2856 ms）。**
+  编译清单中 HMI_CISDEngine.mqh 与 HMI_MSSEngine.mqh 均在列，
+  同时复核了 A-16 的修复确实生效。
 ```
