@@ -19,6 +19,10 @@ input group "=== Panel: ATR / ADR ==="
 input bool InpShowATR    = false;  // ambient info; off by default to keep the panel short
 input bool InpShowADR    = true;
 input int  InpADRDays    = 20;    // closed days averaged for ADR
+input double InpADRWarnPct    = 80.0;          // % of ADR consumed -> warn colour
+input double InpADRExhaustPct = 100.0;         // % consumed -> exhausted colour
+input color  InpADRWarnColor    = clrOrange;
+input color  InpADRExhaustColor = clrRed;
 
 double   g_adr          = 0.0;    // average daily range, price units
 int      g_adr_samples  = 0;
@@ -74,20 +78,36 @@ string RangesATRText()
    return(s);
   }
 
+// single source of truth, so the text and the colour can never disagree
+double RangesADRUsedPct()
+  {
+   if(!g_adr_ok || g_adr <= 0.0) return(-1.0);
+   return(100.0 * g_today_range / g_adr);
+  }
+
+color RangesADRColor(const color fallback)
+  {
+   double p = RangesADRUsedPct();
+   if(p < 0.0)                  return(fallback);
+   if(p >= InpADRExhaustPct)    return(InpADRExhaustColor);
+   if(p >= InpADRWarnPct)       return(InpADRWarnColor);
+   return(fallback);
+  }
+
 string RangesADRText()
   {
-   if(!g_adr_ok || g_adr <= 0.0)
+   double used_pct = RangesADRUsedPct();
+   if(used_pct < 0.0)
       return("ADR(" + IntegerToString(InpADRDays) + "): n/a");
 
-   double used_pct = 100.0 * g_today_range / g_adr;
-   double left     = g_adr - g_today_range;
+   double left = g_adr - g_today_range;
    if(left < 0.0) left = 0.0;
 
    string s = "ADR(" + IntegerToString(g_adr_samples) + "): " + RangesPips(g_adr) + " pip";
    s += "  |  today " + RangesPips(g_today_range) + " pip (";
    s += DoubleToString(used_pct, 0) + "%)";
    s += "  |  left " + RangesPips(left) + " pip";
-   if(used_pct >= 100.0) s += "  [EXHAUSTED]";
+   if(used_pct >= InpADRExhaustPct) s += "  [EXHAUSTED]";
    return(s);
   }
 

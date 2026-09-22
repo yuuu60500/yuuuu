@@ -18,8 +18,12 @@ input PanelMode       InpPanelMode   = PANEL_COMPACT;      // OFF / COMPACT / FU
 input ENUM_BASE_CORNER InpPanelCorner = CORNER_LEFT_UPPER;
 input int    InpPanelX            = 10;
 input int    InpPanelY            = 18;
-input color  InpPanelColor        = clrWhite;
+input color  InpPanelColor        = clrWhite;      // default row colour
 input int    InpPanelFontSize     = 8;
+input bool   InpPanelColorByContext = true;       // colour the context row by direction
+input color  InpPanelCtxBullColor   = clrLimeGreen;
+input color  InpPanelCtxBearColor   = clrTomato;
+input color  InpPanelCtxRangeColor  = clrSilver;  // RANGE and TRANSITION
 
 //================== H4 POI =========================================
 input group "=== Style: H4 POI zone ==="
@@ -204,6 +208,15 @@ void StylesInit()
    SetT(TS_LEVEL,   InpLevelTextColor, InpLevelTextSize);
    SetT(TS_PANEL,   InpPanelColor,     InpPanelFontSize);
    SetT(TS_PREVIEW, InpPreviewColor,   InpPreviewTextSize);
+  }
+
+// the context row reads as a direction at a glance, without parsing text
+color CtxPanelColor(const color fallback)
+  {
+   if(!InpPanelColorByContext) return(fallback);
+   if(g_ctx == CTX_BULLISH) return(InpPanelCtxBullColor);
+   if(g_ctx == CTX_BEARISH) return(InpPanelCtxBearColor);
+   return(InpPanelCtxRangeColor);              // RANGE / TRANSITION
   }
 
 //--- state -> style resolvers (keeps OM_SyncAll free of ternaries) --

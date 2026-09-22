@@ -181,7 +181,7 @@ void OM_Level(const string name, const datetime t1, const datetime t2,
    ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
   }
 
-void OM_PanelRow(const int row, const string text, const int ypix)
+void OM_PanelRow(const int row, const string text, const int ypix, const color clr)
   {
    string name = OM_Name(TT_CTX, 0, row);
    if(!ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0)) { }
@@ -194,7 +194,7 @@ void OM_PanelRow(const int row, const string text, const int ypix)
    ObjectSetString(0, name, OBJPROP_TEXT, text);
    ObjectSetString(0, name, OBJPROP_FONT, InpFontName);
    ObjectSetInteger(0, name, OBJPROP_FONTSIZE, TS_PANEL.size);
-   ObjectSetInteger(0, name, OBJPROP_COLOR, TS_PANEL.clr);
+   ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
   }
@@ -327,7 +327,9 @@ void OM_DrawPanel()
    if(InpPanelMode == PANEL_OFF) return;
 
    string L[MAX_PANEL_ROWS];
+   color  C[MAX_PANEL_ROWS];
    int n = 0;
+   color base = TS_PANEL.clr;
 
    int poi_active = 0;
    for(int i = 0; i < g_poi_n; i++) if(g_poi[i].state == POI_ACTIVE) poi_active++;
@@ -338,36 +340,43 @@ void OM_DrawPanel()
 
    if(InpPanelMode == PANEL_FULL)
      {
+      C[n] = base;
       L[n++] = "HMI v" + HMI_VERSION + "  MARK ONLY - NO ENTRY DECISION";
+      C[n] = CtxPanelColor(base);
       L[n++] = "H4 CONTEXT: " + ctx +
                "   strength " + IntegerToString(g_ctx_strength) +
                (g_ctx_messy ? "   quality MESSY" : "   quality CLEAN");
+      C[n] = base;
       L[n++] = "H4 POI: " + IntegerToString(poi_active) + " ACTIVE / " +
                IntegerToString(g_diag_poi_rejected_gap) + " REJECTED-BY-GAP" +
                "   |   M5 BLOCK GAP-REJECTED: " + IntegerToString(g_diag_blk_rejected_gap);
+      C[n] = base;
       L[n++] = "SESSION: " + (g_sess.active ? "ACTIVE since " +
                TimeToString(g_sess.start_time, TIME_DATE|TIME_MINUTES) : "none");
+      C[n] = base;
       L[n++] = "CYCLE " + OM_PanelCycleLine();
      }
    else   // PANEL_COMPACT
      {
+      C[n] = CtxPanelColor(base);
       L[n++] = ctx +
                "   str " + IntegerToString(g_ctx_strength) +
                (g_ctx_messy ? " MESSY" : " CLEAN") +
                "   |   POI " + IntegerToString(poi_active) +
                "   |   " + (g_sess.active ? "SESSION " +
                TimeToString(g_sess.start_time, TIME_MINUTES) : "no session");
+      C[n] = base;
       L[n++] = OM_PanelCycleLine();
      }
 
-   if(InpShowATR && n < MAX_PANEL_ROWS) L[n++] = RangesATRText();
-   if(InpShowADR && n < MAX_PANEL_ROWS) L[n++] = RangesADRText();
+   if(InpShowATR && n < MAX_PANEL_ROWS) { C[n] = base;                   L[n++] = RangesATRText(); }
+   if(InpShowADR && n < MAX_PANEL_ROWS) { C[n] = RangesADRColor(base);   L[n++] = RangesADRText(); }
 
    //--- draw; bottom corners stack upward so reading order is kept ---
    int  step  = TS_PANEL.size + 6;
    bool lower = (InpPanelCorner == CORNER_LEFT_LOWER || InpPanelCorner == CORNER_RIGHT_LOWER);
    for(int i = 0; i < n; i++)
-      OM_PanelRow(i, L[i], InpPanelY + (lower ? (n - 1 - i) : i) * step);
+      OM_PanelRow(i, L[i], InpPanelY + (lower ? (n - 1 - i) : i) * step, C[i]);
 
    //--- drop rows left over from a longer panel ---------------------
    for(int i = n; i < MAX_PANEL_ROWS; i++)

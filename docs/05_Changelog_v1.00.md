@@ -353,3 +353,44 @@ Compile Status:
 Replay Status:
   NOT VERIFIED
 ```
+
+---
+
+## v1.32 — 面板按状态变色
+
+```
+Version:  v1.32
+Date:     2026-09-22
+
+Changed Functions:
+  OM_PanelRow          新增 color 参数（不再统一用 TS_PANEL.clr）
+  OM_DrawPanel         行数组旁增加并行的颜色数组
+  CtxPanelColor        新增（HMI_Style.mqh）
+  RangesADRUsedPct     新增（HMI_Ranges.mqh）：文字与颜色的唯一数据来源
+  RangesADRColor       新增（HMI_Ranges.mqh）
+  RangesADRText        改为复用 RangesADRUsedPct()
+
+New inputs:
+  InpPanelColorByContext  true         关掉即退回全面板单色
+  InpPanelCtxBullColor    clrLimeGreen
+  InpPanelCtxBearColor    clrTomato
+  InpPanelCtxRangeColor   clrSilver    RANGE 与 TRANSITION 共用
+  InpADRWarnPct           80.0
+  InpADRExhaustPct        100.0
+  InpADRWarnColor         clrOrange
+  InpADRExhaustColor      clrRed
+
+Reason:
+  用户要求 Context 行按方向变色、ADR 行按消耗度变色。
+  只做这两处 —— 变色在这两行能替代读字，其余行变色只是装饰。
+
+  实现上把「百分比」抽成 RangesADRUsedPct()，让 [EXHAUSTED] 文字与颜色阈值
+  共用同一个计算；否则两边各算一次，改了阈值就会出现「显示红色但没有
+  EXHAUSTED 标记」这类自相矛盾。
+
+Trading Logic Changed:
+  NO —— 纯显示层。
+
+Compile Status:
+  NOT COMPILE VERIFIED
+```
