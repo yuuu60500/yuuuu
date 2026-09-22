@@ -37,6 +37,9 @@ input int    InpM5SwingRight          = 2;
 input int    InpM5RefinementMaxBars   = 288;
 input int    InpM5BlockLookbackFromTouch = 2; // D-3 (was 0)
 input int    InpM5MaxBlocks           = 64;
+input bool   InpEnableBreaker         = false;  // D-10: OFF by default.
+                                                // ON restores Rule 8 / Rule 11 and also
+                                                // re-enables counter-direction OB tracking
 
 input group "=== Identification ==="
 input int    InpCISDLookbackBars      = 12;   // Rule 19

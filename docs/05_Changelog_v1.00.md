@@ -394,3 +394,42 @@ Trading Logic Changed:
 Compile Status:
   NOT COMPILE VERIFIED
 ```
+
+---
+
+## v2.00 — Breaker 开关化，默认关闭
+
+```
+Version:  v2.00
+Date:     2026-09-22
+
+Changed Functions:
+  M5BlocksOnFVG        新增两处 guard：
+                         - 逆势 OB：关闭时直接 return，不再创建
+                         - breaker 匹配循环：关闭时直接 return
+  M5BlockInvalidate    breaker 候选生成加 guard
+  LogPhase7            CSV 新增 anchor_type 列（OB / BREAKER）
+
+Changed States:
+  无新增字段。关闭时 g_brk[] 恒为空，counter_dir 恒为 false
+
+New inputs:
+  InpEnableBreaker = false
+
+Reason:
+  用户裁决 D-10。动机是简化审计面与编译面（A-09 仍未编译），
+  并且 Breaker 在当前 Rule 11 约束下预计极少成立 ——
+  瓶颈是「翻转方向的 FVG 必须与原 OB 区域 Touch/Overlap」，
+  而价格击穿区域后继续位移产生的 FVG 通常落在区域上方，形成正空隙 → INVALID。
+
+Trading Logic Changed:
+  YES —— 默认行为改变，出厂状态不再满足 Rule 8 / Rule 11。
+  已按 Rule 65 出具 BRI-05 并记录 D-10；规则原文保留未改写。
+  InpEnableBreaker = true 即完整恢复。
+
+Compile Status:
+  NOT COMPILE VERIFIED
+
+Replay Status:
+  NOT VERIFIED（新增 BRK-00 与 POI-07b 用例）
+```

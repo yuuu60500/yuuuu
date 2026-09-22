@@ -1,6 +1,6 @@
 # H4 Context → M5 Identification Indicator
 
-**Version:** spec v1.00 (frozen baseline) / code v1.32
+**Version:** spec v1.00 (frozen baseline) / code v2.00
 **Platform:** MetaTrader 5 / MQL5 Custom Indicator
 **Mode:** Trend-Following Only
 **Purpose:** MARK ONLY — Detect / Confirm / Track / Mark / Invalidate
@@ -26,6 +26,10 @@
 ### Rule 2 — 顺势模式
 
 v1.00 只实现 Trend-Following。不实现 Counter-Trend。
+
+> **v2.00 默认值偏离声明：** `InpEnableBreaker = false`，
+> 因此**出厂状态不产生 M5 Breaker Block**，不满足 Rule 8 / Rule 11。
+> 代码实现完整保留，设为 `true` 即恢复。详见 `docs/02` 的 BRI-05 / D-10。
 
 ---
 

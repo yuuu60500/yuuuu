@@ -30,6 +30,7 @@
 | POI-05 Reload | 在 POI-03 之后 Refresh / 切周期 / 重启 MT5 | POI 的 confirm_time / zone / state 完全一致 |
 | POI-06 窗口挤出（A-11） | 连续创建超过 `InpH4MaxPOIs` 个 POI | 最旧的 POI **图形消失**（不是停留在存活样式）；其内部记录仍在且为 `POI_EXPIRED` |
 | POI-07 v1.00 等价性（A-11） | 同一区间跑 v1.00 与 v1.01，导出 CSV | 两份信号日志**逐行完全相同** |
+| POI-07b v2.00 等价性（D-10） | 与 v1.x 对比时**必须先设 `InpEnableBreaker = true`** | 设为 true 后逐行相同；设为 false 时差异应**仅限**于 Breaker 锚定的 Cycle（用 CSV 的 `anchor_type` 列核对） |
 | POI-08 复触默认关闭（A-06） | `InpPOIMaxSessions = 1`，Session 超时后价格回到同一 POI | **不**开启新 Session（与 v1.00 相同） |
 | POI-09 复触开启（A-06） | `InpPOIMaxSessions = 2` | 必须先有一根已关闭 M5 完全脱离 POI 区间，之后再次触碰才开新 Session；价格一直压在区内则**永不**重启 |
 
@@ -48,6 +49,7 @@
 
 | 用例 | 期望 |
 |------|------|
+| BRK-00 开关（D-10） | `InpEnableBreaker = false`（默认）→ 全区间**不得**出现任何 `M5 BREAKER ARMED`，且逆势 M5 OB 一个都不该被创建；设为 true 后以下用例才适用 |
 | BRK-01 原 OB | 逆势方向 M5 OB 被登记但**不 ARMED**（CONF-06） |
 | BRK-02 Break | 收盘突破 + margin → 原 OB INVALIDATED + Breaker Candidate |
 | BRK-03 FVG Connection | 翻转方向 FVG 与 Breaker zone Touch/Overlap → 有效；正空隙 → 无效 |

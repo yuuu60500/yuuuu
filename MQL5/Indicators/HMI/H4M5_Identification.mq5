@@ -9,7 +9,7 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "1.32"
+#property version   "2.00"
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window
@@ -61,8 +61,9 @@ void LogPhase7()
                       : (m == MDL_MSS ? g_cyc[ci].mss_level : 0.0));
          datetime rt = (m == MDL_CISD ? g_cyc[ci].cisd_ref_time
                        : (m == MDL_MSS ? g_cyc[ci].mss_ref_time : 0));
-         PrintFormat("%s,%s,MODEL,%d,%I64d,%I64d,%s,%s,%s,%s,%s",
+         PrintFormat("%s,%s,MODEL,%d,%I64d,%I64d,%s,%s,%s,%s,%s,%s",
                      tag, _Symbol, g_cyc[ci].dir, g_cyc[ci].cycle_id, g_cyc[ci].block_id,
+                     (g_cyc[ci].anchor_type == BT_M5_OB ? "OB" : "BREAKER"),
                      ModelName(m),
                      TimeToString(CloseTimeOf(g_cyc[ci].cfm_time[m], PERIOD_M5), TIME_DATE|TIME_SECONDS),
                      DoubleToString(g_cyc[ci].cfm_price[m], _Digits),

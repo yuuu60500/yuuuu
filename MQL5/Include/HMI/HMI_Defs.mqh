@@ -6,7 +6,7 @@
 #ifndef HMI_DEFS_MQH
 #define HMI_DEFS_MQH
 
-#define HMI_VERSION      "1.32"
+#define HMI_VERSION      "2.00"
 #define HMI_PREFIX       "HMI"
 
 //--- direction ------------------------------------------------------

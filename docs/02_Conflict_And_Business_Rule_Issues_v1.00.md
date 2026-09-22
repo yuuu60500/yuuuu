@@ -510,3 +510,53 @@ PA REJECTION 的确认事件就是 bar A 自身的收盘，而刺入 Block 的�
 > ADR 的用途是回答"今天还剩多少空间"。日波幅消耗接近 100% 时再去追一个远离当日中枢的
 > Setup，赔率通常已经很差 —— 但这个判断**由交易员做**，指标只把数字摆出来（Rule 1）。
 > 若将来想用 ADR 消耗度去过滤信号，必须先按 Rule 65 出 BUSINESS RULE ISSUE。
+
+### BRI-05
+
+```
+BUSINESS RULE ISSUE
+
+Current Rule:
+Rule 8  — M5 Block 至少识别 A. M5 Order Block  B. M5 Breaker Block，两者并列。
+Rule 11 — Breaker Block 必须独立于普通 OB 类型识别，并给出完整的
+          「原 OB 被突破 → 角色转换 → 新方向 FVG Touch/Overlap」链条。
+
+Problem:
+用户要求把 Breaker 做成开关并**默认关闭**。
+默认关闭意味着：指标的出厂行为**不再满足 Rule 8 / Rule 11**。
+代码仍然完整保留 Breaker 实现，把 InpEnableBreaker 设为 true 即可恢复，
+但「默认状态」已经与冻结规则不一致。
+
+Possible Consequence:
+- 默认状态下不会出现任何 M5 BREAKER ARMED，Breaker 相关的 Cycle 全部消失
+- 「失败的 OB 变成反向支撑」这类形态（止损被扫后反转的位置）不再被标记
+- 若日后有人只读 Rule 8 / Rule 11 而不读本条记录，会误以为指标漏实现
+
+Suggested Alternative:
+InpEnableBreaker 默认 true（仅把它做成可关的开关）。
+这样规则不破，想清理图面或简化审计时手动关掉即可。
+
+Would Trading Logic Change:
+YES —— 默认关闭会直接减少信号。
+
+Decision:
+用户于 2026-09-22 明确选择 **默认关闭**，并已被告知上述后果。
+按 Rule 65，规则本身不改写（Rule 8 / Rule 11 原文保留），
+仅记录「默认值偏离规则」这一事实。
+```
+
+### D-10 —— Breaker 开关（2026-09-22，用户裁决）
+
+| 项目 | 裁决 |
+|------|------|
+| 形式 | `InpEnableBreaker`，**默认 false** |
+| 关闭时的行为 | 不生成 Breaker；**连逆势 M5 OB 也不再创建**（它们存在的唯一目的就是喂 Breaker，见 CONF-06），所以关闭路径是真的更省，不是「算了但不显示」 |
+| 代码是否保留 | **保留完整实现**。三个 guard 控制，设为 true 即恢复 Rule 8 / Rule 11 |
+| 版本 | **v2.00**（Rule 74：Business Logic Change）。若默认是 true，这就只是 v1.40 Minor Feature |
+| 新增统计字段 | CSV 日志加 `anchor_type`（OB / BREAKER），供日后评估开关是否值得打开 |
+
+**Trading Logic Changed：YES（默认行为改变，已获用户明确批准）。**
+
+> **对回归测试的影响（重要）：** `docs/04` 的 POI-07 等价性测试（v1.x 与新版 CSV 逐行相同）
+> 从 v2.00 起**必须先把 `InpEnableBreaker` 设为 true** 才能与 v1.x 对比，
+> 否则差异来自这次刻意的默认值变更，不是 bug。

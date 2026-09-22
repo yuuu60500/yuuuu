@@ -113,6 +113,12 @@ void M5BlocksOnFVG(const int n, const int fvg_idx)
    int dir = g_m5fvg[fvg_idx].dir;
    int tol = PipsToPts(InpM5ConnectTolerancePips);
 
+   // Counter-direction OBs exist for one reason only: to become breaker
+   // material (CONF-06). With breakers off they are not tracked at all,
+   // so the disabled path is genuinely cheaper, not just hidden.
+   bool counter = (dir != g_sess.dir);
+   if(counter && !InpEnableBreaker) return;
+
    //--- 1) plain M5 order block ------------------------------------
    int oldest = MathMax(0, n - InpM5OBtoFVGMaxBars);
    oldest = MathMax(oldest, g_sess.start_index - InpM5BlockLookbackFromTouch);  // D-3
@@ -151,6 +157,7 @@ void M5BlocksOnFVG(const int n, const int fvg_idx)
    if(saw && !made) g_diag_blk_rejected_gap++;
 
    //--- 2) breaker block -------------------------------------------
+   if(!InpEnableBreaker) return;
    for(int c = 0; c < g_brk_n; c++)
      {
       if(g_brk[c].used || g_brk[c].dir != dir) continue;
@@ -202,7 +209,7 @@ void M5BlockInvalidate(const int n)
       g_blk[i].state        = BLOCK_INVALID;
       g_blk[i].invalid_time = t;
 
-      if(g_sess.active && g_blk[i].session_id == g_sess.id)
+      if(InpEnableBreaker && g_sess.active && g_blk[i].session_id == g_sess.id)
         {
          BreakerCand c;
          c.src_block_id = g_blk[i].id;
