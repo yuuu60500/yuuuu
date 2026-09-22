@@ -331,3 +331,47 @@ Replay:                NOT VERIFIED
 2. 一次修一个，编译 → Replay → 下一个
 3. 按 `docs/04_Test_Plan_v1.00.md` 逐条跑 Replay 与 Repaint 对比（开 `InpLogSignals` 导出 CSV）
 4. 依据实测结果，把上表的 NOT VERIFIED 逐项改写
+
+---
+
+## 补充：v1.10 顺带修掉的显示缺口
+
+### A-13
+```
+ID:                      A-13
+Severity:                P2
+Module:                  HMI_ObjectManager
+Function:                OM_SyncAll (POI / block loops)
+Location:                颜色与线型的三元表达式
+Trigger:                 POI 或 M5 Block 进入 TOUCHED 状态
+Expected Behavior:       状态机区分 ACTIVE 与 TOUCHED，图上也应当能区分
+Actual Behavior:         颜色与线型只在 dead 上分叉，ACTIVE 与 TOUCHED 渲染完全相同；
+                         用户无法一眼判断某个 POI 是"还在等价格"还是"已经触发过 Session"
+Impact:                  可读性；不影响任何标记
+Historical Repaint:      NO
+Future Leak:             NO
+Business Logic Impact:   NO
+Recommended Fix:         给 TOUCHED 独立样式（ZS_POI_TOUCH / ZS_BLK_TOUCH）
+Status:                  FIXED — v1.10
+Confidence:              HIGH
+```
+
+### A-14（仍未修）
+```
+ID:                      A-14
+Severity:                P3
+Module:                  HMI_Params
+Function:                —
+Location:                InpShowRejectedOB
+Trigger:                 用户拨动该参数
+Expected Behavior:       BRI-04 的设计：用极淡虚线画出被 Gap 否决的 OB
+Actual Behavior:         参数在全部源码中只出现 1 次（声明本身），没有任何地方读它，
+                         拨动它没有任何效果
+Impact:                  参数面板有一个假开关
+Historical Repaint:      NO
+Future Leak:             NO
+Business Logic Impact:   NO
+Recommended Fix:         实现绘制（约 20 行），或删掉该参数
+Status:                  Potential Risk — 未修
+Confidence:              HIGH
+```

@@ -70,22 +70,7 @@ input int    InpMaxCyclesKept         = 20;
 input int    InpObjectHistoryLimit    = 500;
 input int    InpLevelLineExtendBars   = 12;
 input int    InpPreviewUpdateMs       = 250;   // bar-0 preview throttle
-input int    InpPanelX                = 10;
-input int    InpPanelY                = 18;
 
-input group "=== Colors ==="
-input color  InpColPOIBull            = clrTeal;
-input color  InpColPOIBear            = clrMaroon;
-input color  InpColPOIDead            = clrDimGray;
-input color  InpColBlockBull          = clrDodgerBlue;
-input color  InpColBlockBear          = clrOrangeRed;
-input color  InpColBlockArmed         = clrGold;
-input color  InpColBlockDead          = clrDimGray;
-input color  InpColBPR                = clrMediumPurple;
-input color  InpColBPRDead            = clrDimGray;
-input color  InpColText               = clrWhite;
-input color  InpColTRange             = clrSlateGray;
-input int    InpFontSize              = 8;
 
 input group "=== Alerts ==="
 input bool   InpAlertsEnabled         = false;

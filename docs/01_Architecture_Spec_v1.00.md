@@ -1624,7 +1624,11 @@ ChartRedraw() 每次 OnCalculate 最多调用一次
 | `InpMaxCyclesKept` | 20 |
 | `InpObjectHistoryLimit` | 500 |
 | `InpPreviewUpdateMs` | 250 |
-| 各类颜色 / 线宽 / 字号 | — |
+| 各类颜色 / 线型 / 线宽 / 字号 | 见 `HMI_Style.mqh`（106 个参数，v1.10） |
+
+> **样式参数全部集中在 `MQL5/Include/HMI/HMI_Style.mqh`**，与功能参数（本附录 A.1–A.5）
+> 物理分离。样式层不被任何识别引擎读取，因此任何样式改动都不可能移动一个标记。
+> MT5 行为注意：线型（DASH / DOT 等）只在 `width == 1` 时才会被渲染，宽度 > 1 一律显示为实线。
 
 ### A.7 Alert
 

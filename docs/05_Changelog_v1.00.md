@@ -190,3 +190,44 @@ Compile Status:
 Replay Status:
   NOT VERIFIED（新增 POI-06..POI-09 用例，其中 POI-07 就是 v1.00/v1.01 等价性回归）
 ```
+
+---
+
+## v1.10 — Minor Feature：样式全面参数化
+
+```
+Version:  v1.10
+Date:     2026-09-22
+
+Changed Functions:
+  新增 HMI_Style.mqh          106 个样式 input + StyleZone / StyleText +
+                              StylesInit() + POIStyleOf / BlockStyleOf /
+                              BPRStyleOf / ModelStyleOf
+  OM_Rect / OM_Text / OM_Level / OM_Panel
+                              签名改为接收 StyleZone / StyleText，
+                              不再接收裸 color + style，并统一应用 WIDTH
+  OM_SyncAll / OM_Preview     全部调用点改为使用样式解析器
+  OnInit                      新增 StylesInit() 调用（在任何绘图之前）
+
+Changed States:
+  无（样式不属于业务状态）
+
+Affected Modules:
+  HMI_Style.mqh（新建）/ HMI_Params.mqh（移出旧的颜色与字号）/
+  HMI_ObjectManager.mqh / H4M5_Identification.mq5
+
+Reason:
+  用户要求每个显示元素可独立设置颜色 / 线型 / 线宽 / 字号。
+  顺带修掉 A-13（ACTIVE 与 TOUCHED 在图上无法区分）。
+
+Trading Logic Changed:
+  NO
+  样式层不被任何识别引擎引用；矩形几何、触碰判定、确认逻辑一行未动。
+  可用 POI-07 等价性测试验证（CSV 信号日志应与 v1.01 逐行相同）。
+
+Compile Status:
+  NOT COMPILE VERIFIED
+
+Replay Status:
+  NOT VERIFIED
+```
