@@ -9,14 +9,15 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "2.00"
+#property version   "2.01"
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window
 #property indicator_buffers 0
 #property indicator_plots   0
 
-#include <HMI/HMI_AlertManager.mqh>
+#include "HMI_AlertManager.mqh"   // quoted: resolves next to this file,
+                                  // so the whole indicator lives in ONE folder
 
 //+------------------------------------------------------------------+
 //| Phase 0 helper: consume one CLOSED H4 bar                        |
