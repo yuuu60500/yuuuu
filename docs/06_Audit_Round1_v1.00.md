@@ -314,7 +314,9 @@ Business Logic:        PASS          (D-1..D-7 已裁决并落地)
 Future Leak:           PASS (static) / NOT VERIFIED (replay)
 Historical Repaint:    PASS (static) / NOT VERIFIED (replay)
 H4/M5 Alignment:       PASS (static) / NOT VERIFIED (replay)
-H4 POI:                NOT VERIFIED
+H4 POI:                PARTIAL PASS  (POI-01 / POI-02 已用真实数据逐条核对，
+                                     见 docs/04「已执行的验证记录」；
+                                     POI-03..09 仍未验证)
 M5 OB:                 NOT VERIFIED
 M5 Breaker:            NOT VERIFIED
 ARMED:                 NOT VERIFIED

@@ -78,7 +78,7 @@ H4 Context
 | Phase 3 — MQL5 Implementation | **COMPLETE** (v1.00, ~2560 lines) |
 | Phase 4 — Audit (P0–P3) | **ROUND 4** (10 fixed, 5 potential risks, 1 withdrawn) |
 | Phase 5 — MetaEditor Compile | **PASS** — v2.11, 0 errors / 0 warnings (2026-09-22) |
-| Phase 6 — Visual Replay / Repaint Test | **NOT VERIFIED**（已完成首次目视挂载确认，见 docs/06 Round 3） |
+| Phase 6 — Visual Replay / Repaint Test | **进行中** —— POI-01/02 已用真实 H4 数据 PASS（docs/04），Replay / Repaint 仍 NOT VERIFIED |
 
 ## 源码
 
