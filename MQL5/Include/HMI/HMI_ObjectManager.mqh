@@ -7,6 +7,7 @@
 #include "HMI_BPREngine.mqh"
 #include "HMI_Style.mqh"
 #include "HMI_KillZone.mqh"
+#include "HMI_Ranges.mqh"
 #include "HMI_PriceActionEngine.mqh"
 
 #define TT_MARK  "MK"
@@ -196,6 +197,8 @@ void OM_Panel(const int line, const string text)
    ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
   }
 
+int g_panel_line = 0;         // running panel row, so any block can be off
+
 //================== kill zone levels (display only) =================
 #define MAX_KZ_DRAWN 64
 int      g_kzd_zone[MAX_KZ_DRAWN];
@@ -296,8 +299,10 @@ void OM_SyncAll()
    datetime redge = OM_RightEdge();
 
    OM_SyncKillZones();
+   RangesUpdate();                       // panel metrics only (ATR / ADR)
 
    //--- context panel ----------------------------------------------
+   g_panel_line = 0;
    if(InpShowH4Context)
      {
       string s1 = "H4 CONTEXT: " + CtxName(g_ctx) +
@@ -330,12 +335,15 @@ void OM_SyncAll()
               (cy.anchor_invalidated ? " [ANCHOR INVALIDATED]" : "") +
               (cy.ctx_changed ? " [CTX CHANGED DURING CYCLE]" : "");
         }
-      OM_Panel(0, "HMI v" + HMI_VERSION + "  MARK ONLY - NO ENTRY DECISION");
-      OM_Panel(1, s1);
-      OM_Panel(2, s2);
-      OM_Panel(3, s3);
-      OM_Panel(4, s4);
+      OM_Panel(g_panel_line++, "HMI v" + HMI_VERSION + "  MARK ONLY - NO ENTRY DECISION");
+      OM_Panel(g_panel_line++, s1);
+      OM_Panel(g_panel_line++, s2);
+      OM_Panel(g_panel_line++, s3);
+      OM_Panel(g_panel_line++, s4);
      }
+
+   if(InpShowATR) OM_Panel(g_panel_line++, RangesATRText());
+   if(InpShowADR) OM_Panel(g_panel_line++, RangesADRText());
 
    //--- trading range ----------------------------------------------
    if(InpShowTradingRange && g_tr_n > 0)

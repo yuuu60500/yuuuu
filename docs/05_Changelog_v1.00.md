@@ -275,3 +275,40 @@ Compile Status:
 Replay Status:
   NOT VERIFIED
 ```
+
+---
+
+## v1.30 — Minor Feature：面板 ATR / ADR
+
+```
+Version:  v1.30
+Date:     2026-09-22
+
+Changed Functions:
+  新增 HMI_Ranges.mqh   InpShowATR / InpShowADR / InpADRDays
+                        RangesUpdate / RangesPips / RangesATRText / RangesADRText
+  OM_SyncAll            调用 RangesUpdate()，面板改为使用 g_panel_line 滚动行号
+                        （任一显示块关闭都不会在面板上留空行）
+
+Changed States:
+  无业务状态。新增绘图层变量 g_panel_line 与 ADR 缓存（g_adr / g_today_range 等）
+
+Affected Modules:
+  HMI_Ranges.mqh（新建）/ HMI_ObjectManager.mqh / HMI_Defs.mqh（版本号）/
+  H4M5_Identification.mq5（版本号）
+
+Reason:
+  用户要求把 ATR 与 ADR 加到面板（不画线）。
+  ATR 此前虽然已在内部逐根递推，但只在 MARGIN_ATR_FRAC 模式下被用到，且完全不可见；
+  ADR 此前完全不存在（全库无任何 D1 逻辑）。
+
+Trading Logic Changed:
+  NO —— 见 D-9。HMI_Ranges.mqh 不被 Phase 0-7 引用；ATR 复用引擎已有的序列，
+  不引入第二套可能与 margin 判定不一致的 ATR。
+
+Compile Status:
+  NOT COMPILE VERIFIED
+
+Replay Status:
+  NOT VERIFIED
+```

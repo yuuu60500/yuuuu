@@ -1,6 +1,6 @@
 # H4 Context → M5 Identification Indicator
 
-**Version:** spec v1.00 (frozen baseline) / code v1.20
+**Version:** spec v1.00 (frozen baseline) / code v1.30
 **Platform:** MetaTrader 5 / MQL5 Custom Indicator
 **Mode:** Trend-Following Only
 **Purpose:** MARK ONLY — Detect / Confirm / Track / Mark / Invalidate
@@ -84,6 +84,7 @@ MQL5/Include/HMI/HMI_Defs.mqh                   enum / struct / 全局状态
 MQL5/Include/HMI/HMI_Params.mqh                 功能 input（Rule 60：阈值不散落）
 MQL5/Include/HMI/HMI_Style.mqh                  样式 input：颜色 / 线型 / 线宽 / 字号
 MQL5/Include/HMI/HMI_KillZone.mqh               Kill Zone 时段 HIGH/LOW（纯显示，见 D-8）
+MQL5/Include/HMI/HMI_Ranges.mqh                 面板 ATR / ADR（纯显示，见 D-9）
 MQL5/Include/HMI/HMI_Util.mqh                   整数 point 比较 / pip / 时间工具
 MQL5/Include/HMI/HMI_Series.mqh                 M5 / H4 显式取数 + break margin（D-6）
 MQL5/Include/HMI/HMI_SwingEngine.mqh            fractal swing（带 confirm_time）
