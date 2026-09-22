@@ -125,6 +125,7 @@ void LiqPush(const HSwing &s)
    p.origin_time = s.bar_time;
    p.swept       = false;
    p.swept_time  = 0;
+   p.vis         = -1;
    g_liq[g_liq_n] = p;
    g_liq_n++;
   }

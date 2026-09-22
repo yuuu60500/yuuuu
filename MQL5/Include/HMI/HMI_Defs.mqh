@@ -6,7 +6,7 @@
 #ifndef HMI_DEFS_MQH
 #define HMI_DEFS_MQH
 
-#define HMI_VERSION      "1.10"
+#define HMI_VERSION      "1.20"
 #define HMI_PREFIX       "HMI"
 
 //--- direction ------------------------------------------------------
@@ -240,6 +240,7 @@ struct LiqPool
    datetime          origin_time;
    bool              swept;
    datetime          swept_time;
+   int               vis;            // last drawn state (-2 = graphics removed)
   };
 
 //====================== GLOBAL STATE ================================

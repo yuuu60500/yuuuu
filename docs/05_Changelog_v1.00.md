@@ -231,3 +231,47 @@ Compile Status:
 Replay Status:
   NOT VERIFIED
 ```
+
+---
+
+## v1.20 — Minor Feature：Kill Zone HIGH/LOW + 流动性默认打开
+
+```
+Version:  v1.20
+Date:     2026-09-22
+
+Changed Functions:
+  新增 HMI_KillZone.mqh    47 个 input（4 个时段各自开关/命名/起止时分/
+                           颜色/线型/线宽 + 通用参数）
+                           KZInit / KZDayAnchor / KZContains / KZWindowEnd /
+                           KZCollect（纯函数，只读已关闭 M5 序列）
+  OM_SyncKillZones         新增：画 HIGH / LOW 两条线 + 可选标签，
+                           并显式删除滚出范围的旧时段对象
+  OM_KZDelete              新增
+  OM_SyncAll               liquidity 循环重写：按侧限量 + 被扫即删线
+  OM_Protected             KZ 与 LIQ 对象不参与通用裁剪（它们自管生命周期）
+  OnInit                   新增 KZInit() 调用
+
+Changed States:
+  LiqPool 新增 vis 字段（A-15）
+  绘图层新增 g_kzd_zone / g_kzd_anchor 追踪表（属于绘图层资产，非业务状态）
+
+Affected Modules:
+  HMI_KillZone.mqh（新建）/ HMI_Defs.mqh / HMI_Params.mqh /
+  HMI_H4RangeEngine.mqh / HMI_ObjectManager.mqh / H4M5_Identification.mq5
+
+Reason:
+  用户要求：加 Kill Zone 时段标识（只要 HIGH/LOW，不要矩形）、每个时段线型颜色粗细
+  可自定义、流动性默认打开。顺带修掉 A-15（被扫的流动性线永不删除）。
+
+Trading Logic Changed:
+  NO
+  Kill Zone 不被 Phase 0-7 任何代码引用（见 D-8 的边界声明）；
+  流动性在 v1.00 起就是 mark-only，本次只改显示默认值与数量上限。
+
+Compile Status:
+  NOT COMPILE VERIFIED
+
+Replay Status:
+  NOT VERIFIED
+```

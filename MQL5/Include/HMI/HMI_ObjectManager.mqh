@@ -6,6 +6,7 @@
 #define HMI_OM_MQH
 #include "HMI_BPREngine.mqh"
 #include "HMI_Style.mqh"
+#include "HMI_KillZone.mqh"
 #include "HMI_PriceActionEngine.mqh"
 
 #define TT_MARK  "MK"
@@ -19,6 +20,7 @@
 #define TT_LVL   "LV"
 #define TT_BPR   "BZ"
 #define TT_PRV   "DB"
+#define TT_KZ    "KZ"
 
 string OM_Prefix() { return(HMI_PREFIX + "_" + g_inst + "_"); }
 
@@ -109,7 +111,9 @@ bool OM_Protected(const string name)
    // the instance marker owns the tag and the panel is rebuilt every bar:
    // trimming either one would break multi-instance safety or flicker
    return(StringFind(name, "_" + TT_MARK + "_") >= 0 ||
-          StringFind(name, "_" + TT_CTX  + "_") >= 0);
+          StringFind(name, "_" + TT_CTX  + "_") >= 0 ||
+          StringFind(name, "_" + TT_KZ   + "_") >= 0 ||
+          StringFind(name, "_" + TT_LIQ  + "_") >= 0);
   }
 
 void OM_Trim()
@@ -192,6 +196,75 @@ void OM_Panel(const int line, const string text)
    ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
   }
 
+//================== kill zone levels (display only) =================
+#define MAX_KZ_DRAWN 64
+int      g_kzd_zone[MAX_KZ_DRAWN];
+datetime g_kzd_anchor[MAX_KZ_DRAWN];
+int      g_kzd_n = 0;
+
+void OM_KZDelete(const int zone, const datetime anchor)
+  {
+   for(int s2 = 0; s2 < 4; s2++)
+     {
+      string nm = OM_Name(TT_KZ, (long)anchor, zone * 4 + s2);
+      ObjectDelete(0, nm);
+      OM_Unregister(nm);
+     }
+  }
+
+void OM_SyncKillZones()
+  {
+   KZInst kz[];
+   int n = (InpShowKillZones ? KZCollect(kz) : 0);
+
+   //--- drop windows that scrolled out of range or were switched off
+   for(int d = g_kzd_n - 1; d >= 0; d--)
+     {
+      bool still = false;
+      for(int i = 0; i < n && !still; i++)
+         if(kz[i].zone == g_kzd_zone[d] && kz[i].anchor == g_kzd_anchor[d]) still = true;
+      if(still) continue;
+      OM_KZDelete(g_kzd_zone[d], g_kzd_anchor[d]);
+      for(int k = d + 1; k < g_kzd_n; k++)
+        {
+         g_kzd_zone[k-1]   = g_kzd_zone[k];
+         g_kzd_anchor[k-1] = g_kzd_anchor[k];
+        }
+      g_kzd_n--;
+     }
+   if(n <= 0) return;
+
+   for(int i = 0; i < n; i++)
+     {
+      int z = kz[i].zone;
+      // a window still forming is not extended: it reads as live, not final
+      int ext = (kz[i].complete ? InpKZExtendBars : 1);
+      datetime t2 = kz[i].t_to + (datetime)((long)ext * PeriodSeconds(PERIOD_M5));
+
+      OM_Level(OM_Name(TT_KZ, (long)kz[i].anchor, z * 4 + 0),
+               kz[i].t_from, t2, kz[i].hi, g_kz_style[z]);
+      OM_Level(OM_Name(TT_KZ, (long)kz[i].anchor, z * 4 + 1),
+               kz[i].t_from, t2, kz[i].lo, g_kz_style[z]);
+      if(InpKZShowLabel)
+        {
+         OM_Text(OM_Name(TT_KZ, (long)kz[i].anchor, z * 4 + 2), t2, kz[i].hi,
+                 g_kz_name[z] + " HIGH", TS_KZ, ANCHOR_LEFT_LOWER);
+         OM_Text(OM_Name(TT_KZ, (long)kz[i].anchor, z * 4 + 3), t2, kz[i].lo,
+                 g_kz_name[z] + " LOW", TS_KZ, ANCHOR_LEFT_UPPER);
+        }
+
+      bool known = false;
+      for(int d = 0; d < g_kzd_n && !known; d++)
+         if(g_kzd_zone[d] == z && g_kzd_anchor[d] == kz[i].anchor) known = true;
+      if(!known && g_kzd_n < MAX_KZ_DRAWN)
+        {
+         g_kzd_zone[g_kzd_n]   = z;
+         g_kzd_anchor[g_kzd_n] = kz[i].anchor;
+         g_kzd_n++;
+        }
+     }
+  }
+
 //--- helpers --------------------------------------------------------
 datetime OM_RightEdge()
   {
@@ -221,6 +294,8 @@ int BlkVis(const M5Block &b)
 void OM_SyncAll()
   {
    datetime redge = OM_RightEdge();
+
+   OM_SyncKillZones();
 
    //--- context panel ----------------------------------------------
    if(InpShowH4Context)
@@ -270,14 +345,30 @@ void OM_SyncAll()
               redge, g_tr[i].a_lo, ZS_TRANGE);
      }
 
-   //--- liquidity ---------------------------------------------------
-   if(InpShowLiquidity)
-      for(int i = 0; i < g_liq_n; i++)
+   //--- liquidity: newest un-swept pools first, capped per side ------
+   //--- a pool that gets swept must LOSE its line, not keep it -------
+   int shown_bsl = 0, shown_ssl = 0;
+   int liq_cap = MathMax(0, InpLiqMaxLines);
+   for(int i = g_liq_n - 1; i >= 0; i--)
+     {
+      bool want = false;
+      if(InpShowLiquidity && !g_liq[i].swept)
         {
-         if(g_liq[i].swept) continue;
+         if(g_liq[i].type == DIR_BULL) { if(shown_bsl < liq_cap) { want = true; shown_bsl++; } }
+         else                          { if(shown_ssl < liq_cap) { want = true; shown_ssl++; } }
+        }
+      if(want)
+        {
          OM_Level(OM_Name(TT_LIQ, g_liq[i].id, 0), g_liq[i].origin_time, redge,
                   g_liq[i].price, g_liq[i].type == DIR_BULL ? ZS_BSL : ZS_SSL);
+         g_liq[i].vis = 0;
         }
+      else if(g_liq[i].vis >= 0)
+        {
+         OM_DeleteOwner(TT_LIQ, g_liq[i].id, 1);
+         g_liq[i].vis = -2;
+        }
+     }
 
    //--- H4 POI ------------------------------------------------------
    if(InpShowH4POI)

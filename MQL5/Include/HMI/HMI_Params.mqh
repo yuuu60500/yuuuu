@@ -55,7 +55,8 @@ input group "=== Display ==="
 input bool   InpShowH4Context         = true;
 input bool   InpShowH4POI             = true;
 input bool   InpShowTradingRange      = true;
-input bool   InpShowLiquidity         = false;
+input bool   InpShowLiquidity         = true;
+input int    InpLiqMaxLines            = 10;   // per side; keeps the chart readable
 input bool   InpShowM5Blocks          = true;
 input bool   InpShowCounterDirBlocks  = false;  // CONF-06 breaker material
 input bool   InpShowRejectedOB        = false;  // BRI-04 diagnostic

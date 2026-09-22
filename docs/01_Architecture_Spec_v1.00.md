@@ -1625,6 +1625,9 @@ ChartRedraw() 每次 OnCalculate 最多调用一次
 | `InpObjectHistoryLimit` | 500 |
 | `InpPreviewUpdateMs` | 250 |
 | 各类颜色 / 线型 / 线宽 / 字号 | 见 `HMI_Style.mqh`（106 个参数，v1.10） |
+| Kill Zone 时段与样式 | 见 `HMI_KillZone.mqh`（47 个参数，v1.20，见 D-8） |
+| `InpShowLiquidity` | **true**（v1.20 起默认打开） |
+| `InpLiqMaxLines` | 10（每侧上限，纯显示） |
 
 > **样式参数全部集中在 `MQL5/Include/HMI/HMI_Style.mqh`**，与功能参数（本附录 A.1–A.5）
 > 物理分离。样式层不被任何识别引擎读取，因此任何样式改动都不可能移动一个标记。

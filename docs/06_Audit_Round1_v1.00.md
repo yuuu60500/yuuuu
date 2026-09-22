@@ -375,3 +375,25 @@ Recommended Fix:         实现绘制（约 20 行），或删掉该参数
 Status:                  Potential Risk — 未修
 Confidence:              HIGH
 ```
+
+### A-15（v1.20 顺带修掉）
+```
+ID:                      A-15
+Severity:                P2
+Module:                  HMI_ObjectManager
+Function:                OM_SyncAll (liquidity loop)
+Location:                if(g_liq[i].swept) continue;
+Trigger:                 一个流动性池被扫（SWEPT）
+Expected Behavior:       该池的线应当从图上消失（或改样式）
+Actual Behavior:         循环只是 continue，已经画出去的线既不更新也不删除，
+                         永久停留在图上。v1.00/v1.10 里 InpShowLiquidity 默认关闭，
+                         所以没暴露；一旦默认打开就会变成明显的脏图
+Impact:                  图上出现大量"已经被扫但仍然显示"的流动性线，
+                         与 Rule 36 要求的可见真实性冲突
+Historical Repaint:      NO
+Future Leak:             NO
+Business Logic Impact:   NO
+Recommended Fix:         给 LiqPool 加 vis 字段，被扫或超出显示上限时删除其图形
+Status:                  FIXED — v1.20
+Confidence:              HIGH
+```
