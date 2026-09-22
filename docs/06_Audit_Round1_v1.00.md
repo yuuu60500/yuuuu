@@ -397,3 +397,46 @@ Recommended Fix:         给 LiqPool 加 vis 字段，被扫或超出显示上�
 Status:                  FIXED — v1.20
 Confidence:              HIGH
 ```
+
+---
+
+## Audit Round 2 —— 首次真实编译反馈（2026-09-22）
+
+> 这是本项目**第一个有证据的 Confirmed Bug**。此前所有条目都只能写
+> `Potential Risk`，因为没有编译器、没有 Replay。编译器一跑就抓到了
+> 静态通读六遍都没看出来的问题。
+
+### A-16
+```
+ID:                      A-16
+Severity:                P0
+Module:                  H4M5_Identification.mq5 / include 拓扑
+Function:                Phase4_Identification（主文件 134-135 行）
+Location:                #include 链
+Trigger:                 F7 编译
+Expected Behavior:       六个识别引擎全部参与编译，Phase 4 能调用它们
+Actual Behavior:         HMI_CISDEngine.mqh 与 HMI_MSSEngine.mqh
+                         **从未被任何文件 include**，因此不在编译单元内。
+                         编译器报 undeclared identifier 'CISD_Check' / 'MSS_Check'，
+                         另外 6 个错误（',' unexpected / 'cy' some operator expected /
+                         ')' unexpected）全是解析器遇到未知函数名后的连锁反应。
+Impact:                  指标无法编译。即使能编译，六个模型里的两个（CISD 与 MSS）
+                         也会静默缺席 —— 而这两个恰恰是规格里最核心的两个。
+Root Cause:              主文件只 include 了 HMI_AlertManager.mqh，靠它逐层往下拉。
+                         BPREngine 与 PriceActionEngine 是**碰巧**被 ObjectManager
+                         拉进来的，不是设计；CISDEngine 与 MSSEngine 没有这个运气。
+                         讽刺的是，这正是 docs/03「四个识别引擎互不 #include」
+                         那条架构原则的副作用：既然它们互不引用，就必须由调用方
+                         显式引用，而主文件没有。
+Historical Repaint:      N/A
+Future Leak:             N/A
+Business Logic Impact:   NO（修复后逻辑与规格一致；缺失的是编译可见性，不是实现）
+Recommended Fix:         主文件显式 include 它直接调用的每一个引擎
+                         （include what you use）。include guard 让重复无害。
+Status:                  FIXED — v2.02
+Confidence:              HIGH（编译器输出为证）
+```
+
+**教训（值得写进流程）：** `docs/03` 用「引擎互不 include」来在编译期保证
+Rule 30 / 44（模型不互相 Consume）。这条原则是对的，但它把「谁来 include 引擎」
+的责任推给了调用方 —— 而这一点当初没有写进架构文档。已在 docs/03 补充。

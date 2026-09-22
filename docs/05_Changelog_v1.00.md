@@ -470,3 +470,36 @@ Compile Status:
   注意：上一次 F7 在第 19 行就中断，2800 行头文件一行都没被检查过，
   所以 "2 errors, 0 warnings" 完全不代表代码接近通过。
 ```
+
+---
+
+## v2.02 — 修复 A-16：CISD / MSS 引擎从未进入编译单元
+
+```
+Version:  v2.02
+Date:     2026-09-22
+
+Changed Functions:
+  无。主文件 include 段从 1 行扩展为 5 行：
+     HMI_AlertManager / HMI_CISDEngine / HMI_MSSEngine /
+     HMI_BPREngine / HMI_PriceActionEngine
+
+Changed States:
+  无
+
+Reason:
+  第一次真实 F7 报 undeclared identifier 'CISD_Check' / 'MSS_Check'（共 8 个错误，
+  其中 6 个是解析器连锁反应）。根因：主文件只 include AlertManager，
+  靠传递性把其它模块拉进来；BPREngine 与 PriceActionEngine 碰巧被
+  ObjectManager 拉进来了，CISDEngine 与 MSSEngine 没有。
+
+  这是 docs/03「四个识别引擎互不 #include」原则的副作用 ——
+  该原则正确（它在编译期保证 Rule 30 / 44），但它把 include 责任
+  推给了调用方，而这一点当初没写进架构文档。现已补上。
+
+Trading Logic Changed:
+  NO —— 缺的是编译可见性，不是实现。CISD / MSS 的代码本身一行未动。
+
+Compile Status:
+  NOT COMPILE VERIFIED（本次修复后尚未由用户实际编译验证）
+```

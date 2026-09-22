@@ -1,6 +1,6 @@
 # H4 Context → M5 Identification Indicator
 
-**Version:** spec v1.00 (frozen baseline) / code v2.01
+**Version:** spec v1.00 (frozen baseline) / code v2.02
 **Platform:** MetaTrader 5 / MQL5 Custom Indicator
 **Mode:** Trend-Following Only
 **Purpose:** MARK ONLY — Detect / Confirm / Track / Mark / Invalidate
@@ -76,7 +76,7 @@ H4 Context
 | Phase 1 — Architecture & Logic Specification | **COMPLETE** |
 | Phase 2 — Conflict Resolution / Business Rule Sign-off | **COMPLETE** (D-1..D-7 signed off 2026-09-22) |
 | Phase 3 — MQL5 Implementation | **COMPLETE** (v1.00, ~2560 lines) |
-| Phase 4 — Audit (P0–P3) | **ROUND 1 DONE** (6 fixed, 5 potential risks) |
+| Phase 4 — Audit (P0–P3) | **ROUND 2** (7 fixed, 5 potential risks, 1 confirmed bug A-16) |
 | Phase 5 — MetaEditor Compile | **NOT COMPILE VERIFIED** |
 | Phase 6 — Visual Replay / Repaint Test | **NOT VERIFIED** |
 

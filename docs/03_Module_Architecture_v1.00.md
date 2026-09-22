@@ -51,6 +51,12 @@ ObjectManager / AlertManager        (只读 State，不被任何上游引用)
 
 > `CISDEngine` **不得** `#include` `MSSEngine`，反之亦然。
 > 这是把 Rule 30 / 44「模型不互相 Consume」写进**编译期**的手段。
+>
+> **推论（A-16 的教训，必须遵守）：** 既然四个识别引擎互不引用，
+> 就**必须由调用方（主文件）显式 include 它们**。
+> 不得依赖「ObjectManager 碰巧把某个引擎拉进来了」这种传递性 ——
+> v2.01 就是这样漏掉了 CISDEngine 与 MSSEngine，导致无法编译。
+> 规则：**主文件 include 它直接调用的每一个模块**（include what you use）。
 
 ---
 

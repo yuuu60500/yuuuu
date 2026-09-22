@@ -9,15 +9,22 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "2.01"
+#property version   "2.02"
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window
 #property indicator_buffers 0
 #property indicator_plots   0
 
-#include "HMI_AlertManager.mqh"   // quoted: resolves next to this file,
-                                  // so the whole indicator lives in ONE folder
+// Quoted includes resolve next to this file, so the whole indicator lives
+// in ONE folder. Include what this file actually CALLS - relying on another
+// module to drag an engine in is how CISD_Check and MSS_Check went missing
+// from the build (A-16). Include guards make the overlap free.
+#include "HMI_AlertManager.mqh"        // -> ObjectManager -> state + drawing
+#include "HMI_CISDEngine.mqh"          // Phase 4: CISD_Check
+#include "HMI_MSSEngine.mqh"           // Phase 4: MSS_Check
+#include "HMI_BPREngine.mqh"           // Phase 4: BPR_Check / BPRLifecycle
+#include "HMI_PriceActionEngine.mqh"   // Phase 4 / 5b: PA_*
 
 //+------------------------------------------------------------------+
 //| Phase 0 helper: consume one CLOSED H4 bar                        |
