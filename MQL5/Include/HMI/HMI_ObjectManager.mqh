@@ -80,6 +80,29 @@ void OM_RecreateMarker()
    OM_Register(mk);
   }
 
+void OM_Unregister(const string name)
+  {
+   for(int i = 0; i < g_obj_n; i++)
+      if(g_obj[i] == name)
+        {
+         for(int k = i + 1; k < g_obj_n; k++) g_obj[k-1] = g_obj[k];
+         g_obj_n--;
+         return;
+        }
+  }
+
+// Drop the graphics of one owner while its record stays in memory
+// (Spec 14.7: graphics are trimmed, records are not).
+void OM_DeleteOwner(const string tt, const long owner, const int subs)
+  {
+   for(int s2 = 0; s2 < subs; s2++)
+     {
+      string nm = OM_Name(tt, owner, s2);
+      ObjectDelete(0, nm);
+      OM_Unregister(nm);
+     }
+  }
+
 bool OM_Protected(const string name)
   {
    // the instance marker owns the tag and the panel is rebuilt every bar:
@@ -259,6 +282,11 @@ void OM_SyncAll()
    if(InpShowH4POI)
       for(int i = 0; i < g_poi_n; i++)
         {
+         if(g_poi[i].out_of_window)          // left the display window: drop graphics once
+           {
+            if(g_poi[i].vis >= 0) { OM_DeleteOwner(TT_POI, g_poi[i].id, 2); g_poi[i].vis = -2; }
+            continue;
+           }
          int vis = POIVis(g_poi[i]);
          bool dead = (vis == 2);
          if(dead && g_poi[i].vis == vis) continue;

@@ -43,6 +43,15 @@ void SessionEndNow(const SessionEnd reason, const datetime t)
    g_sess.end_time   = t;
    g_sess.end_reason = reason;
    SessionExpireOpenBlocks();     // ARMED blocks / cycles are NOT touched (Rule 15)
+
+   // A-06 (opt-in, default off): only a TIMEOUT may hand the POI back.
+   // POI_INVALID / CONTEXT_FLIP / NEW_SESSION never re-arm.
+   if(reason != SE_TIMEOUT || InpPOIMaxSessions <= 1) return;
+   int pi = POIFindById(g_sess.poi_id);
+   if(pi < 0) return;
+   if(g_poi[pi].state != POI_TOUCHED || g_poi[pi].out_of_window) return;
+   if(g_poi[pi].session_count >= InpPOIMaxSessions) return;
+   g_poi[pi].awaiting_leave = true;
   }
 
 void SessionStart(const int poi_idx, const int n)
@@ -57,6 +66,7 @@ void SessionStart(const int poi_idx, const int n)
    g_sess.end_time    = 0;
    g_sess.end_reason  = SE_NONE;
    g_sess.active      = true;
+   g_poi[poi_idx].session_count++;
   }
 
 void SessionMaintain(const int n)
@@ -65,7 +75,7 @@ void SessionMaintain(const int n)
    datetime t = CloseTimeOf(g_m5[n].time, PERIOD_M5);
 
    int pi = POIFindById(g_sess.poi_id);
-   if(pi >= 0 && (g_poi[pi].state == POI_INVALID || g_poi[pi].state == POI_EXPIRED))
+   if(pi >= 0 && g_poi[pi].state == POI_INVALID)     // Spec 5.1: INVALIDATED only
      { SessionEndNow(SE_POI_INVALID, t); return; }
 
    if(CtxDirection() != DIR_NONE && CtxDirection() != g_sess.dir)

@@ -1,4 +1,4 @@
-# Audit Round 1 — v1.00 Implementation
+# Audit Round 1 — v1.00 Implementation  (+ v1.01 fixes)
 
 **日期：** 2026-09-22
 **范围：** `MQL5/Indicators/HMI/H4M5_Identification.mq5` + `MQL5/Include/HMI/*.mqh`（约 2560 行）
@@ -99,6 +99,44 @@ Confidence:              HIGH
 
 ---
 
+### A-11  （本轮新发现，A-05 的真正根因）
+```
+ID:                      A-11
+Severity:                P1
+Module:                  HMI_H4POIEngine
+Function:                POIPush
+Location:                数组满时的驱逐
+Trigger:                 H4 POI 数量达到 InpH4MaxPOIs（default 12）后再创建新 POI
+Expected Behavior:       Spec 4.6 / 14.7 / AX-4：被挤出逻辑窗口的 POI
+                         标记为 POI_EXPIRED，**记录保留**，只丢弃图形
+Actual Behavior:         整条记录被移出数组直接消失，导致两个后果：
+                         (1) 它的 Rectangle 停留在"存活样式"僵在图上，
+                             直到被对象裁剪顺手删掉（违反 Rule 36 的可见真实性）
+                         (2) 活跃 Session 持有的 poi_id 变成悬空引用 → A-05
+Impact:                  图上出现内部已不存在、却仍以存活样式显示的 POI
+Historical Repaint:      NO
+Future Leak:             NO
+Business Logic Impact:   NO（修复后可触碰的 POI 集合逐条相同，见下方等价性证明）
+Recommended Fix:         物理存储扩到 MAX_POIS = 64，逻辑窗口仍然是 InpH4MaxPOIs；
+                         离开窗口的记录降级为 POI_EXPIRED + out_of_window，
+                         绘图层一次性删除其图形（Spec 14.7 的字面实现）
+Status:                  FIXED (static) — v1.01
+Confidence:              HIGH
+```
+
+**等价性证明（为什么这不是交易逻辑改变）：**
+
+| 检查点 | v1.00 | v1.01 |
+|--------|-------|-------|
+| 可触碰集合 | 被删除的记录不在数组里 → 不可触碰 | 记录仍在，但状态被强制为 `POI_EXPIRED`，而 `POITouchedBy` 只接受 `POI_ACTIVE` → 不可触碰 |
+| 能否再被 INVALIDATED | 记录不存在 → 否 | `POIInvalidateOnBar` 跳过非 ACTIVE/TOUCHED → 否 |
+| 能否再被 age-out | 否 | 同上 → 否 |
+| Session 是否因它结束 | `POIFindById` 返回 -1 → 检查被跳过 → 不结束 | `SessionMaintain` 改为只认 `POI_INVALID`（Spec 5.1 字面），而该记录永远到不了 INVALID → 不结束 |
+
+四条全部一致 ⇒ **标记结果逐条相同**。唯一变化是图上那个僵尸矩形消失了。
+
+---
+
 ## 未修复 / 待 Replay 验证（Potential Risk）
 
 ### A-05
@@ -119,7 +157,12 @@ Future Leak:             NO
 Business Logic Impact:   YES（Session 生命周期）
 Recommended Fix:         Session 直接缓存 poi_hi / poi_lo / poi_confirm_time，
                          或在 POI 被挤出时主动结束引用它的 Session
-Status:                  Potential Risk — 未修（需用户确认属于 Bug 还是可接受行为）
+Status:                  PARTIALLY FIXED — v1.01。根因（A-11 的记录删除）已修，
+                         悬空引用在实践中不再可能出现（记录要撑过 52 次新 POI 创建
+                         才会被物理淘汰，而 Session 最长仅 288 根 M5 = 1 天）。
+                         **可观测行为刻意保持不变**：Session 仍然只因
+                         POI_INVALID / CONTEXT_FLIP / TIMEOUT 结束。
+                         用户明确要求不改交易逻辑，故未加"引用丢失即结束"的 fail-safe。
 Confidence:              MEDIUM
 ```
 
@@ -138,8 +181,16 @@ Impact:                  长时间盘整的 POI 只有第一次反应会被精�
 Historical Repaint:      NO
 Future Leak:             NO
 Business Logic Impact:   YES（潜在漏标）
-Recommended Fix:         若用户认为应支持复触，需新增业务规则（Rule 65：不擅自更改）
-Status:                  Potential Risk — 行为已确定且可重放，等待业务裁决
+Recommended Fix:         InpPOIMaxSessions（**default 1 = v1.00 行为，逐 tick 相同**）。
+                         设为 >1 时：仅当 Session 以 SE_TIMEOUT 结束、POI 仍为 TOUCHED
+                         且未离开逻辑窗口时，标记 awaiting_leave；
+                         之后必须有一根已关闭 M5 K 线的 [low, high] **完全脱离** POI 区间，
+                         该 POI 才回到 POI_ACTIVE 并可再次触发 Session。
+                         「必须先完全离开」是防止 Session 在价格仍压在 POI 内时
+                         超时后逐根无限重启的关键闸门。
+                         SE_POI_INVALID / SE_CONTEXT_FLIP / SE_NEW_SESSION 一律不复触。
+Status:                  IMPLEMENTED AS OPT-IN — v1.01，默认关闭。
+                         默认值下 awaiting_leave 永不被置位，代码路径永不进入。
 Confidence:              HIGH
 ```
 
@@ -254,6 +305,7 @@ Confidence:              MEDIUM
 
 ```
 Architecture:          PASS          (规格 + 代码结构一致)
+Code Version:          v1.01         (v1.00 spec baseline 未变)
 Business Logic:        PASS          (D-1..D-7 已裁决并落地)
 Future Leak:           PASS (static) / NOT VERIFIED (replay)
 Historical Repaint:    PASS (static) / NOT VERIFIED (replay)

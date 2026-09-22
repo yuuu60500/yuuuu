@@ -13,16 +13,60 @@ int POIFindById(const long id)
    return(-1);
   }
 
+// The logical window stays exactly InpH4MaxPOIs wide, so which POIs are
+// touchable is unchanged. What changes is that the record falling out of
+// the window is DEMOTED to POI_EXPIRED instead of being deleted (Spec 4.6 /
+// 14.7 / AX-4): a deleted record left its rectangle frozen in live style on
+// the chart and left an active session holding a dangling poi_id.
 void POIPush(const H4POI &p)
   {
    int cap = MathMin(MAX_POIS, MathMax(1, InpH4MaxPOIs));
+
+   //--- 1) demote whatever leaves the logical window ---------------
    if(g_poi_n >= cap)
      {
-      for(int i = 1; i < g_poi_n; i++) g_poi[i-1] = g_poi[i];
+      int drop = g_poi_n - cap;                 // oldest still inside the window
+      if(SafeIdx(drop, g_poi_n))
+        {
+         if(g_poi[drop].state != POI_INVALID) g_poi[drop].state = POI_EXPIRED;
+         g_poi[drop].out_of_window = true;      // drawing layer will drop its graphics
+        }
+     }
+
+   //--- 2) physical store: only ever drop records that are already
+   //---    out of the window, and never the one the session uses ---
+   if(g_poi_n >= MAX_POIS)
+     {
+      int kill = 0;
+      while(kill < g_poi_n - 1 &&
+            (!g_poi[kill].out_of_window ||
+             (g_sess.active && g_poi[kill].id == g_sess.poi_id)))
+         kill++;
+      if(!g_poi[kill].out_of_window) kill = 0;   // pathological: fall back to v1.00 behaviour
+      for(int i = kill + 1; i < g_poi_n; i++) g_poi[i-1] = g_poi[i];
       g_poi_n--;
      }
+
    g_poi[g_poi_n] = p;
    g_poi_n++;
+  }
+
+// A-06 (opt-in): a session that ended on TIMEOUT may re-arm its POI, but
+// only after price has fully left the zone on a closed bar - otherwise the
+// session would restart on the very next bar, forever.
+// InpPOIMaxSessions = 1 (default) never reaches this path.
+void POIReArmCheck(const int n)
+  {
+   for(int i = 0; i < g_poi_n; i++)
+     {
+      if(!g_poi[i].awaiting_leave) continue;
+      if(g_poi[i].state != POI_TOUCHED || g_poi[i].out_of_window)
+        { g_poi[i].awaiting_leave = false; continue; }
+      if(RangesIntersect(g_m5[n].low, g_m5[n].high, g_poi[i].lo, g_poi[i].hi)) continue;
+      g_poi[i].awaiting_leave = false;
+      g_poi[i].state          = POI_ACTIVE;
+      g_poi[i].vis            = -1;
+     }
   }
 
 // Called for H4 bar h with the FVG (if any) that this bar completed.
@@ -56,10 +100,13 @@ void POIOnBar(const int h, const int fvg_idx)
       p.hi           = g_h4[o].high;            // FULL order block (Rule 5)
       p.lo           = g_h4[o].low;
       p.fvg_id       = g_h4fvg[fvg_idx].id;
-      p.state        = POI_ACTIVE;
-      p.touched_time = 0;
-      p.invalid_time = 0;
-      p.vis          = -1;
+      p.state          = POI_ACTIVE;
+      p.touched_time   = 0;
+      p.invalid_time   = 0;
+      p.out_of_window  = false;
+      p.session_count  = 0;
+      p.awaiting_leave = false;
+      p.vis            = -1;
       POIPush(p);
       return;
      }

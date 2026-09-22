@@ -142,3 +142,51 @@ Compile Status:
 Replay Status:
   NOT VERIFIED
 ```
+
+---
+
+## v1.01 — Bug Fix（A-11 / A-05 / A-06），交易逻辑不变
+
+```
+Version:  v1.01
+Date:     2026-09-22
+
+Changed Functions:
+  POIPush                 重写：逻辑窗口仍为 InpH4MaxPOIs，离开窗口的记录
+                          降级为 POI_EXPIRED + out_of_window 而非删除；
+                          物理淘汰只动已出窗记录，且永不动 Session 引用的那条
+  POIReArmCheck           新增（A-06，默认关闭）
+  SessionEndNow           新增 TIMEOUT 复触钩子（默认关闭）
+  SessionStart            记录 session_count
+  SessionMaintain         结束条件改为只认 POI_INVALID（Spec 5.1 字面）
+  OM_Unregister           新增
+  OM_DeleteOwner          新增：丢弃单个 owner 的图形而保留其记录（Spec 14.7）
+  OM_SyncAll              POI 循环处理 out_of_window
+  ProcessClosedM5BarPhase3 新增 POIReArmCheck 调用
+
+Changed States:
+  H4POI 新增 out_of_window / session_count / awaiting_leave
+  MAX_POIS 16 -> 64（物理存储；逻辑窗口默认仍为 12）
+
+Affected Modules:
+  HMI_Defs / HMI_Params / HMI_H4POIEngine / HMI_M5BlockEngine /
+  HMI_ObjectManager / H4M5_Identification.mq5
+
+Reason:
+  A-11：被挤出的 POI 记录被整条删除，导致图上僵尸矩形 + Session 悬空引用。
+  A-05：上述悬空引用的直接后果。
+  A-06：POI 复触做成默认关闭的开关，供后续 Replay 评估。
+
+Trading Logic Changed:
+  NO
+  - A-11 修复的等价性证明见 docs/06（可触碰集合 / 失效路径 / Session 结束条件
+    四项逐条一致）
+  - A-06 的 InpPOIMaxSessions 默认 1，代码路径永不进入
+  - A-05 的可观测行为刻意保持不变（未加 fail-safe，因为那会改变逻辑）
+
+Compile Status:
+  NOT COMPILE VERIFIED
+
+Replay Status:
+  NOT VERIFIED（新增 POI-06..POI-09 用例，其中 POI-07 就是 v1.00/v1.01 等价性回归）
+```

@@ -6,7 +6,7 @@
 #ifndef HMI_DEFS_MQH
 #define HMI_DEFS_MQH
 
-#define HMI_VERSION      "1.00"
+#define HMI_VERSION      "1.01"
 #define HMI_PREFIX       "HMI"
 
 //--- direction ------------------------------------------------------
@@ -23,7 +23,7 @@
 #define MAX_M5_SWINGS   128
 #define MAX_H4_FVG      128
 #define MAX_M5_FVG      256
-#define MAX_POIS         16
+#define MAX_POIS         64   // physical record store; the LOGICAL window is InpH4MaxPOIs
 #define MAX_BLOCKS       64
 #define MAX_BRKCAND      16
 #define MAX_CYCLES       32
@@ -115,7 +115,10 @@ struct H4POI
    POIState          state;
    datetime          touched_time;
    datetime          invalid_time;
-   int               vis;            // last drawn visual state
+   bool              out_of_window;  // pushed out of the logical window: record kept, graphics dropped
+   int               session_count;  // refinement sessions started from this POI
+   bool              awaiting_leave;  // timed out; price must fully leave before it re-arms
+   int               vis;            // last drawn visual state (-2 = graphics removed)
   };
 
 struct M5Block

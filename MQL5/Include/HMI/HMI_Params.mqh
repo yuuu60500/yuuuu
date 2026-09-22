@@ -29,6 +29,7 @@ input int    InpH4SwingRight          = 2;
 input int    InpH4MaxPOIs             = 12;
 input int    InpH4POIMaxAgeBars       = 120;  // H4 bars
 input int    InpH4TransitionMaxBars   = 18;   // H4 bars before TRANSITION -> RANGE
+input int    InpPOIMaxSessions        = 1;    // refinement sessions per H4 POI (1 = v1.00 behaviour)
 
 input group "=== M5 refinement ==="
 input int    InpM5SwingLeft           = 2;

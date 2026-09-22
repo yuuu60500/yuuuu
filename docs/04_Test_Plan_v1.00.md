@@ -28,6 +28,10 @@
 | POI-03 Touch | 价格回落触碰 POI | 触碰 K 线收盘时 POI → TOUCHED，同时 Refinement Session 建立 |
 | POI-04 Invalidation | H4 收盘跌破 POI 下沿 − margin | POI → INVALIDATED，样式改变，**矩形不消失** |
 | POI-05 Reload | 在 POI-03 之后 Refresh / 切周期 / 重启 MT5 | POI 的 confirm_time / zone / state 完全一致 |
+| POI-06 窗口挤出（A-11） | 连续创建超过 `InpH4MaxPOIs` 个 POI | 最旧的 POI **图形消失**（不是停留在存活样式）；其内部记录仍在且为 `POI_EXPIRED` |
+| POI-07 v1.00 等价性（A-11） | 同一区间跑 v1.00 与 v1.01，导出 CSV | 两份信号日志**逐行完全相同** |
+| POI-08 复触默认关闭（A-06） | `InpPOIMaxSessions = 1`，Session 超时后价格回到同一 POI | **不**开启新 Session（与 v1.00 相同） |
+| POI-09 复触开启（A-06） | `InpPOIMaxSessions = 2` | 必须先有一根已关闭 M5 完全脱离 POI 区间，之后再次触碰才开新 Session；价格一直压在区内则**永不**重启 |
 
 ### 2.2 M5 Order Block
 
