@@ -50,9 +50,12 @@ input int             InpPOITextSize    = 8;
 
 //================== H4 trading range / liquidity ===================
 input group "=== Style: H4 trading range & liquidity ==="
-input color           InpTRangeColor    = clrSlateGray;
+input color           InpTRangeColor    = clrSilver;      // was clrSlateGray: too dark to find
 input ENUM_LINE_STYLE InpTRangeStyle    = STYLE_DOT;
 input int             InpTRangeWidth    = 1;
+input bool            InpTRangeShowLabel= true;
+input color           InpTRangeTextColor= clrSilver;
+input int             InpTRangeTextSize = 7;
 input color           InpBSLColor       = clrSlateGray;      // buy-side liquidity
 input ENUM_LINE_STYLE InpBSLStyle       = STYLE_DOT;
 input int             InpBSLWidth       = 1;
@@ -174,7 +177,7 @@ StyleZone ZS_BLK_TOUCH, ZS_BLK_ARMED, ZS_BLK_DEAD;
 StyleZone ZS_BPR,       ZS_BPR_TOUCH, ZS_BPR_DEAD;
 StyleZone ZS_CISD_LINE, ZS_MSS_LINE;
 
-StyleText TS_POI, TS_ARMED, TS_LEVEL, TS_PANEL, TS_PREVIEW;
+StyleText TS_POI, TS_ARMED, TS_LEVEL, TS_PANEL, TS_PREVIEW, TS_TRANGE;
 
 void SetZ(StyleZone &z, const color c, const ENUM_LINE_STYLE s, const int w, const bool f)
   { z.clr = c; z.style = s; z.width = MathMax(1, w); z.fill = f; }
@@ -213,6 +216,7 @@ void StylesInit()
    SetT(TS_LEVEL,   InpLevelTextColor, InpLevelTextSize);
    SetT(TS_PANEL,   InpPanelColor,     InpPanelFontSize);
    SetT(TS_PREVIEW, InpPreviewColor,   InpPreviewTextSize);
+   SetT(TS_TRANGE,  InpTRangeTextColor, InpTRangeTextSize);
   }
 
 bool M5LayerOn() { return(InpM5Layer != M5LAYER_OFF); }

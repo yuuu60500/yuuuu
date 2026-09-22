@@ -9,7 +9,7 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "2.10"
+#property version   "2.11"
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window
@@ -194,6 +194,7 @@ void ResetEngine()
    g_sess.dir = DIR_NONE;  g_sess.start_index = 0;  g_sess.start_time = 0;
    g_sess.end_time = 0;    g_sess.end_reason = SE_NONE;
 
+   g_tr_drawn_id = -1;
    OM_DeleteOwnAll();
    OM_RecreateMarker();
   }

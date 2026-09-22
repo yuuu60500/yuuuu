@@ -488,3 +488,62 @@ Confidence:              —
 > 以上属于**目视确认**，不等于 `docs/04` 的用例通过。
 > Rule 71 / 72 要求的逐根 Replay 与 Reload 对比仍未执行，
 > 因此验收表中相关项仍为 NOT VERIFIED。
+
+---
+
+## Audit Round 4（2026-09-22）
+
+### A-18
+```
+ID:                      A-18
+Severity:                P2
+Module:                  HMI_ObjectManager
+Function:                OM_SyncAll（trading range 段）
+Location:                OM_Name(TT_TR, version_id, 0)
+Trigger:                 每一次 BOS / CHOCH / Forward Extension 产生新的
+                         TradingRange 版本
+Expected Behavior:       图上任何时刻只有当前版本的 Trading Range
+Actual Behavior:         版本化设计（Rule 4）让每个新版本拿到新的 version_id，
+                         于是生成**新的对象名**；旧版本的矩形从未被删除，
+                         长期运行会在图上堆积多个历史区间框。
+                         与 A-15（被扫流动性线不删）属于同一类：
+                         「对象名随状态变化」却没有配套的退休逻辑。
+Impact:                  图面混乱；用户可能把过期区间当成当前区间
+Historical Repaint:      NO
+Future Leak:             NO
+Business Logic Impact:   NO（纯显示）
+Recommended Fix:         追踪已绘制的 version_id，换版本时先删旧的三个对象
+Status:                  FIXED — v2.11
+Confidence:              HIGH
+```
+
+### A-19 —— **我自己在 v2.04 引入的回归**
+```
+ID:                      A-19
+Severity:                P0
+Module:                  HMI_ObjectManager
+Function:                （编译期）
+Location:                #define MAX_PANEL_ROWS 与 OM_KZDelete 之间
+Trigger:                 F7 编译
+Expected Behavior:       v2.04 只撤销 v2.03 的折行
+Actual Behavior:         撤销时按「注释起点 → OM_KZDelete」整段删除，
+                         把夹在中间的 Kill Zone 追踪声明一并删掉：
+                           #define MAX_KZ_DRAWN 64
+                           int      g_kzd_zone[MAX_KZ_DRAWN];
+                           datetime g_kzd_anchor[MAX_KZ_DRAWN];
+                           int      g_kzd_n = 0;
+                         **v2.04 与 v2.10 均无法编译**（undeclared identifier）。
+                         两版都已发布，但用户尚未编译，所以没有暴露。
+Impact:                  两个已发布版本不可用
+Historical Repaint:      NO
+Future Leak:             NO
+Business Logic Impact:   NO
+Recommended Fix:         恢复四行声明
+Status:                  FIXED — v2.11
+Confidence:              HIGH
+```
+
+**教训:** 按「起点字符串 → 终点字符串」整段删除,会连带删掉期间**后来插入**的内容。
+撤销一个改动时,应当按该改动自身的边界删除,而不是按当前文件里两个锚点之间的范围。
+本轮已加入一个简单的静态自检(列出全局标识符,逐个确认有声明),
+但它**替代不了编译器** —— 这正是 A-09 之后本项目反复验证的一点。

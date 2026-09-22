@@ -207,6 +207,17 @@ void OM_PanelRow(const int row, const string text, const int ypix, const color c
 
 #define MAX_PANEL_ROWS 12
 
+//================== kill zone bookkeeping ==========================
+#define MAX_KZ_DRAWN 64
+int      g_kzd_zone[MAX_KZ_DRAWN];
+datetime g_kzd_anchor[MAX_KZ_DRAWN];
+int      g_kzd_n = 0;
+
+// The trading range is versioned (Rule 4): every BOS / CHOCH / forward
+// extension closes the live version and appends a new one with a NEW id,
+// hence a NEW object name. Without tracking the drawn version, the
+// superseded rectangle stayed on the chart forever (A-18).
+long     g_tr_drawn_id = -1;
 
 void OM_KZDelete(const int zone, const datetime anchor)
   {
@@ -398,12 +409,28 @@ void OM_SyncAll()
 
    OM_DrawPanel();
 
-   //--- trading range ----------------------------------------------
+   //--- trading range: exactly one version on screen ----------------
    if(InpShowTradingRange && g_tr_n > 0)
      {
       int i = g_tr_n - 1;
-      OM_Rect(OM_Name(TT_TR, g_tr[i].version_id, 0), g_tr[i].valid_from, g_tr[i].a_hi,
+      long vid = g_tr[i].version_id;
+      if(g_tr_drawn_id >= 0 && g_tr_drawn_id != vid)
+         OM_DeleteOwner(TT_TR, g_tr_drawn_id, 3);      // retire the superseded version
+      OM_Rect(OM_Name(TT_TR, vid, 0), g_tr[i].valid_from, g_tr[i].a_hi,
               redge, g_tr[i].a_lo, ZS_TRANGE);
+      if(InpTRangeShowLabel)
+        {
+         OM_Text(OM_Name(TT_TR, vid, 1), redge, g_tr[i].a_hi,
+                 "H4 RANGE HIGH", TS_TRANGE, ANCHOR_LEFT_LOWER);
+         OM_Text(OM_Name(TT_TR, vid, 2), redge, g_tr[i].a_lo,
+                 "H4 RANGE LOW", TS_TRANGE, ANCHOR_LEFT_UPPER);
+        }
+      g_tr_drawn_id = vid;
+     }
+   else if(g_tr_drawn_id >= 0)
+     {
+      OM_DeleteOwner(TT_TR, g_tr_drawn_id, 3);
+      g_tr_drawn_id = -1;
      }
 
    //--- liquidity: newest un-swept pools first, capped per side ------

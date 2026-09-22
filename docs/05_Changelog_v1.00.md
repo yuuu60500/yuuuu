@@ -619,3 +619,41 @@ Trading Logic Changed:
 Compile Status:
   PASS 于 v2.02；v2.10 尚未编译验证。
 ```
+
+---
+
+## v2.11 — Trading Range 标签 + 修复 A-18 / A-19
+
+```
+Version:  v2.11
+Date:     2026-09-22
+
+Changed Functions:
+  OM_SyncAll（trading range 段）  重写：版本切换时退休旧对象 + 绘制两个标签
+  ResetEngine                     重置 g_tr_drawn_id
+
+New inputs:
+  InpTRangeShowLabel  = true
+  InpTRangeTextColor  = clrSilver
+  InpTRangeTextSize   = 7
+  InpTRangeColor      默认由 clrSlateGray 改为 clrSilver（原色在深色背景上几乎不可见）
+
+  说明：线的颜色 / 线型 / 线宽本来就有
+  （InpTRangeColor / InpTRangeStyle / InpTRangeWidth，v1.10 起），
+  本次新增的是**标签**及其文字样式。
+
+标签文字：H4 RANGE HIGH / H4 RANGE LOW，画在右边缘，
+          与 Kill Zone 的 "<NAME> HIGH / LOW" 命名保持一致。
+
+修复：
+  A-18  版本化 Trading Range 的旧版本矩形从不删除（与 A-15 同类）
+  A-19  **我在 v2.04 撤销折行时误删了 Kill Zone 的四行声明，
+        导致 v2.04 与 v2.10 无法编译。** 已恢复。
+
+Trading Logic Changed:
+  NO
+
+Compile Status:
+  NOT COMPILE VERIFIED —— v2.04 与 v2.10 实际上是坏的，
+  本版修复后必须重新 F7 确认。
+```
