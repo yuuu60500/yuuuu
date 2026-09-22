@@ -6,10 +6,13 @@
 
 ## 1. 文件结构
 
+> **v2.01 起：全部文件放在同一个文件夹** `MQL5/Indicators/HMI/`。
+> 主文件用引号 include（相对所在文件解析），21 个头文件之间本来就用引号，
+> 所以整套与位置无关。安装 = 拖一个文件夹，不再有 `Include` 目录找不到的问题。
+
 ```
 MQL5/Indicators/HMI/
    H4M5_Identification.mq5          // 入口：inputs / OnInit / OnCalculate / OnDeinit
-MQL5/Include/HMI/
    HMI_Defs.mqh                     // enum / struct / 常量 / 方向 / 类型码
    HMI_Params.mqh                   // 所有 input 的集中持有与派生值（PipSize / MarginPoints）
    HMI_Util.mqh                     // Pts() / SafeIdx() / CloseTime() / H4VisibleTo() / Hash

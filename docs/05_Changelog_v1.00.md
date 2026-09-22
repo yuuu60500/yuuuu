@@ -433,3 +433,40 @@ Compile Status:
 Replay Status:
   NOT VERIFIED（新增 BRK-00 与 POI-07b 用例）
 ```
+
+---
+
+## v2.01 — 打包修复：全部文件移入同一个文件夹
+
+```
+Version:  v2.01
+Date:     2026-09-22
+
+Changed Functions:
+  无。唯一的代码改动是主文件第 19 行：
+     #include <HMI/HMI_AlertManager.mqh>   ->   #include "HMI_AlertManager.mqh"
+
+Changed States:
+  无
+
+Affected Modules:
+  21 个 .mqh 从 MQL5/Include/HMI/ 移到 MQL5/Indicators/HMI/
+  MQL5/Include/ 目录删除
+
+Reason:
+  用户第一次 F7 报 "file 'Include\HMI\HMI_AlertManager.mqh' not found"。
+  尖括号 include 只在数据文件夹的 Include 下解析，所以安装必须精确地把文件拆到
+  两个目录，任何一步错位都编译不过。第二个错误 "OnCalculate function not found"
+  只是预处理在第 19 行中断后的连带结果，不是真的缺函数。
+
+  21 个头文件之间本来就用引号互相引用（相对所在文件解析，与位置无关），
+  所以只有主文件这一行需要改。改完之后安装 = 拖一个文件夹。
+
+Trading Logic Changed:
+  NO —— 未触碰任何逻辑，仅文件位置与一行 include 形式。
+
+Compile Status:
+  NOT COMPILE VERIFIED
+  注意：上一次 F7 在第 19 行就中断，2800 行头文件一行都没被检查过，
+  所以 "2 errors, 0 warnings" 完全不代表代码接近通过。
+```

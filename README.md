@@ -1,6 +1,6 @@
 # H4 Context → M5 Identification Indicator
 
-**Version:** spec v1.00 (frozen baseline) / code v2.00
+**Version:** spec v1.00 (frozen baseline) / code v2.01
 **Platform:** MetaTrader 5 / MQL5 Custom Indicator
 **Mode:** Trend-Following Only
 **Purpose:** MARK ONLY — Detect / Confirm / Track / Mark / Invalidate
@@ -83,31 +83,33 @@ H4 Context
 ## 源码
 
 ```
-MQL5/Indicators/HMI/H4M5_Identification.mq5     入口 / OnInit / OnCalculate / Phase 0-7
-MQL5/Include/HMI/HMI_Defs.mqh                   enum / struct / 全局状态
-MQL5/Include/HMI/HMI_Params.mqh                 功能 input（Rule 60：阈值不散落）
-MQL5/Include/HMI/HMI_Style.mqh                  样式 input：颜色 / 线型 / 线宽 / 字号
-MQL5/Include/HMI/HMI_KillZone.mqh               Kill Zone 时段 HIGH/LOW（纯显示，见 D-8）
-MQL5/Include/HMI/HMI_Ranges.mqh                 面板 ATR / ADR（纯显示，见 D-9）
-MQL5/Include/HMI/HMI_Util.mqh                   整数 point 比较 / pip / 时间工具
-MQL5/Include/HMI/HMI_Series.mqh                 M5 / H4 显式取数 + break margin（D-6）
-MQL5/Include/HMI/HMI_SwingEngine.mqh            fractal swing（带 confirm_time）
-MQL5/Include/HMI/HMI_FVGEngine.mqh              FVG + OB/FVG 连接判定
-MQL5/Include/HMI/HMI_H4StructureEngine.mqh      BOS / CHOCH
-MQL5/Include/HMI/HMI_H4ContextEngine.mqh        4 状态 Context 机
-MQL5/Include/HMI/HMI_H4RangeEngine.mqh          版本化 Trading Range + Liquidity
-MQL5/Include/HMI/HMI_H4POIEngine.mqh            H4 POI 全生命周期
-MQL5/Include/HMI/HMI_M5BlockEngine.mqh          Refinement Session / M5 OB / Breaker
-MQL5/Include/HMI/HMI_CycleManager.mqh           ARMED 仲裁 / Reference 冻结 / Cycle 隔离
-MQL5/Include/HMI/HMI_CISDEngine.mqh             CISD（不引用其它模型）
-MQL5/Include/HMI/HMI_MSSEngine.mqh              MSS（不引用其它模型）
-MQL5/Include/HMI/HMI_BPREngine.mqh              BPR（不引用其它模型）
-MQL5/Include/HMI/HMI_PriceActionEngine.mqh      PA x3（不引用其它模型）
-MQL5/Include/HMI/HMI_ObjectManager.mqh          唯一允许调用 Object* 的模块
-MQL5/Include/HMI/HMI_AlertManager.mqh           Phase 7 告警
+MQL5/Indicators/HMI/             <- 整个指标就这一个文件夹
+   H4M5_Identification.mq5          入口 / OnInit / OnCalculate / Phase 0-7
+   HMI_Defs.mqh                     enum / struct / 全局状态
+   HMI_Params.mqh                   功能 input（Rule 60：阈值不散落）
+   HMI_Style.mqh                    样式 input：颜色 / 线型 / 线宽 / 字号
+   HMI_KillZone.mqh                 Kill Zone 时段 HIGH/LOW（纯显示，见 D-8）
+   HMI_Ranges.mqh                   面板 ATR / ADR（纯显示，见 D-9）
+   HMI_Util.mqh                     整数 point 比较 / pip / 时间工具
+   HMI_Series.mqh                   M5 / H4 显式取数 + break margin（D-6）
+   HMI_SwingEngine.mqh              fractal swing（带 confirm_time）
+   HMI_FVGEngine.mqh                FVG + OB/FVG 连接判定
+   HMI_H4StructureEngine.mqh        BOS / CHOCH
+   HMI_H4ContextEngine.mqh          4 状态 Context 机
+   HMI_H4RangeEngine.mqh            版本化 Trading Range + Liquidity
+   HMI_H4POIEngine.mqh              H4 POI 全生命周期
+   HMI_M5BlockEngine.mqh            Refinement Session / M5 OB / Breaker
+   HMI_CycleManager.mqh             ARMED 仲裁 / Reference 冻结 / Cycle 隔离
+   HMI_CISDEngine.mqh               CISD（不引用其它模型）
+   HMI_MSSEngine.mqh                MSS（不引用其它模型）
+   HMI_BPREngine.mqh                BPR（不引用其它模型）
+   HMI_PriceActionEngine.mqh        PA x3（不引用其它模型）
+   HMI_ObjectManager.mqh            唯一允许调用 Object* 的模块
+   HMI_AlertManager.mqh             Phase 7 告警
 ```
 
-安装：把 `MQL5/` 下的两个目录复制到 MT5 数据目录的对应位置，挂在 **M5** 图表上。
+安装：把 `MQL5/Indicators/HMI` **整个文件夹**复制到 MT5 数据文件夹的 `MQL5\Indicators\` 下，
+挂在 **M5** 图表上。**不需要动 `Include` 目录。**
 
 > **NOT COMPILE VERIFIED** —— 本仓库的代码从未经过 MetaEditor 编译，
 > 也从未在 MT5 上跑过 Replay。任何"0 Errors / 0 Warnings"或"Replay PASS"的说法
