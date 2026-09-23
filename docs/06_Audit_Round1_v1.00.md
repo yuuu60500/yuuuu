@@ -333,7 +333,7 @@ Object Management:     PASS (static) / NOT VERIFIED (replay)
                        注：编译通过只证明语法与类型，不证明任何行为
 Multi-instance:        PASS (static) / NOT VERIFIED (replay)
 Historical vs Live:    PARTIAL PASS  (重建可复现已证；LIVE vs BUILD 待测)
-MetaEditor:            PASS          (v2.11, 0 errors / 0 warnings, 2026-09-22)
+MetaEditor:            PASS          (v2.21, 0 errors / 0 warnings, 2026-09-23)
                        注：v2.04 / v2.10 因 A-19 实际不可编译，已于 v2.11 修复并复验
 Replay:                NOT VERIFIED
 ```

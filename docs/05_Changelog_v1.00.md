@@ -788,8 +788,7 @@ Trading Logic Changed:
         是行为等价的提取，未改任何阈值、过滤或信号时序（Rule 68/69）。
 
 Compile Status:
-  NOT COMPILE VERIFIED   （v2.11 为最后一次实测 PASS；本版改动待用户在
-                           MetaEditor 按 F7 验证）
+  PASS — 0 errors / 0 warnings（用户实测，2026-09-23，2886 ms，AVX2 + FMA3）
 
 Replay Status:
   POI-02b   待执行（流程见 docs/04）
@@ -831,7 +830,7 @@ Trading Logic Changed:
   NO —— 指标源码未改动任何逻辑。
 
 Compile Status:
-  NOT COMPILE VERIFIED   （与 v2.20 同批，待用户 F7）
+  PASS — 0 errors / 0 warnings（用户实测，2026-09-23，2886 ms，AVX2 + FMA3）
 
 Replay Status:
   POI-02b       待执行

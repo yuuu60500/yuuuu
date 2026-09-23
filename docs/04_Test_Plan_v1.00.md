@@ -435,6 +435,6 @@ PA:                    NOT VERIFIED
 Object Management:     NOT VERIFIED
 Multi-instance:        NOT VERIFIED
 Historical vs Live:    NOT VERIFIED
-MetaEditor:            NOT COMPILE VERIFIED
+MetaEditor:            PASS         (v2.21, 0 errors / 0 warnings, 2026-09-23)
 Replay:                NOT VERIFIED
 ```
