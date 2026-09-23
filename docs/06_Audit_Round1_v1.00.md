@@ -321,10 +321,11 @@ Historical Repaint:    PASS          (2026-09-23 实测，四品种同时挂载�
 H4/M5 Alignment:       PASS          (2026-09-23 实测：M2/M5/M15/M30 四种图表周期
                                      14 次构建结果完全一致，验证 §15.4 周期独立性)
 H4 POI:                PARTIAL PASS  (POI-01 / POI-02a 接受侧已用真实数据逐条核对；
-                                     POI-02b 否决侧四品种取得 31 条样本，
-                                     29 条可读行的 gap_pts 手算复核零误差、全部为正 ——
-                                     算术侧 PASS；K 线方向 / FVG 存在性 / 图上无矩形
-                                     三项仍需数据窗口核对，故整条不记 PASS；
+                                     POI-02b 否决侧 PASS —— AUDUSD 2026.09.03 一条
+                                     完整追溯八项全中（FVG 存在 / 边界 / CONF-14 /
+                                     OB 反方向 / 边界 / gap 14 点 / 图上无矩形），
+                                     另 29 条 gap_pts 手算零误差；
+                                     已排除「超上限删图形」的误判（12 上限，实际 3 个）；
                                      POI-03..09 仍未验证)
 M5 OB:                 NOT VERIFIED
 M5 Breaker:            NOT VERIFIED

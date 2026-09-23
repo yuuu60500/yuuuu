@@ -878,3 +878,30 @@ Replay Status:
   POI-02b       待执行
   Future Leak   待执行（四品种 Live 测试进行中）
 ```
+
+---
+
+## 测试记录 —— POI-02b PASS（无代码改动）
+
+```
+Version:  v2.22（未改动）
+Date:     2026-09-23
+
+Changed Functions:
+  (none)
+
+Affected Modules:
+  docs/04_Test_Plan_v1.00.md     POI-02b 由「待执行」改为 PASS，附完整追溯
+  docs/06_Audit_Round1_v1.00.md  Rule 73 验收表 H4 POI 一栏更新
+  README.md                      Phase 6 状态
+
+Reason:
+  v2.20 加的 HMI-REJECT 诊断在四品种上取得 31 条样本。
+  取 AUDUSD 2026.09.03 一条完整追溯：FVG 三根原始 OHLC、OB 的反方向性与
+  High/Low、CONF-14 的回溯顺序、Rule 6 的 14 点空隙，全部与日志一致；
+  对象列表确认 09.03 00:00 处无 POI 矩形，且已排除「超上限删图形」的误判
+  （InpH4MaxPOIs = 12，实际仅 3 个 POI，淘汰分支从未执行）。
+
+Trading Logic Changed:
+  NO —— 本次只写文档。
+```
