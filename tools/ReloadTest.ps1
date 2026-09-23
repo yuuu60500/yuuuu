@@ -8,13 +8,17 @@
 #  Usage:
 #     .\ReloadTest.ps1                       list sources and their blocks
 #     .\ReloadTest.ps1 -Source "USDJPY,M5"   compare the last two blocks
-#                                            of ONE chart
+#                                            of ONE chart  (repaint test)
+#     .\ReloadTest.ps1 -Source "USDJPY,M5" -LiveVsBuild
+#                                            every mark emitted LIVE must
+#                                            reappear identically in the
+#                                            rebuild  (future-leak test)
 #
 #  Several charts each run their own instance and write into the SAME log,
 #  so blocks interleave. Comparing across sources would be meaningless -
 #  hence the grouping below.
 # ============================================================
-param([string]$Source = "")
+param([string]$Source = "", [switch]$LiveVsBuild)
 
 $log = Get-ChildItem *.log | Sort-Object LastWriteTime | Select-Object -Last 1
 Write-Host "log file : $($log.Name)" -ForegroundColor Cyan
@@ -48,6 +52,41 @@ foreach ($g in $sources) {
 
 if ($Source -eq "") {
     Write-Host "`npick one chart, e.g.:  .\ReloadTest.ps1 -Source `"USDJPY,M5`"" -ForegroundColor Yellow
+    exit
+}
+
+if ($LiveVsBuild) {
+    # A reload test cannot see a future leak: a leaking build re-reads the
+    # same future bars every time and stays self-consistent. Live rows were
+    # emitted bar by bar with only the past available, so a mark that does
+    # not survive into the rebuild - or changes - is the real signal.
+    $live = @()
+    foreach ($l in $raw) {
+        $src = if ($l -match '\(([A-Za-z0-9._#]+,[A-Za-z0-9]+)\)') { $Matches[1] } else { '?' }
+        if ($src -eq $Source -and $l -match 'HMI-LIVE,(.*)$') { $live += $Matches[1] }
+    }
+    $sel2 = $blocks | Where-Object { $_.Src -eq $Source }
+    if ($sel2.Count -lt 1) { Write-Host "`nno build block for '$Source'." -ForegroundColor Red; exit }
+    $build = $sel2[-1].Rows
+
+    Write-Host "`n--- $Source : LIVE vs BUILD ---" -ForegroundColor Cyan
+    Write-Host "  live rows  : $($live.Count)"
+    Write-Host "  build rows : $($build.Count)  ($($sel2[-1].Head))"
+    if ($live.Count -eq 0) {
+        Write-Host "`nno HMI-LIVE rows yet. Leave the chart running until new marks" -ForegroundColor Yellow
+        Write-Host "confirm live, then reload once and run this again." -ForegroundColor Yellow
+        exit
+    }
+    $missing = $live | Where-Object { $build -notcontains $_ }
+    if (-not $missing) {
+        Write-Host "`nALL $($live.Count) LIVE MARKS SURVIVED THE REBUILD, byte for byte." -ForegroundColor Green
+        Write-Host "no sign of a future leak in this window." -ForegroundColor Green
+    } else {
+        Write-Host "`n$($missing.Count) LIVE mark(s) do NOT appear in the rebuild:" -ForegroundColor Red
+        $missing | Select-Object -First 20 | ForEach-Object { Write-Host "  $_" }
+        $missing | Set-Content live_vs_build_diff.txt
+        Write-Host "written to live_vs_build_diff.txt" -ForegroundColor Red
+    }
     exit
 }
 

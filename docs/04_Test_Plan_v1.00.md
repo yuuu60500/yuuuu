@@ -57,6 +57,71 @@ H4 原始数据（数据窗口逐根读出）
 
 ---
 
+### ✅ Reload 一致性 —— PASS（2026-09-23，USDJPY，v2.13）
+
+```
+USDJPY,M5   -> 7 blocks    全部 rows=143
+USDJPY,M15  -> 5 blocks    全部 rows=143
+USDJPY,M2   -> 1 block     rows=143
+USDJPY,M30  -> 1 block     rows=143
+
+窗口一致：m5_bars=5000, h4_bars=500, from=2026.08.28 18:30, to=2026.09.23 03:25
+
+--- USDJPY,M5 : comparing the last two builds ---
+IDENTICAL - 143 rows match exactly. No repaint.
+```
+
+| 用例 | 结果 | 依据 |
+|------|------|------|
+| POI-05 / CISD-06 / MSS-06（Reload 一致性） | **PASS** | 同一图表两次重建逐字节相同 |
+| §15.4 图表周期独立性 | **PASS** | **14 次独立构建、4 种图表周期（M2/M5/M15/M30），全部 143 行、窗口一致** |
+| CONF-16 窗口滑动 | **符合预期** | block[0] 窗口早一根（18:25→03:20），行数仍为 143，滑出/滑入的 K 线均不带标记 |
+
+**这个结果不能证明什么（重要）：**
+
+```
+Reload 一致性  =  「重建是数据窗口的纯函数」
+              ≠  「没有使用未来数据」
+```
+
+若实现中存在未来函数，每次重建都会读到同样的未来 K 线，于是每次都产出同样的
+（错误的）结果 —— 照样 IDENTICAL。**该测试对 Future Leak 是盲的。**
+
+真正的 Future Leak 实测见下一节。
+
+---
+
+### Future Leak 测试 —— LIVE vs BUILD
+
+```
+HMI-LIVE   逐根实时产生：那一刻只有「到当前 K 线为止」的数据
+HMI-BUILD  重建产生：整个窗口都在手上
+```
+
+若某个标记实时产生时是 A，重建后变成 B（或消失 / 多出），
+说明重建用到了当时不可能拥有的数据 —— 这就是 Rule 51「Historical Build ≈ Live Replay」
+的实测，也是唯一能证伪 Future Leak 的日志级方法。
+
+**步骤：**
+
+1. `InpLogSignals = true`，**让图表持续运行**，直到有新的标记在实时状态下确认
+   （日志里出现 `HMI-LIVE,` 开头的行）
+2. 重载一次（切周期往返）
+3. ```powershell
+   .\ReloadTest.ps1 -Source "USDJPY,M5" -LiveVsBuild
+   ```
+
+**判定：**
+
+| 输出 | 结论 |
+|------|------|
+| `ALL n LIVE MARKS SURVIVED THE REBUILD, byte for byte.` | 本窗口内**未见** Future Leak |
+| `n LIVE mark(s) do NOT appear in the rebuild` | **确认 Future Leak 或实时/重建路径不一致** |
+
+> 成本说明：需要等实时确认出新标记，可能要数小时。这是这项测试无法回避的代价。
+
+---
+
 ## 2. 逐模块 Replay Test (Rule 71)
 
 ### 2.1 H4 POI

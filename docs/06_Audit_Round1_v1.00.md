@@ -312,8 +312,11 @@ Architecture:          PASS          (规格 + 代码结构一致)
 Code Version:          v1.01         (v1.00 spec baseline 未变)
 Business Logic:        PASS          (D-1..D-7 已裁决并落地)
 Future Leak:           PASS (static) / NOT VERIFIED (replay)
-Historical Repaint:    PASS (static) / NOT VERIFIED (replay)
-H4/M5 Alignment:       PASS (static) / NOT VERIFIED (replay)
+                       注：Reload 一致性对 Future Leak 是盲的 ——
+                       有未来函数的实现每次重建都会自洽。见 docs/04 的 LIVE vs BUILD
+Historical Repaint:    PASS          (2026-09-23 实测：同图表两次重建 143 行逐字节相同)
+H4/M5 Alignment:       PASS          (2026-09-23 实测：M2/M5/M15/M30 四种图表周期
+                                     14 次构建结果完全一致，验证 §15.4 周期独立性)
 H4 POI:                PARTIAL PASS  (POI-01 / POI-02 已用真实数据逐条核对，
                                      见 docs/04「已执行的验证记录」；
                                      POI-03..09 仍未验证)
@@ -328,7 +331,7 @@ PA:                    NOT VERIFIED
 Object Management:     PASS (static) / NOT VERIFIED (replay)
                        注：编译通过只证明语法与类型，不证明任何行为
 Multi-instance:        PASS (static) / NOT VERIFIED (replay)
-Historical vs Live:    NOT VERIFIED
+Historical vs Live:    PARTIAL PASS  (重建可复现已证；LIVE vs BUILD 待测)
 MetaEditor:            PASS          (v2.11, 0 errors / 0 warnings, 2026-09-22)
                        注：v2.04 / v2.10 因 A-19 实际不可编译，已于 v2.11 修复并复验
 Replay:                NOT VERIFIED
