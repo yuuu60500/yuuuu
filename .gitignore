@@ -1,0 +1,12 @@
+# Packaged indicator zips are built from MQL5/Indicators/HMI/ on demand and
+# sent to the user directly; the source in the tree is the record, not the
+# binary. Keeping them out avoids one opaque blob per shipped version.
+HMI_v*.zip
+
+# MT5 artefacts, if a compiled build ever lands in the tree
+*.ex5
+
+# Test-script output written next to the log file
+reload_diff.txt
+live_vs_build_diff.txt
+poi_rejects.txt
