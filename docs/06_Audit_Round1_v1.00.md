@@ -314,12 +314,17 @@ Business Logic:        PASS          (D-1..D-7 已裁决并落地)
 Future Leak:           PASS (static) / NOT VERIFIED (replay)
                        注：Reload 一致性对 Future Leak 是盲的 ——
                        有未来函数的实现每次重建都会自洽。见 docs/04 的 LIVE vs BUILD
-Historical Repaint:    PASS          (2026-09-23 实测：同图表两次重建 143 行逐字节相同)
+Historical Repaint:    PASS          (2026-09-23 实测，四品种同时挂载：
+                                     AUDUSD 156 / EURUSD 199 / GBPUSD 52 / USDJPY 143 行，
+                                     每个品种全部 block 行数一致；EURUSD/GBPUSD 窗口相同
+                                     逐字节相等，AUDUSD/USDJPY 窗口滑动后剔除序号相等)
 H4/M5 Alignment:       PASS          (2026-09-23 实测：M2/M5/M15/M30 四种图表周期
                                      14 次构建结果完全一致，验证 §15.4 周期独立性)
-H4 POI:                PARTIAL PASS  (POI-01 / POI-02a 接受侧已用真实数据逐条核对，
-                                     见 docs/04「已执行的验证记录」；
-                                     POI-02b 否决侧 v2.20 起可测，流程已写，待执行；
+H4 POI:                PARTIAL PASS  (POI-01 / POI-02a 接受侧已用真实数据逐条核对；
+                                     POI-02b 否决侧四品种取得 31 条样本，
+                                     29 条可读行的 gap_pts 手算复核零误差、全部为正 ——
+                                     算术侧 PASS；K 线方向 / FVG 存在性 / 图上无矩形
+                                     三项仍需数据窗口核对，故整条不记 PASS；
                                      POI-03..09 仍未验证)
 M5 OB:                 NOT VERIFIED
 M5 Breaker:            NOT VERIFIED
@@ -331,7 +336,9 @@ BPR:                   NOT VERIFIED
 PA:                    NOT VERIFIED
 Object Management:     PASS (static) / NOT VERIFIED (replay)
                        注：编译通过只证明语法与类型，不证明任何行为
-Multi-instance:        PASS (static) / NOT VERIFIED (replay)
+Multi-instance:        PARTIAL PASS  (2026-09-23 实测：四个实例同时写同一日志，
+                                     按 (SYMBOL,TF) 分组后各自结果互不污染；
+                                     同图表多实例仍未测)
 Historical vs Live:    PARTIAL PASS  (重建可复现已证；LIVE vs BUILD 待测)
 MetaEditor:            PASS          (v2.21, 0 errors / 0 warnings, 2026-09-23)
                        注：v2.04 / v2.10 因 A-19 实际不可编译，已于 v2.11 修复并复验
@@ -586,6 +593,12 @@ Actual Behavior:         日志行第 4、5 列是 cycle_id / block_id，
 Evidence:                源码直读（三处，见上）。只要实时期间有任意一个
                          id 分配事件落在被丢弃的最老区间内即触发；
                          跨天挂机必然发生。
+                         **2026-09-23 实测确认：** AUDUSD,M5 与 USDJPY,M5
+                         的最后两次重建窗口不同，整行比对不等、剔除
+                         cycle_id / block_id 后 156 / 143 行完全相等 ——
+                         正是本条描述的序号漂移，且无任何真实重绘。
+                         同一次运行里窗口相同的 EURUSD / GBPUSD 走整行
+                         相等分支，证明修复没有把真差异一并掩盖。
 Impact:                  Future Leak 测试不可信（假阳性）
 Historical Repaint:      NO
 Future Leak:             NO   —— 这是测试工具的缺陷，不是指标的缺陷
@@ -665,5 +678,23 @@ Business Logic Impact:   NO
 Recommended Fix:         -Source 改为可选：不给就遍历日志里出现的全部图表；
                          给了但不在列表里则明确报错，而不是返回空。
 Status:                  **FIXED — v2.22**
+Confidence:              HIGH
+```
+
+### A-24 —— **测试工具缺陷：多品种跑 -Rejects 时输出文件互相覆盖**
+
+```
+Severity:                P3
+Rule Violated:           Rule 52
+Location:                tools/ReloadTest.ps1 v2.21（Set-Content poi_rejects.txt）
+Trigger:                 用循环对四个品种连跑 -Rejects
+Actual Behavior:         三次都写同一个 poi_rejects.txt，后一次覆盖前一次；
+                         屏幕上四份结果都在，落地文件只剩最后一个品种。
+Impact:                  多品种样本只能靠滚屏回看，容易漏
+Historical Repaint:      NO
+Future Leak:             NO
+Business Logic Impact:   NO
+Recommended Fix:         输出文件名带上品种与周期
+Status:                  **FIXED — v2.22（已按 poi_rejects_<SYM>_<TF>.txt 命名）**
 Confidence:              HIGH
 ```

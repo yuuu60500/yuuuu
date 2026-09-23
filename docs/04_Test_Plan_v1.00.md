@@ -111,6 +111,83 @@ HMI-REJECT,<symbol>,H4POI,<BULL|BEAR>,fvg=<time>,fvg_lo=..,fvg_hi=..|ob=<time>,o
 
 ---
 
+### ✅ 重绘测试（四品种）—— PASS（2026-09-23，v2.21）
+
+AUDUSD / EURUSD / GBPUSD / USDJPY 四张 M5 图同时挂载，各自多次重建：
+
+| 品种 | block 数 | 每个 block 行数 | 最后两次窗口 | 结果 |
+|------|---------|---------------|------------|------|
+| AUDUSD,M5 | 3 | 156 | **不同**（07:40→08:05 / 16:15→16:40） | IDENTICAL apart from cycle_id / block_id |
+| EURUSD,M5 | 4 | 199 | 相同（08:05 / 16:40） | **IDENTICAL — 199 rows match exactly** |
+| GBPUSD,M5 | 4 | 52 | 相同（07:55 / 16:40） | **IDENTICAL — 52 rows match exactly** |
+| USDJPY,M5 | 3 | 143 | **不同**（05:35→07:45 / 14:30→16:40） | IDENTICAL apart from cycle_id / block_id |
+
+**两点值得单独记下：**
+
+1. **窗口滑动了行数却不变。** 四个品种的所有 block（含最早那次 `to=14:10`
+   与最后那次 `to=16:40`）行数完全一致。窗口整体前移而历史标记数量不动，
+   说明新数据没有改写旧结论。
+
+2. **A-20 描述的重新编号被实测到了。** AUDUSD 与 USDJPY 的最后两次窗口不同，
+   整行比对不等、剔除 `cycle_id` / `block_id` 后完全相等 —— 正是 A-20 预测的
+   序号漂移。这同时是两件事的证据：
+   - A-20 的机制成立（此前只有源码推理，现在有运行时证据）
+   - v2.21 的修复有效：真重绘与重新编号被正确区分开了
+   窗口相同的 EURUSD / GBPUSD 则连序号都一致，走的是更严的整行相等分支。
+
+> 与前一条一样：**这仍然测不出未来函数**。见下面的 LIVE vs BUILD。
+
+---
+
+### ⏳ POI-02b（Rule 6 否决侧）—— 算术侧 PASS，图表侧待核（2026-09-23，v2.21）
+
+四品种一次跑出 31 条否决记录（EURUSD 那次的计数未截到）：
+
+```
+AUDUSD    8 refused FVG(s)
+GBPUSD   14 refused FVG(s)
+USDJPY    9 refused FVG(s)
+```
+
+**已核对：29 条可读行的 `gap_pts` 全部逐条手算复核，零误差。**
+
+| 检查项 | 结果 |
+|-------|------|
+| BULL 方向公式 `fvg_lo − ob_hi` | 29/29 与日志 `gap_pts` 完全一致 |
+| BEAR 方向公式 `ob_lo − fvg_hi` | 同上 |
+| 空隙为正 | 29/29 严格 > 0（容差 0 点） |
+| 点值换算（5 位 / 3 位品种） | 29/29 正确 |
+
+抽样（AUDUSD，5 位，1 点 = 0.00001）：
+
+```
+BEAR  ob_lo 0.71154 − fvg_hi 0.71026 = 0.00128 → 128 pts   日志 gap_pts=128
+BULL  fvg_lo 0.70386 − ob_hi 0.70318 = 0.00068 →  68 pts   日志 gap_pts=68
+```
+
+USDJPY（3 位，1 点 = 0.001）：
+
+```
+BEAR  ob_lo 163.457 − fvg_hi 162.311 = 1.146 → 1146 pts    日志 gap_pts=1146
+BULL  fvg_lo 160.774 − ob_hi 160.700 = 0.074 →   74 pts    日志 gap_pts=74
+```
+
+**尚未核对（必须在数据窗口做，日志给不出）：**
+
+| 检查项 | 为什么日志不够 |
+|-------|--------------|
+| `ob=` 那根是否为反方向 K 线 | 日志只有 High / Low，没有 Open / Close |
+| FVG 是否真实存在 | 需要 `high[i-2]` / `low[i]` 三根原始 K 线 |
+| **该 OB 处是否确实没有 POI 矩形** | 这是整条规则的落点，只能看图 |
+
+前两项若不符 = OB 选取或 FVG 判定有误；第三项若出现矩形 = Rule 6 被绕过，
+属 Confirmed Bug。三项全中才算 POI-02b PASS。
+
+> 顺带：v2.21 把三个品种的结果都写进同一个 `poi_rejects.txt`，
+> 后一次覆盖前一次，屏幕上只留最后的 USDJPY。v2.22 已按品种分文件。
+
+---
+
 ### ✅ Reload 一致性 —— PASS（2026-09-23，USDJPY，v2.13）
 
 ```
