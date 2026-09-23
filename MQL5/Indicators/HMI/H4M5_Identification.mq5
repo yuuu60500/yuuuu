@@ -9,7 +9,7 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "2.12"
+#property version   "2.13"
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window
@@ -241,6 +241,8 @@ int OnInit()
       return(INIT_FAILED);
      }
    IndicatorSetString(INDICATOR_SHORTNAME, "HMI v" + HMI_VERSION + " [" + g_inst + "]");
+   PrintFormat("HMI v%s starting on %s %s  instance=%s",
+               HMI_VERSION, _Symbol, EnumToString((ENUM_TIMEFRAMES)Period()), g_inst);
 
    double m = 0.0;
    switch(InpBreakMarginMode)
