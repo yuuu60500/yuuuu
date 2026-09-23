@@ -157,6 +157,43 @@ H4 原始数据（数据窗口逐根读出）
 
 ## 3. Repaint Test (Rule 72)
 
+### 3.0 Reload 一致性测试（最快能证伪重绘的做法）
+
+**前置：** v2.12 起，每次历史重建会在日志里写一对标记，
+用于界定「一次构建」的边界，并暴露窗口是否滑动：
+
+```
+HMI-BUILD-BEGIN,USDJPY,m5_bars=5000,h4_bars=500,from=2026.09.05 12:35,to=2026.09.22 19:20
+HMI-BUILD,...            <- 每个确认的标记一行
+HMI-BUILD-END,USDJPY,marks=137,cycles=20,pois=12,blocks=64
+```
+
+**步骤：**
+
+1. 指标参数 `InpLogSignals = true`
+   （改参数本身就会触发一次重新初始化 → 完整重建 → 写下第 1 个 block）
+2. 在 `<数据文件夹>\MQL5\Logs` 里 Shift+右键 → 在此处打开 PowerShell
+3. `.\ReloadTest.ps1` —— 确认能看到 1 个 block
+4. **强制重建**（三选一，可靠性从高到低）：
+   - 切周期 M5 → M15 → M5
+   - 改一个纯显示参数（例如 `InpPanelX` 10 → 11）
+   - 移除指标再重新添加
+   > 注意：图表「刷新」**不一定**触发重建 —— 它不重新调用 `OnInit`。
+   > 用上面三种之一，并用步骤 5 确认 block 数确实增加了。
+5. `.\ReloadTest.ps1 -Compare`
+
+**判定：**
+
+| 输出 | 含义 |
+|------|------|
+| `IDENTICAL - N rows match exactly` | 本区间**无重绘**，POI-05 / CISD-06 / MSS-06 通过 |
+| `DIFFERENCES: n` 且 `WINDOW MOVED` 同时出现，差异只在最老边缘 | 窗口滑动，非重绘（见 CONF-16） |
+| `DIFFERENCES: n`，差异出现在中间任意位置 | **重绘或未来函数，真问题** |
+
+脚本位于仓库 `tools/ReloadTest.ps1`。
+
+---
+
 ### 3.1 执行流程
 
 ```

@@ -9,7 +9,7 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "2.11"
+#property version   "2.12"
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window
@@ -54,6 +54,8 @@ void H4ProcessBar(const int h)
 //+------------------------------------------------------------------+
 //| Phase 7 logging half (CSV, for build-vs-live diffing)            |
 //+------------------------------------------------------------------+
+int g_log_count = 0;          // marks written this build, for the BEGIN/END markers
+
 void LogPhase7()
   {
    if(!InpLogSignals) return;
@@ -65,6 +67,7 @@ void LogPhase7()
          if(g_cyc[ci].result[m] != MR_CONFIRMED) continue;
          if((g_cyc[ci].logged_mask & (1 << m)) != 0) continue;
          g_cyc[ci].logged_mask |= (1 << m);
+         g_log_count++;
          double lvl = (m == MDL_CISD ? g_cyc[ci].cisd_level
                       : (m == MDL_MSS ? g_cyc[ci].mss_level : 0.0));
          datetime rt = (m == MDL_CISD ? g_cyc[ci].cisd_ref_time
@@ -202,8 +205,24 @@ void ResetEngine()
 void BuildHistory()
   {
    g_live = false;
+   g_log_count = 0;
+
+   // Bracketing the build makes the reload comparison self-verifying: the
+   // two markers delimit each run's block, and from=/to= expose a window
+   // that slid because a new M5 bar closed between runs - which would
+   // otherwise look like a repaint at the oldest edge.
+   if(InpLogSignals)
+      PrintFormat("HMI-BUILD-BEGIN,%s,m5_bars=%d,h4_bars=%d,from=%s,to=%s",
+                  _Symbol, g_m5_n, g_h4_n,
+                  TimeToString(g_m5[0].time, TIME_DATE|TIME_MINUTES),
+                  TimeToString(g_m5[g_m5_n-1].time, TIME_DATE|TIME_MINUTES));
+
    for(int n = 0; n < g_m5_n; n++) ProcessClosedM5Bar(n);
    g_live = true;
+
+   if(InpLogSignals)
+      PrintFormat("HMI-BUILD-END,%s,marks=%d,cycles=%d,pois=%d,blocks=%d",
+                  _Symbol, g_log_count, g_cyc_n, g_poi_n, g_blk_n);
    g_alertq_n = 0;                     // historical build never alerts
    OM_SyncAll();
    OM_Trim();

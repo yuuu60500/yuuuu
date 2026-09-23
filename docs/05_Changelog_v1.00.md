@@ -658,3 +658,33 @@ Compile Status:
   编译清单中 HMI_CISDEngine.mqh 与 HMI_MSSEngine.mqh 均在列，
   同时复核了 A-16 的修复确实生效。
 ```
+
+---
+
+## v2.12 — 构建标记 + Reload 测试脚本
+
+```
+Version:  v2.12
+Date:     2026-09-23
+
+Changed Functions:
+  BuildHistory   在历史重建前后写 HMI-BUILD-BEGIN / HMI-BUILD-END
+                 （仅当 InpLogSignals = true）
+  LogPhase7      计数 g_log_count
+
+New files:
+  tools/ReloadTest.ps1   按标记切分日志、剥掉 MT5 时间戳前缀、比对最后两个 block
+
+Reason:
+  做 Reload 一致性测试时有三个坑，全部由标记解决：
+   1. 日志是追加写的，两次运行混在同一个文件里 —— BEGIN/END 界定边界
+   2. MT5 的时间戳前缀每次不同 —— 脚本按 'HMI-BUILD,' 切开只留载荷
+   3. 若期间跨了新的 M5 K 线，历史窗口会整体前移一根，最老边缘的差异
+      是合理的 —— BEGIN 的 from=/to= 直接暴露这件事，不必猜
+
+Trading Logic Changed:
+  NO —— 只增加日志输出，且全部在 InpLogSignals 之后。
+
+Compile Status:
+  NOT COMPILE VERIFIED（v2.11 PASS，本版改动待编译）
+```
