@@ -18,16 +18,34 @@
 #                                            Rule 6 REFUSED, with the measured
 #                                            gap  (refusal-side test, POI-02b)
 #
+#     add  -Days 5  to any of the above to merge the 5 most recent log files.
+#     MT5 starts a NEW log file every day. A live run that spans days leaves
+#     its marks in yesterday's file while today's reload writes into today's,
+#     and a single-file read would silently see none of them.
+#
 #  Several charts each run their own instance and write into the SAME log,
 #  so blocks interleave. Comparing across sources would be meaningless -
 #  hence the grouping below.
 # ============================================================
-param([string]$Source = "", [switch]$LiveVsBuild, [switch]$Rejects)
+param([string]$Source = "", [switch]$LiveVsBuild, [switch]$Rejects, [int]$Days = 1)
 
-$log = Get-ChildItem *.log | Sort-Object LastWriteTime | Select-Object -Last 1
-Write-Host "log file : $($log.Name)" -ForegroundColor Cyan
+# Row layout after the tag is stripped:
+#   0 symbol  1 "MODEL"  2 dir  3 cycle_id  4 block_id  5 anchor  6 model
+#   7 confirm_time  8 price  9 ref_time  10 ref_level
+# Columns 3 and 4 are init-relative sequence numbers - see -LiveVsBuild below.
+function Key([string]$row) {
+    $c = $row -split ','
+    if ($c.Count -lt 6) { return $row }
+    (@($c[0..2]) + @($c[5..($c.Count-1)])) -join ','
+}
 
-$all = Get-Content $log.FullName
+$logs = Get-ChildItem *.log | Sort-Object LastWriteTime | Select-Object -Last $Days
+if (-not $logs) { Write-Host "no .log file here. Are you in <data folder>\MQL5\Logs ?" -ForegroundColor Red; exit }
+Write-Host "log file(s): $($logs.Name -join ', ')" -ForegroundColor Cyan
+
+# Oldest first, so LIVE rows keep their real order relative to the rebuild.
+$all = @()
+foreach ($f in $logs) { $all += Get-Content $f.FullName }
 $raw = $all | Where-Object { $_ -match 'HMI-BUILD' }
 if ($raw.Count -eq 0) {
     Write-Host "`nno HMI-BUILD lines found." -ForegroundColor Red
@@ -108,15 +126,32 @@ if ($LiveVsBuild) {
         Write-Host "confirm live, then reload once and run this again." -ForegroundColor Yellow
         exit
     }
-    $missing = $live | Where-Object { $build -notcontains $_ }
-    if (-not $missing) {
-        Write-Host "`nALL $($live.Count) LIVE MARKS SURVIVED THE REBUILD, byte for byte." -ForegroundColor Green
+    # cycle_id / block_id are g_next_id sequence numbers, reset to 1 on every
+    # init. A live session keeps appending to the window it started with; a
+    # rebuild takes the most recent 5000 M5 bars, so the oldest bars - and the
+    # ids allocated in them - are gone, and every later id shifts down. Those
+    # two columns therefore CANNOT match across live and rebuild, and comparing
+    # whole rows would report a future leak that is only renumbering.
+    # The event's identity is the rest: dir, anchor, model, confirm time,
+    # price, reference time and level.
+    $liveKey  = @{}
+    foreach ($r in $live)  { $liveKey[(Key $r)] = $r }
+    $buildKey = @{}
+    foreach ($r in $build) { $buildKey[(Key $r)] = $r }
+
+    $missing = @($liveKey.Keys | Where-Object { -not $buildKey.ContainsKey($_) })
+    Write-Host "  distinct live marks : $($liveKey.Count)   (ids ignored)"
+    if ($missing.Count -eq 0) {
+        Write-Host "`nALL $($liveKey.Count) LIVE MARKS SURVIVED THE REBUILD." -ForegroundColor Green
+        Write-Host "every field but the sequence ids is identical." -ForegroundColor Green
         Write-Host "no sign of a future leak in this window." -ForegroundColor Green
     } else {
         Write-Host "`n$($missing.Count) LIVE mark(s) do NOT appear in the rebuild:" -ForegroundColor Red
-        $missing | Select-Object -First 20 | ForEach-Object { Write-Host "  $_" }
-        $missing | Set-Content live_vs_build_diff.txt
+        $missing | Select-Object -First 20 | ForEach-Object { Write-Host "  $($liveKey[$_])" }
+        $missing | ForEach-Object { $liveKey[$_] } | Set-Content live_vs_build_diff.txt
         Write-Host "written to live_vs_build_diff.txt" -ForegroundColor Red
+        Write-Host "check the oldest one first: if it predates the rebuild window" -ForegroundColor Yellow
+        Write-Host "(see from= in the BEGIN line) it simply aged out - not a leak." -ForegroundColor Yellow
     }
     exit
 }
@@ -141,6 +176,12 @@ if ($A.Head -ne $B.Head) {
 $diff = Compare-Object $A.Rows $B.Rows
 if (-not $diff) {
     Write-Host "`nIDENTICAL - $($A.Rows.Count) rows match exactly. No repaint." -ForegroundColor Green
+} elseif (-not (Compare-Object ($A.Rows | ForEach-Object { Key $_ }) ($B.Rows | ForEach-Object { Key $_ }))) {
+    # Every event matches once the sequence ids are set aside. That is
+    # renumbering, not a repaint: the window slid, an id-allocating event
+    # dropped off the oldest edge, and every later id shifted down.
+    Write-Host "`nIDENTICAL apart from cycle_id / block_id - $($A.Rows.Count) rows." -ForegroundColor Green
+    Write-Host "the window moved and the sequence ids renumbered. No repaint." -ForegroundColor Green
 } else {
     Write-Host "`nDIFFERENCES: $($diff.Count) of $($A.Rows.Count) rows" -ForegroundColor Red
     $diff | Select-Object -First 40 | Format-Table SideIndicator, InputObject -AutoSize

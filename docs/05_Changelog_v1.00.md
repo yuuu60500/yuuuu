@@ -794,3 +794,46 @@ Compile Status:
 Replay Status:
   POI-02b   待执行（流程见 docs/04）
 ```
+
+---
+
+## v2.21 — 修复 A-20 / A-21：LIVE vs BUILD 的比对键与跨天日志
+
+```
+Version:  v2.21
+Date:     2026-09-23
+
+Changed Functions:
+  (none — 指标源码只改版本号字符串)
+
+Changed Files:
+  tools/ReloadTest.ps1              -LiveVsBuild 改为按事件比对，剔除
+                                    cycle_id / block_id 两列（A-20）；
+                                    Reload 比对在整行不等时追加一次
+                                    「剔除序号」复核，区分重新编号与真重绘；
+                                    新增 -Days N，合并最近 N 个日志文件（A-21）
+  docs/04_Test_Plan_v1.00.md        写明比对键与跨天注意事项
+  docs/06_Audit_Round1_v1.00.md     新增 Audit Round 5：A-20、A-21
+
+Reason:
+  A-20：日志行第 4、5 列是 g_next_id 自增序号，每次 init 重置为 1；
+        SeriesAppend() 只追加不裁剪，实时会话的窗口比重载后的窗口更靠前，
+        最老区间里分配过的 id 全部消失，之后 id 整体前移。
+        逐字节比对整行会把「重新编号」误报成未来函数 —— 即将开始的四品种
+        跨天挂机必然踩中。
+  A-21：MT5 每天新开一个日志文件，脚本只读最新一个，跨天样本被静默截断。
+
+  两条都是**测试工具**的缺陷，不是指标的缺陷。指标的 id 只是簿记且出现在
+  图形对象名里，为迁就脚本去改它属于 Rule 68/69 禁止的顺手重构 ——
+  缺陷在比对方法，就在比对方法上修。
+
+Trading Logic Changed:
+  NO —— 指标源码未改动任何逻辑。
+
+Compile Status:
+  NOT COMPILE VERIFIED   （与 v2.20 同批，待用户 F7）
+
+Replay Status:
+  POI-02b       待执行
+  Future Leak   待执行（四品种 Live 测试进行中）
+```

@@ -556,3 +556,69 @@ Confidence:              HIGH
 撤销一个改动时,应当按该改动自身的边界删除,而不是按当前文件里两个锚点之间的范围。
 本轮已加入一个简单的静态自检(列出全局标识符,逐个确认有声明),
 但它**替代不了编译器** —— 这正是 A-09 之后本项目反复验证的一点。
+
+---
+
+## Audit Round 5（2026-09-23，启动四品种 Live 测试之前）
+
+### A-20 —— **测试工具缺陷：LIVE vs BUILD 用了会漂移的序号做比对键**
+
+```
+Severity:                P1（不影响指标输出，但会让 Future Leak 测试报假阳性）
+Rule Violated:           Rule 52 / Rule 72（测试必须能判真伪）
+Location:                tools/ReloadTest.ps1  -LiveVsBuild
+Trigger:                 挂机跑出 HMI-LIVE 行后 reload，再跑 -LiveVsBuild
+Expected Behavior:       同一个真实事件在 live 行与 rebuild 行中一致
+Actual Behavior:         日志行第 4、5 列是 cycle_id / block_id，
+                         它们来自 g_next_id 这个**自增序号**：
+                           HMI_Defs.mqh:266     long g_next_id = 1;
+                           H4M5_Identification.mq5:187   g_next_id = 1;（每次 init 重置）
+                         而 SeriesAppend() 只追加、从不裁剪（HMI_Series.mqh），
+                         所以一个跑了 K 根 M5 的实时会话，其窗口是
+                           [T0-5000, T0+K]
+                         但此刻重新加载得到的窗口是
+                           [T0+K-5000, T0+K]
+                         最老的 K 根被丢掉，其中分配过的每一个 id 随之消失，
+                         之后所有 id 整体前移。
+                         原脚本逐字节比对整行 → 同一事件因序号不同被判为
+                         "LIVE mark does NOT appear in the rebuild"，
+                         即**把重新编号误报成未来函数**。
+Evidence:                源码直读（三处，见上）。只要实时期间有任意一个
+                         id 分配事件落在被丢弃的最老区间内即触发；
+                         跨天挂机必然发生。
+Impact:                  Future Leak 测试不可信（假阳性）
+Historical Repaint:      NO
+Future Leak:             NO   —— 这是测试工具的缺陷，不是指标的缺陷
+Business Logic Impact:   NO
+Recommended Fix:         比对键改为事件本身：dir / anchor / model /
+                         confirm_time / price / ref_time / ref_level，
+                         剔除第 4、5 列。Reload 比对保持整行（更严），
+                         仅在整行不等时再用剔除序号的键复核一次，
+                         以便区分「重新编号」与「真重绘」。
+Status:                  **FIXED — v2.21（脚本层修复，指标未改一行）**
+Confidence:              HIGH
+```
+
+> **为什么不去改指标让 id 稳定：** id 只是簿记，且出现在图形对象名里；
+> 为了迁就一个测试脚本去改它属于 Rule 68/69 明令禁止的「顺手重构」。
+> 缺陷在比对方法，就在比对方法上修。
+
+### A-21 —— **测试工具缺陷：MT5 每天新开一个日志文件，脚本只读最新一个**
+
+```
+Severity:                P2
+Rule Violated:           Rule 52
+Location:                tools/ReloadTest.ps1（Get-ChildItem *.log | Select -Last 1）
+Trigger:                 跨天挂机后再 reload 比对
+Expected Behavior:       能看到这次挂机期间的全部 HMI-LIVE 行
+Actual Behavior:         昨天的 live 行在昨天的 .log 里，今天 reload 写进今天的
+                         .log。脚本只读最新一个文件 → live rows 显示为 0 或
+                         只剩今天的几条，**静默丢样本**。
+Impact:                  跨天测试的样本被无声截断
+Historical Repaint:      NO
+Future Leak:             NO
+Business Logic Impact:   NO
+Recommended Fix:         新增 -Days N，按时间升序合并最近 N 个日志文件
+Status:                  **FIXED — v2.21**
+Confidence:              HIGH
+```

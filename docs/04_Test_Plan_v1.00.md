@@ -155,20 +155,39 @@ HMI-BUILD  重建产生：整个窗口都在手上
 说明重建用到了当时不可能拥有的数据 —— 这就是 Rule 51「Historical Build ≈ Live Replay」
 的实测，也是唯一能证伪 Future Leak 的日志级方法。
 
+**比对键：不含 cycle_id / block_id（A-20）**
+
+日志行的第 4、5 列是 `g_next_id` 自增序号，每次 init 重置为 1。
+而 `SeriesAppend()` 只追加不裁剪：跑了 K 根 M5 的实时会话，窗口是
+`[T0-5000, T0+K]`；此刻重载得到的窗口是 `[T0+K-5000, T0+K]`。
+最老的 K 根连同其中分配过的 id 一起消失，之后所有 id 整体前移。
+
+**因此这两列在 live 与 rebuild 之间必然不同，逐字节比对整行会把
+「重新编号」误报成未来函数。** 脚本自 v2.21 起按事件本身比对：
+
+```
+dir / anchor / model / confirm_time / price / ref_time / ref_level
+```
+
+这七项里任何一项变了，才是真信号。
+
 **步骤：**
 
 1. `InpLogSignals = true`，**让图表持续运行**，直到有新的标记在实时状态下确认
    （日志里出现 `HMI-LIVE,` 开头的行）
-2. 重载一次（切周期往返）
-3. ```powershell
-   .\ReloadTest.ps1 -Source "USDJPY,M5" -LiveVsBuild
+2. 期间**不要**重载图表 —— 重载会把已有的实时标记变成重建标记，样本归零
+3. 重载一次（切周期往返）
+4. ```powershell
+   .\ReloadTest.ps1 -Source "USDJPY,M5" -LiveVsBuild -Days 5
    ```
+   跨天挂机**必须**带 `-Days N`：MT5 每天新开一个日志文件，
+   昨天的实时行在昨天的文件里，不带这个参数会静默丢样本（A-21）。
 
 **判定：**
 
 | 输出 | 结论 |
 |------|------|
-| `ALL n LIVE MARKS SURVIVED THE REBUILD, byte for byte.` | 本窗口内**未见** Future Leak |
+| `ALL n LIVE MARKS SURVIVED THE REBUILD.` | 本窗口内**未见** Future Leak |
 | `n LIVE mark(s) do NOT appear in the rebuild` | **确认 Future Leak 或实时/重建路径不一致** |
 
 > 成本说明：需要等实时确认出新标记，可能要数小时。这是这项测试无法回避的代价。
