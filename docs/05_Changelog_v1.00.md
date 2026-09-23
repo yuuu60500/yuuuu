@@ -836,3 +836,45 @@ Replay Status:
   POI-02b       待执行
   Future Leak   待执行（四品种 Live 测试进行中）
 ```
+
+---
+
+## v2.22 — 修复 A-22 / A-23：脚本自己找日志目录，-Source 变可选
+
+```
+Version:  v2.22
+Date:     2026-09-23
+
+Changed Functions:
+  (none — 指标源码只改版本号字符串)
+
+Changed Files:
+  tools/ReloadTest.ps1   新增 Find-LogDir()：当前目录 →
+                         %APPDATA%\MetaQuotes\Terminal\*\MQL5\Logs 中
+                         .log 最新的那个；另给 -LogDir 手动覆盖（A-22）
+                         -Source 改为可选，不给则遍历日志里的全部图表；
+                         给了但不在列表里则明确报错（A-23）
+                         三个输出文件改为写回日志目录并按品种命名
+  docs/04_Test_Plan_v1.00.md     更新调用方式
+  docs/06_Audit_Round1_v1.00.md  新增 A-22、A-23
+
+Reason:
+  用户在 C:\Users\<name> 直接跑脚本，得到 CommandNotFoundException。
+  这是同一类坑的第二次：第一次是把脚本放进了 Terminal\<ID>\logs
+  而不是 Terminal\<ID>\MQL5\Logs。一个测试工具要求用户先手工找到
+  一个哈希命名的目录、而同一终端下还有两个都叫 Logs 的目录 ——
+  这个前提本身就是缺陷，应该由脚本自己解决。
+  同时 -Source 手写品种名在多品种测试里很容易因券商后缀
+  （EURUSD.a / EURUSDm / EURUSD#）静默匹配不到，看起来像「没有样本」。
+
+Trading Logic Changed:
+  NO —— 指标源码未改动任何逻辑。
+
+Compile Status:
+  PASS — 0 errors / 0 warnings（v2.21 实测，2026-09-23；本版指标源码
+         仅版本号字符串变化）
+
+Replay Status:
+  POI-02b       待执行
+  Future Leak   待执行（四品种 Live 测试进行中）
+```

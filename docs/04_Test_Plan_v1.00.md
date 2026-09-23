@@ -82,11 +82,12 @@ HMI-REJECT,<symbol>,H4POI,<BULL|BEAR>,fvg=<time>,fvg_lo=..,fvg_hi=..|ob=<time>,o
 **执行步骤**
 
 1. 目标图表设 `InpLogSignals = true`，重新编译并加载 v2.20。
-2. 到 `<数据文件夹>\MQL5\Logs` 跑：
+2. 任意目录下跑（脚本自己找日志目录）：
    ```
-   .\ReloadTest.ps1 -Source "USDJPY,M5" -Rejects
+   .\ReloadTest.ps1 -Rejects -Days 5
    ```
-   （结果同时写入 `poi_rejects.txt`）
+   不加 `-Source` 即所有图表一起列；结果按品种写入
+   `poi_rejects_<品种>_<周期>.txt`
 3. 从列表里挑**一行**，在 H4 图表上用数据窗口逐根读出：
    - `ob=` 那根 K 线的 High / Low / Open / Close
    - `fvg=` 那根 K 线以及它前两根的 High / Low
@@ -178,10 +179,15 @@ dir / anchor / model / confirm_time / price / ref_time / ref_level
 2. 期间**不要**重载图表 —— 重载会把已有的实时标记变成重建标记，样本归零
 3. 重载一次（切周期往返）
 4. ```powershell
-   .\ReloadTest.ps1 -Source "USDJPY,M5" -LiveVsBuild -Days 5
+   .\ReloadTest.ps1 -LiveVsBuild -Days 5
    ```
-   跨天挂机**必须**带 `-Days N`：MT5 每天新开一个日志文件，
-   昨天的实时行在昨天的文件里，不带这个参数会静默丢样本（A-21）。
+   - 脚本自 v2.22 起**自己找日志目录**（当前目录 →
+     `%APPDATA%\MetaQuotes\Terminal\<ID>\MQL5\Logs` 中 .log 最新的那个），
+     在哪个目录跑都行；找不到时用 `-LogDir "<路径>"` 指定（A-22）。
+   - **不加 `-Source` 就是全部图表一起跑**。手写品种名是个坑：
+     券商会加后缀（`EURUSD.a` / `EURUSDm` / `EURUSD#`），写错了会静默匹配不到。
+   - 跨天挂机**必须**带 `-Days N`：MT5 每天新开一个日志文件，
+     昨天的实时行在昨天的文件里，不带这个参数会静默丢样本（A-21）。
 
 **判定：**
 

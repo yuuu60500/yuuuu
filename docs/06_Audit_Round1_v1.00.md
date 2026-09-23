@@ -622,3 +622,48 @@ Recommended Fix:         新增 -Days N，按时间升序合并最近 N 个日�
 Status:                  **FIXED — v2.21**
 Confidence:              HIGH
 ```
+
+### A-22 —— **测试工具缺陷：脚本要求用户先切到正确目录**
+
+```
+Severity:                P2（挡住测试，不影响指标）
+Rule Violated:           Rule 52
+Location:                tools/ReloadTest.ps1（Get-ChildItem *.log 用相对路径）
+Trigger:                 用户在 C:\Users\<name> 直接跑 .\ReloadTest.ps1
+Actual Behavior:         CommandNotFoundException —— 脚本不在当前目录。
+                         此前已踩过一次同类坑（用户把脚本放进了
+                         Terminal\<ID>\logs 而不是 Terminal\<ID>\MQL5\Logs）。
+                         一个测试工具要求先手工找到一个哈希命名的目录、
+                         而且同一个终端下还有两个都叫 Logs 的目录，
+                         这个前提本身就是缺陷。
+Impact:                  测试启动失败，且失败信息与真正的原因无关
+Historical Repaint:      NO
+Future Leak:             NO
+Business Logic Impact:   NO
+Recommended Fix:         脚本自行定位：当前目录 →
+                         %APPDATA%\MetaQuotes\Terminal\*\MQL5\Logs 中
+                         .log 最新的那个；另给 -LogDir 手动覆盖。
+                         输出文件也写回日志目录而不是当前目录。
+Status:                  **FIXED — v2.22**
+Confidence:              HIGH
+```
+
+### A-23 —— **测试工具缺陷：-Source 需要手写品种名**
+
+```
+Severity:                P2
+Rule Violated:           Rule 52
+Location:                tools/ReloadTest.ps1
+Trigger:                 券商品种带后缀（EURUSD.a / EURUSDm / EURUSD#）
+Actual Behavior:         手写的 -Source 匹配不到任何 source，脚本按
+                         「没有 block」处理 —— 静默给出空结果，
+                         看起来像「没有样本」而不是「名字写错了」。
+Impact:                  多品种测试容易得到假的「无样本」结论
+Historical Repaint:      NO
+Future Leak:             NO
+Business Logic Impact:   NO
+Recommended Fix:         -Source 改为可选：不给就遍历日志里出现的全部图表；
+                         给了但不在列表里则明确报错，而不是返回空。
+Status:                  **FIXED — v2.22**
+Confidence:              HIGH
+```
