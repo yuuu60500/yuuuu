@@ -49,13 +49,19 @@ int FvgDetect(const MqlRates &r[], const int n, const ENUM_TIMEFRAMES tf,
 
 //--- OB <-> FVG connection (Rule 6 / Rule 10 — FROZEN) --------------
 //  Touch (gap == 0) VALID | Overlap (gap < 0) VALID | Gap > 0 INVALID
+// Single source of truth for the gap, so the accept/reject decision and the
+// HMI-REJECT diagnostic can never disagree about the same pair.
+int ConnectionGapPts(const int dir, const double ob_hi, const double ob_lo,
+                     const double fvg_hi, const double fvg_lo)
+  {
+   if(dir == DIR_BULL) return(Pts(fvg_lo, ob_hi));
+   return(Pts(ob_lo, fvg_hi));
+  }
+
 bool ConnectionValid(const int dir, const double ob_hi, const double ob_lo,
                      const double fvg_hi, const double fvg_lo, const int tol_pts)
   {
-   int gap;
-   if(dir == DIR_BULL) gap = Pts(fvg_lo, ob_hi);
-   else                gap = Pts(ob_lo,  fvg_hi);
-   return(gap <= tol_pts);
+   return(ConnectionGapPts(dir, ob_hi, ob_lo, fvg_hi, fvg_lo) <= tol_pts);
   }
 
 #endif // HMI_FVG_MQH

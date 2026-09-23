@@ -81,13 +81,23 @@ void POIOnBar(const int h, const int fvg_idx)
    int oldest = MathMax(0, h - InpH4OBtoFVGMaxBars);
    bool saw_candidate = false;
 
+   string rejected = "";                       // filled only when nothing is created
+
    for(int o = h - 1; o >= oldest; o--)         // nearest to the FVG first (CONF-14)
      {
       if(CandleDir(g_h4[o]) != -dir) continue;  // OB is the opposite candle
       saw_candidate = true;
-      if(!ConnectionValid(dir, g_h4[o].high, g_h4[o].low,
-                          g_h4fvg[fvg_idx].hi, g_h4fvg[fvg_idx].lo, tol))
-         continue;                              // real positive gap -> keep looking
+      int gap = ConnectionGapPts(dir, g_h4[o].high, g_h4[o].low,
+                                 g_h4fvg[fvg_idx].hi, g_h4fvg[fvg_idx].lo);
+      if(gap > tol)                             // real positive gap -> keep looking
+        {
+         if(InpLogSignals)
+            rejected += StringFormat("|ob=%s,ob_hi=%s,ob_lo=%s,gap_pts=%d",
+                                     TimeToString(g_h4[o].time, TIME_DATE|TIME_MINUTES),
+                                     DoubleToString(g_h4[o].high, _Digits),
+                                     DoubleToString(g_h4[o].low, _Digits), gap);
+         continue;
+        }
 
       for(int i = 0; i < g_poi_n; i++)          // de-duplicate
          if(g_poi[i].origin_time == g_h4[o].time && g_poi[i].dir == dir) return;
@@ -112,6 +122,16 @@ void POIOnBar(const int h, const int fvg_idx)
      }
 
    if(saw_candidate) g_diag_poi_rejected_gap++;  // BRI-04 / D-7 diagnostic
+
+   // Reaching here means this FVG produced NO POI. Printing every rejected
+   // candidate with its measured gap makes the refusal side of Rule 6
+   // checkable against the data window, instead of just a counter.
+   if(InpLogSignals && rejected != "")
+      PrintFormat("HMI-REJECT,%s,H4POI,%s,fvg=%s,fvg_lo=%s,fvg_hi=%s%s",
+                  _Symbol, (dir == DIR_BULL ? "BULL" : "BEAR"),
+                  TimeToString(g_h4fvg[fvg_idx].bar_time, TIME_DATE|TIME_MINUTES),
+                  DoubleToString(g_h4fvg[fvg_idx].lo, _Digits),
+                  DoubleToString(g_h4fvg[fvg_idx].hi, _Digits), rejected);
   }
 
 //--- invalidation on a closed H4 candle -----------------------------

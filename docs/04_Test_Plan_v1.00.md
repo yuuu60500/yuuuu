@@ -19,7 +19,7 @@
 
 ## 已执行的验证记录
 
-### ✅ POI-01 / POI-02 —— PASS（2026-09-22，USDJPY H4，v2.11）
+### ✅ POI-01 / POI-02a（接受侧）—— PASS（2026-09-22，USDJPY H4，v2.11）
 
 **被测对象：** `HMI_D61E_P4_2319_0`
 
@@ -52,8 +52,61 @@ H4 原始数据（数据窗口逐根读出）
 **结论：** 该 H4 POI 完全符合规格。FVG 下沿比 OB 高点低 57.4 pip，属深度 Overlap，
 距离「正价格空隙」这条否决线很远。
 
-> 说明：本条验证的是 **POI 的几何与 Rule 6 连接**。
-> 它**不**验证反未来函数与不重绘 —— 那需要 §3 的 Reload / Replay 比对。
+> 说明：本条验证的是 **POI 的几何与 Rule 6 的接受侧**。
+> 它**不**验证反未来函数与不重绘 —— 那需要 §3 的 Reload / Replay 比对；
+> 也**不**验证 Rule 6 的**否决侧** —— 一个被正确接受的形态不能证明
+> 「有正空隙时确实会被拒绝」，那是下面的 POI-02b。
+
+---
+
+### ⏳ POI-02b（否决侧）—— 待执行（v2.20 起可测）
+
+**为什么需要单独测：**
+POI-02a 证明的是「连接合法 → 建 POI」。Rule 6 的另一半是
+「连接不合法 → **不**建 POI」。后者在图表上表现为**什么都没有**，
+无法用观察证明 —— 可能是规则起作用了，也可能是那段行情根本没有候选 OB。
+在 v2.20 之前，这条只有 `PANEL_FULL` 里的 `REJECTED-BY-GAP: n` 计数器，
+计数器**无法与数据窗口对账**。
+
+**v2.20 的做法：**
+`POIOnBar()` 在某根 H4 FVG **没有**产出 POI 时，把它检查过、
+但因空隙被否决的每一个 OB 候选连同**实测空隙点数**打印出来：
+
+```
+HMI-REJECT,<symbol>,H4POI,<BULL|BEAR>,fvg=<time>,fvg_lo=..,fvg_hi=..|ob=<time>,ob_hi=..,ob_lo=..,gap_pts=<n>
+```
+
+`gap_pts` 与判定用的是**同一个函数** `ConnectionGapPts()` ——
+`ConnectionValid()` 只是对它的一次比较，因此日志与判定不可能各说各话。
+
+**执行步骤**
+
+1. 目标图表设 `InpLogSignals = true`，重新编译并加载 v2.20。
+2. 到 `<数据文件夹>\MQL5\Logs` 跑：
+   ```
+   .\ReloadTest.ps1 -Source "USDJPY,M5" -Rejects
+   ```
+   （结果同时写入 `poi_rejects.txt`）
+3. 从列表里挑**一行**，在 H4 图表上用数据窗口逐根读出：
+   - `ob=` 那根 K 线的 High / Low / Open / Close
+   - `fvg=` 那根 K 线以及它前两根的 High / Low
+
+**判定标准**
+
+| 检查项 | 期望 |
+|-------|------|
+| 方向 | Bullish 候选必须是**阴线**（Close < Open），Bearish 必须是阳线 |
+| FVG 真实存在 | Bullish：`low[i] > high[i-2]`；Bearish：`high[i] < low[i-2]` |
+| 空隙为正 | Bullish：`fvg_lo − ob_hi > 0`；Bearish：`ob_lo − fvg_hi > 0` |
+| 空隙数值一致 | 手算点数 == 日志里的 `gap_pts`（允许 0 点误差） |
+| 容差 | `gap_pts > PipsToPts(InpH4ConnectTolerancePips)`（默认 0.0 pip → 容差 0 点） |
+| **图表结果** | 该 OB 处**没有** POI 矩形 |
+
+六项全中 = Rule 6 否决侧 PASS。任何一项不符 —— 尤其是「空隙为正却仍画出了矩形」
+或「空隙为负却出现在拒绝列表里」—— 都是 Confirmed Bug。
+
+> 若列表为空：说明这段行情里每根 H4 FVG 都找到了合法连接的 OB。
+> 这**不是** PASS，只是样本不足；换品种或拉长历史再跑。
 
 ---
 
@@ -129,7 +182,8 @@ HMI-BUILD  重建产生：整个窗口都在手上
 | 用例 | 步骤 | 期望 |
 |------|------|------|
 | POI-01 Formation | 定位一个 H4 Bullish OB + Bullish FVG | 矩形在 **FVG 第三根 K 线收盘**时出现，不早于此 |
-| POI-02 Gap Reject | 定位一个 OB 与 FVG 之间有正空隙的形态 | **不**产生 POI（Rule 6） |
+| POI-02a Gap Accept | 定位一个 OB 与 FVG 重叠 / 相接的形态 | 产生 POI，边界 = OB 的 High / Low |
+| POI-02b Gap Reject | 用 `-Rejects` 列出被否决的候选，逐根对数据窗口 | 空隙为正且 > 容差，且该 OB 处**无**矩形（Rule 6） |
 | POI-03 Touch | 价格回落触碰 POI | 触碰 K 线收盘时 POI → TOUCHED，同时 Refinement Session 建立 |
 | POI-04 Invalidation | H4 收盘跌破 POI 下沿 − margin | POI → INVALIDATED，样式改变，**矩形不消失** |
 | POI-05 Reload | 在 POI-03 之后 Refresh / 切周期 / 重启 MT5 | POI 的 confirm_time / zone / state 完全一致 |
@@ -327,6 +381,15 @@ HMI,<utc_iso>,<event>,<dir>,<cycle_id>,<block_id>,<model>,<confirm_time>,<price>
 
 `Phase7` 之外不产生日志。Historical Build 期间日志前缀为 `HMI-BUILD`，
 Live 期间为 `HMI-LIVE`，便于验证两者一致（Rule 51 的直接证据）。
+
+除信号行之外，还有一条**诊断行**（不是信号，不代表任何标记）：
+
+```
+HMI-REJECT,<symbol>,H4POI,<dir>,fvg=..,fvg_lo=..,fvg_hi=..|ob=..,ob_hi=..,ob_lo=..,gap_pts=<n>
+```
+
+在某根 H4 FVG 未能产出 POI 时输出，用于 POI-02b 对账。它只读不写，
+不参与任何状态迁移；关闭 `InpLogSignals` 即完全消失。
 
 ---
 

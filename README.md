@@ -1,6 +1,6 @@
 # H4 Context → M5 Identification Indicator
 
-**Version:** spec v1.00 (frozen baseline) / code v2.12
+**Version:** spec v1.00 (frozen baseline) / code v2.20
 **Platform:** MetaTrader 5 / MQL5 Custom Indicator
 **Mode:** Trend-Following Only
 **Purpose:** MARK ONLY — Detect / Confirm / Track / Mark / Invalidate
@@ -78,7 +78,7 @@ H4 Context
 | Phase 3 — MQL5 Implementation | **COMPLETE** (v1.00, ~2560 lines) |
 | Phase 4 — Audit (P0–P3) | **ROUND 4** (10 fixed, 5 potential risks, 1 withdrawn) |
 | Phase 5 — MetaEditor Compile | **PASS** — v2.11, 0 errors / 0 warnings (2026-09-22) |
-| Phase 6 — Visual Replay / Repaint Test | **进行中** —— POI-01/02、Reload 一致性、图表周期独立性均已 PASS；Future Leak（LIVE vs BUILD）待测 |
+| Phase 6 — Visual Replay / Repaint Test | **进行中** —— POI-01/02a（接受侧）、Reload 一致性、图表周期独立性均已 PASS；POI-02b（Rule 6 否决侧）与 Future Leak（LIVE vs BUILD）待测 |
 
 ## 源码
 

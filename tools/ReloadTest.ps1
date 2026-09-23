@@ -13,17 +13,22 @@
 #                                            every mark emitted LIVE must
 #                                            reappear identically in the
 #                                            rebuild  (future-leak test)
+#     .\ReloadTest.ps1 -Source "USDJPY,M5" -Rejects
+#                                            list the H4 POI candidates that
+#                                            Rule 6 REFUSED, with the measured
+#                                            gap  (refusal-side test, POI-02b)
 #
 #  Several charts each run their own instance and write into the SAME log,
 #  so blocks interleave. Comparing across sources would be meaningless -
 #  hence the grouping below.
 # ============================================================
-param([string]$Source = "", [switch]$LiveVsBuild)
+param([string]$Source = "", [switch]$LiveVsBuild, [switch]$Rejects)
 
 $log = Get-ChildItem *.log | Sort-Object LastWriteTime | Select-Object -Last 1
 Write-Host "log file : $($log.Name)" -ForegroundColor Cyan
 
-$raw = Get-Content $log.FullName | Where-Object { $_ -match 'HMI-BUILD' }
+$all = Get-Content $log.FullName
+$raw = $all | Where-Object { $_ -match 'HMI-BUILD' }
 if ($raw.Count -eq 0) {
     Write-Host "`nno HMI-BUILD lines found." -ForegroundColor Red
     Write-Host "set InpLogSignals = true on the chart you want to test." -ForegroundColor Yellow
@@ -52,6 +57,32 @@ foreach ($g in $sources) {
 
 if ($Source -eq "") {
     Write-Host "`npick one chart, e.g.:  .\ReloadTest.ps1 -Source `"USDJPY,M5`"" -ForegroundColor Yellow
+    Write-Host "add -LiveVsBuild for the future-leak test, -Rejects for Rule 6 refusals." -ForegroundColor Yellow
+    exit
+}
+
+if ($Rejects) {
+    # The accept side (POI-02) is proved by a POI that exists. The refusal
+    # side needs the pairs that were thrown away - a counter cannot be
+    # checked against the chart, a printed gap can.
+    $rej = @()
+    foreach ($l in $all) {
+        $src = if ($l -match '\(([A-Za-z0-9._#]+,[A-Za-z0-9]+)\)') { $Matches[1] } else { '?' }
+        if ($src -eq $Source -and $l -match 'HMI-REJECT,(.*)$') { $rej += $Matches[1] }
+    }
+    Write-Host "`n--- $Source : Rule 6 refusals (H4 POI) ---" -ForegroundColor Cyan
+    if ($rej.Count -eq 0) {
+        Write-Host "`nno HMI-REJECT lines for this chart." -ForegroundColor Yellow
+        Write-Host "either every H4 FVG found a connected OB, or InpLogSignals is off." -ForegroundColor Yellow
+        exit
+    }
+    $rej = $rej | Select-Object -Unique
+    Write-Host "  $($rej.Count) refused FVG(s)`n"
+    $rej | ForEach-Object { Write-Host "  $_" }
+    $rej | Set-Content poi_rejects.txt
+    Write-Host "`nwritten to poi_rejects.txt" -ForegroundColor Green
+    Write-Host "pick one line: open the ob= bar in the data window, confirm the" -ForegroundColor Yellow
+    Write-Host "gap, and confirm NO POI rectangle was drawn at that bar." -ForegroundColor Yellow
     exit
 }
 

@@ -317,8 +317,9 @@ Future Leak:           PASS (static) / NOT VERIFIED (replay)
 Historical Repaint:    PASS          (2026-09-23 实测：同图表两次重建 143 行逐字节相同)
 H4/M5 Alignment:       PASS          (2026-09-23 实测：M2/M5/M15/M30 四种图表周期
                                      14 次构建结果完全一致，验证 §15.4 周期独立性)
-H4 POI:                PARTIAL PASS  (POI-01 / POI-02 已用真实数据逐条核对，
+H4 POI:                PARTIAL PASS  (POI-01 / POI-02a 接受侧已用真实数据逐条核对，
                                      见 docs/04「已执行的验证记录」；
+                                     POI-02b 否决侧 v2.20 起可测，流程已写，待执行；
                                      POI-03..09 仍未验证)
 M5 OB:                 NOT VERIFIED
 M5 Breaker:            NOT VERIFIED

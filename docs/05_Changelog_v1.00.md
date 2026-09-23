@@ -688,3 +688,109 @@ Trading Logic Changed:
 Compile Status:
   NOT COMPILE VERIFIED（v2.11 PASS，本版改动待编译）
 ```
+
+---
+
+## v2.13 — Reload 脚本按图表分组 + OnInit 打印版本
+
+```
+Version:  v2.13
+Date:     2026-09-23
+
+Changed Functions:
+  OnInit         增加一行 PrintFormat：版本 / 品种 / 周期 / instance tag
+
+Changed Files:
+  tools/ReloadTest.ps1   解析 MT5 的来源标签 (SYMBOL,TF)，按图表分组，
+                         列出找到的所有来源，比对前必须用 -Source 指定一个
+
+Reason:
+  日志里同时有四个实例在写（USDCAD H4 / USDCAD M5 / USDJPY H1 / USDJPY H4），
+  build block 互相交错。旧脚本只按 HMI-BUILD 过滤，会拿 USDCAD 的 block 去比
+  USDJPY 的 block，报出来的差异毫无意义。
+  同时日志此前无法分辨跑的是哪个版本 —— 一天里发了好几版，这是必须的。
+
+Trading Logic Changed:
+  NO —— 只增加日志与外部脚本。
+
+Compile Status:
+  NOT COMPILE VERIFIED
+```
+
+---
+
+## v2.14 — Reload 一致性 PASS + 新增 LIVE vs BUILD 模式
+
+```
+Version:  v2.14
+Date:     2026-09-23
+
+Changed Functions:
+  (none — 指标代码仅版本号)
+
+Changed Files:
+  tools/ReloadTest.ps1              新增 -LiveVsBuild
+  docs/04_Test_Plan_v1.00.md        记录 Reload PASS；写明 Reload 测不出未来函数
+  docs/06_Audit_Round1_v1.00.md     Rule 73 验收表更新
+
+Reason:
+  USDJPY v2.13：最后两次 M5 重建 143 行逐字节相同 —— 重绘测试 PASS。
+  附带证据：M2 / M5 / M15 / M30 共 14 次重建在同一窗口上都是 143 行，
+  直接印证 §15.4「引擎显式读 M5/H4，不依赖图表周期」。
+  但 Reload **看不见**未来函数：会偷看未来的实现每次重建都偷看同一批未来
+  K 线，自洽得很。因此 Future Leak 一栏保持 NOT VERIFIED，不借这次结果升级；
+  真正能证伪它的是 -LiveVsBuild：实时行是逐根、只有过去时发出的。
+
+Trading Logic Changed:
+  NO
+
+Compile Status:
+  NOT COMPILE VERIFIED
+```
+
+---
+
+## v2.20 — Rule 6 否决侧可对账（POI-02b）
+
+```
+Version:  v2.20
+Date:     2026-09-23
+
+Changed Functions:
+  ConnectionGapPts()   新增 —— 从 ConnectionValid() 中抽出的「空隙点数」唯一算法
+  ConnectionValid()    改为调用 ConnectionGapPts()，行为完全不变
+  POIOnBar()           当一根 H4 FVG 最终没有产出 POI 时，把它检查过、
+                       但因空隙被否决的每个 OB 候选连同实测 gap_pts 打印为
+                       HMI-REJECT 行（仅当 InpLogSignals = true）
+
+Changed States:
+  (none)
+
+Affected Modules:
+  MQL5/Indicators/HMI/HMI_FVGEngine.mqh
+  MQL5/Indicators/HMI/HMI_H4POIEngine.mqh
+  tools/ReloadTest.ps1              新增 -Rejects
+  docs/04_Test_Plan_v1.00.md        新增 POI-02b 否决侧测试流程；
+                                    原「POI-01 / POI-02 PASS」改称 POI-02a（接受侧），
+                                    因为那条记录只证明了接受侧
+  README.md                         版本号
+
+Reason:
+  POI-02a 证明的是「连接合法 → 建 POI」。Rule 6 的另一半「连接不合法 → 不建 POI」
+  在图表上表现为**什么都没有**，无法用观察证明 —— 可能是规则起了作用，
+  也可能那段行情根本没有候选 OB。此前只有面板上的 REJECTED-BY-GAP 计数器，
+  计数器无法与数据窗口对账。现在每个被否决的组合都带着实测点数落到日志里。
+  抽出 ConnectionGapPts() 是为了让「判定」与「日志」共用同一个算法 ——
+  否则两者可能对同一组形态各说各话（与此前 RangesADRUsedPct 同一个教训）。
+
+Trading Logic Changed:
+  NO —— 新增的全是 InpLogSignals 之后的打印；ConnectionValid() 的重构
+        是行为等价的提取，未改任何阈值、过滤或信号时序（Rule 68/69）。
+
+Compile Status:
+  NOT COMPILE VERIFIED   （v2.11 为最后一次实测 PASS；本版改动待用户在
+                           MetaEditor 按 F7 验证）
+
+Replay Status:
+  POI-02b   待执行（流程见 docs/04）
+```
