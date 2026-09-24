@@ -19,6 +19,8 @@
 #     .\ReloadTest.ps1                       list the charts and their blocks
 #     .\ReloadTest.ps1 -LiveVsBuild          future-leak test, all charts
 #     .\ReloadTest.ps1 -Rejects              Rule 6 refusals, all charts
+#     .\ReloadTest.ps1 -Ctx                  H4 context events + the strength
+#                                            distribution the panel bands on
 #     .\ReloadTest.ps1 -Source "USDJPY,M5"   repaint test on that one chart
 #
 #     add  -Days 5  to merge the 5 most recent log files. MT5 starts a NEW
@@ -31,7 +33,7 @@
 #  hence the grouping below.
 # ============================================================
 param([string]$Source = "", [switch]$LiveVsBuild, [switch]$Rejects, [switch]$Live,
-      [int]$Days = 1, [string]$LogDir = "")
+      [switch]$Ctx, [int]$Days = 1, [string]$LogDir = "")
 
 # Row layout after the tag is stripped:
 #   0 symbol  1 "MODEL"  2 dir  3 cycle_id  4 block_id  5 anchor  6 model
@@ -114,6 +116,59 @@ if ($Live) {
         Write-Host "`nnow reload each chart once (switch timeframe away and back)," -ForegroundColor Yellow
         Write-Host "then run:  .\ReloadTest.ps1 -LiveVsBuild -Days $Days" -ForegroundColor Yellow
     }
+    exit
+}
+
+# -Ctx: the Context chain had no auditable output at all until HMI-CTX, so
+# `str N` on the panel could not be checked or put in perspective. This reads
+# those rows, dedupes across rebuilds, and reports where the current strength
+# sits in that chart's own history - the numbers the panel bands on, measured
+# rather than invented.
+if ($Ctx) {
+    $rows = @()
+    foreach ($l in $all) {
+        if ($l -notmatch 'HMI-CTX,(.*)$') { continue }
+        $c = $Matches[1] -split ','
+        if ($c.Count -lt 11) { continue }
+        $f = @{}
+        foreach ($p in $c[2..($c.Count-1)]) { $kv = $p -split '=', 2; if ($kv.Count -eq 2) { $f[$kv[0]] = $kv[1] } }
+        $rows += [pscustomobject]@{
+            Sym = $c[0]; Kind = $c[1]; Dir = $f['dir']; Live = $f['live']
+            Ctx = $f['ctx']; Str = [int]$f['str']; Messy = $f['messy']
+            Bar = $f['bar']; Swing = $f['swing']; Raw = $Matches[1]
+            Key = "$($c[0])|$($c[1])|$($f['bar'])|$($f['swing'])"
+        }
+    }
+    if ($rows.Count -eq 0) {
+        Write-Host "`nno HMI-CTX rows. Need v2.33+ installed with InpLogSignals = true." -ForegroundColor Red
+        exit
+    }
+    # One event is re-emitted by every rebuild; bar+swing identify it.
+    $rows = $rows | Group-Object Key | ForEach-Object { $_.Group[0] }
+    Write-Host "`n$($rows.Count) distinct context events`n" -ForegroundColor Cyan
+
+    foreach ($g in ($rows | Group-Object Sym | Sort-Object Name)) {
+        Write-Host ("  {0}" -f $g.Name) -ForegroundColor White
+        foreach ($k in ($g.Group | Group-Object Kind | Sort-Object Name)) {
+            Write-Host ("      {0,-14} {1,4}" -f $k.Name, $k.Count)
+        }
+        # Strength is sampled at each BOS: the value that break left behind.
+        $sv = @($g.Group | Where-Object Kind -eq 'BOS' | ForEach-Object { $_.Str } | Sort-Object)
+        if ($sv.Count -ge 5) {
+            function Pct([int[]]$a, [double]$p) { $a[[int][Math]::Floor(($a.Count - 1) * $p)] }
+            $cur = ($g.Group | Sort-Object Bar | Select-Object -Last 1).Str
+            Write-Host ("      strength  n={0}  min={1}  P33={2}  median={3}  P67={4}  P90={5}  max={6}   latest={7}" -f `
+                        $sv.Count, $sv[0], (Pct $sv 0.33), (Pct $sv 0.50), (Pct $sv 0.67), (Pct $sv 0.90), $sv[-1], $cur) -ForegroundColor Green
+            $below = @($sv | Where-Object { $_ -lt $cur }).Count
+            Write-Host ("      latest {0} sits above {1}% of this chart's own history" -f $cur, [int](100.0 * $below / $sv.Count)) -ForegroundColor Green
+        } else {
+            Write-Host "      strength  too few BOS samples yet" -ForegroundColor DarkGray
+        }
+    }
+    $out = Join-Path $dir "ctx_events.csv"
+    $rows | Select-Object Sym, Kind, Dir, Live, Ctx, Str, Messy, Bar, Swing |
+            Sort-Object Sym, Bar | Export-Csv -NoTypeInformation -Encoding UTF8 $out
+    Write-Host "`nwritten to $out" -ForegroundColor Green
     exit
 }
 
@@ -264,6 +319,7 @@ if (-not $LiveVsBuild -and -not $Rejects -and $Source -eq "") {
     Write-Host "  -Live          how many LIVE marks so far (no reload needed)" -ForegroundColor Yellow
     Write-Host "  -LiveVsBuild   future-leak test  (all charts above, or one via -Source)" -ForegroundColor Yellow
     Write-Host "  -Rejects       Rule 6 refusals   (POI-02b)" -ForegroundColor Yellow
+    Write-Host "  -Ctx           context events + strength distribution" -ForegroundColor Yellow
     Write-Host "  -Source `"<name>`"   repaint test on that one chart" -ForegroundColor Yellow
     exit
 }

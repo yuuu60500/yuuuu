@@ -1027,3 +1027,46 @@ Compile Status:
 Replay Status:
   不影响任何已通过项（CSV 日志逐行不变）
 ```
+
+---
+
+## v2.33 — 新增 HMI-CTX 结构诊断日志
+
+```
+Version:  v2.33
+Date:     2026-09-24
+
+Changed Functions:
+  CtxLog()           新增。纯输出，不被任何引擎读取
+  H4ContextOnBar()   各分支记录一个诊断标签 kind，函数末尾统一输出一行；
+                     TIMEOUT 分支单独输出。控制流未改动
+
+Changed States:
+  (none) —— 新增的 kind / vdir 是函数内局部变量
+
+Affected Modules:
+  MQL5/Indicators/HMI/HMI_H4ContextEngine.mqh
+  tools/ReloadTest.ps1              新增 -Ctx：事件计数 + 强度分位 + CSV 导出
+  docs/04_Test_Plan_v1.00.md        记录行格式与用途
+
+Reason:
+  面板上的 `str N` 与 `MESSY` 此前无法验证也无法比较 —— Context 这条链
+  没有任何落到日志或图表上的输出。用户希望强度能以「一目了然」的方式呈现，
+  而任何分档阈值若由我拟定就是凭空捏造；要按数据定，先得有数据。
+
+  同时它补上了 A-25 / BRI-06 的验收手段：TRANS_FAIL 行的 messy 应为 1，
+  其后 BOS 行的 str 应从 1 重新起算。
+
+  前缀刻意避开 HMI-BUILD / HMI-LIVE：重绘比对脚本按 `HMI-BUILD,` 切分，
+  共用前缀会让诊断行被计入标记行，污染已通过的行数比对。
+
+Trading Logic Changed:
+  NO —— 全部在 InpLogSignals 之后，且不改任何控制流、阈值或状态字段。
+        CSV 信号日志逐行不变。
+
+Compile Status:
+  NOT COMPILE VERIFIED
+
+Replay Status:
+  不影响任何已通过项
+```

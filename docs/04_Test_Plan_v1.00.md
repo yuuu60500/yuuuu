@@ -572,7 +572,36 @@ HMI,<utc_iso>,<event>,<dir>,<cycle_id>,<block_id>,<model>,<confirm_time>,<price>
 `Phase7` 之外不产生日志。Historical Build 期间日志前缀为 `HMI-BUILD`，
 Live 期间为 `HMI-LIVE`，便于验证两者一致（Rule 51 的直接证据）。
 
-除信号行之外，还有一条**诊断行**（不是信号，不代表任何标记）：
+除信号行之外，还有**诊断行**（不是信号，不代表任何标记）：
+
+```
+HMI-CTX,<symbol>,<BOS|CHOCH|TRANS_OK|TRANS_FAIL|TRANS_SAMELEG|TIMEOUT>,
+        dir=<UP|DOWN>,live=<0|1>,ctx=<BULLISH|BEARISH|RANGE|TRANSITION>,
+        str=<n>,messy=<0|1>,bar=<确认破坏的H4收盘时间>,
+        swing=<被破坏的摆动点时间>,swing_px=<价格>,close=<破坏时收盘价>
+```
+
+每次 Context 状态变化输出一行，记录的是**这次事件留下的状态**。
+在此之前 Context 这条链没有任何可对账的输出 —— `str N` 与 `MESSY`
+都只能照单全收。有了它可以：
+
+- 把面板上的 `str N` 从日志里**逐个数回来**
+- 核对 Rule 3（`TRANS_SAMELEG` 就是被新鲜度判据挡掉的那些破坏）
+- 验证 A-25 / BRI-06 的修复（`TRANS_FAIL` 的行里 `messy` 应为 1，
+  紧随其后的 `BOS` 行里 `str` 应从 1 重新起算）
+- 统计强度的真实分布，**据此定分档阈值，而不是拍脑袋**
+
+用 `.\ReloadTest.ps1 -Ctx -Days 5` 读取：按品种给出各事件计数、
+强度的 min / P33 / median / P67 / P90 / max，以及当前值所处的分位；
+同时导出 `ctx_events.csv`。
+
+> 前缀特意不用 `HMI-BUILD` / `HMI-LIVE` —— 重绘比对脚本按 `HMI-BUILD,`
+> 切分，若共用前缀，这些诊断行会被当成标记行计入，污染已经通过的
+> 143 / 199 / 52 / 156 那组行数。`live=` 字段承担区分实时与重建的职责。
+
+另一条：
+
+
 
 ```
 HMI-REJECT,<symbol>,H4POI,<dir>,fvg=..,fvg_lo=..,fvg_hi=..|ob=..,ob_hi=..,ob_lo=..,gap_pts=<n>
