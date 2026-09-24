@@ -948,3 +948,44 @@ Compile Status:
 Replay Status:
   不影响已通过项；建议顺带跑一次 POI-04 确认「开关 = true 时行为与此前一致」
 ```
+
+---
+
+## v2.31 — 修复 A-25：MESSY 的置位条件回到规格
+
+```
+Version:  v2.31
+Date:     2026-09-24
+
+Changed Functions:
+  H4ContextOnBar()   CTX_BULLISH / CTX_BEARISH 的 CHOCH 分支：删去 g_ctx_messy = true
+                     CTX_TRANSITION 的失败分支：新增 g_ctx_messy = true
+
+Changed States:
+  g_ctx_messy 的**置位时机**改变。该变量不参与任何判定
+  （全仓只被 HMI_ObjectManager.mqh:360,376 两行面板文字读取）。
+
+Affected Modules:
+  MQL5/Indicators/HMI/HMI_H4ContextEngine.mqh
+
+Reason:
+  规格 docs/01 第 202-204 行：
+      MESSY : 出现过至少一次**失败的 TRANSITION**
+  实现却写在「每一次 CHOCH」上，而真正代表失败 TRANSITION 的分支
+  （brk != g_ctx_pending，原趋势恢复）完全没碰这个变量。
+  CHOCH 之后 TRANSITION 可能成功 —— 那是正常的趋势反转，不是「乱」，
+  规格没要求标记它。
+
+  按 Rule 65，规格本身就是业务规则，把实现改回规格属 bugfix，
+  不构成规则变更，因此不需要另行裁决。
+
+Trading Logic Changed:
+  NO —— g_ctx_messy 不被任何引擎读取，只影响面板那一个词。
+        信号、时序、日志完全不变。
+
+Compile Status:
+  NOT COMPILE VERIFIED
+
+Replay Status:
+  不影响任何已通过项（CSV 日志逐行不变）
+```

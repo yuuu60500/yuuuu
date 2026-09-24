@@ -737,7 +737,9 @@ Business Logic Impact:   NO —— 全仓 grep，g_ctx_messy 只被面板的两�
                          （HMI_ObjectManager.mqh:360, 376），不参与任何判定
 Recommended Fix:         置位移到 CTX_TRANSITION 的失败分支；
                          CHOCH 本身不再置位。
-Status:                  **OPEN —— 未修改，等待用户裁决（见 BRI-06）**
+Status:                  **FIXED — v2.31。置位移到 CTX_TRANSITION 的失败分支，
+                         CHOCH 分支不再置位。按 Rule 65，规格本身即业务规则，
+                         把实现改回规格属 bugfix，不需要另行裁决。**
 Confidence:              HIGH
 ```
 

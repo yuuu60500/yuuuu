@@ -59,7 +59,6 @@ CtxEventType H4ContextOnBar(const int h)
          else
            {
             ev = EV_CHOCH_DOWN;                       // Rule 3: no direct flip
-            g_ctx_messy = true;
             CtxEnter(CTX_TRANSITION, DIR_BEAR, t);
             g_ctx_strength = 0;
            }
@@ -70,7 +69,6 @@ CtxEventType H4ContextOnBar(const int h)
          else
            {
             ev = EV_CHOCH_UP;
-            g_ctx_messy = true;
             CtxEnter(CTX_TRANSITION, DIR_BULL, t);
             g_ctx_strength = 0;
            }
@@ -90,10 +88,14 @@ CtxEventType H4ContextOnBar(const int h)
            }
          else
            {
-            // transition failed: the original trend resumes
+            // Transition failed: the original trend resumes. THIS is the
+            // "failed TRANSITION" the spec means by MESSY (docs/01 202-204) -
+            // not the CHOCH that opened the transition, because a CHOCH whose
+            // transition then succeeds is an ordinary reversal (A-25).
             if(brk == DIR_BULL) { ev = EV_BOS_UP;   CtxEnter(CTX_BULLISH, DIR_NONE, t); }
             else                { ev = EV_BOS_DOWN; CtxEnter(CTX_BEARISH, DIR_NONE, t); }
             g_ctx_strength = 1;
+            g_ctx_messy    = true;
            }
          break;
         }
