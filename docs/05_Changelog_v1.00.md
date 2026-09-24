@@ -1207,3 +1207,50 @@ Replay Status:
   与 v2.38 合并验收：四品种基线预期变化，消失的每一条标记，
   其触碰时刻 H4 context 必为 RANGE / TRANSITION 或与 POI 反向
 ```
+
+---
+
+## v2.40 — 签字边界 1–3 落地：Phase 5 复查 + 时序与可见性确认
+
+```
+Version:  v2.40
+Date:     2026-09-24
+
+边界 1  新 Session 必须检查方向
+  Phase 3：v2.39 已满足（POITouchedBy 循环内过滤，先检查后改状态）
+  Phase 5：**本版新增** M5TouchArbitrate 复查
+           block.session_id == g_sess.id  且  CtxDirection() == g_sess.dir
+           由这两项拦下时输出 HMI-GUARD 行（InpLogSignals 之后）
+
+边界 2  新 Session 不追溯本根 FVG —— **现有代码已满足，未改动**
+  证据：M5BlocksOnFVG 全仓唯一调用点在 Phase 1（H4M5_Identification.mq5:117），
+        只接收本根 FvgDetect 的结果；Phase 1 时 Session 尚未建立，
+        首行 `if(!g_sess.active ...) return;` 直接返回。
+        其余遍历 g_m5fvg 的只有 BPR 引擎，产出的是 BPR 区而非 block。
+        InpM5BlockLookbackFromTouch 仅出现在 OB 回溯下限的计算中。
+
+边界 3  不改 H4 可见性 —— **现有代码已满足，未改动**
+  证据：H4VisibleTo(h4_open, m5_open) = h4_open + 4h <= m5_open
+        Phase 0b 只读 g_ctx / g_poi，不直接访问 H4 序列。
+
+Changed Functions:
+  M5TouchArbitrate()   armable 追加 session_id 与当前方向复查
+
+Changed States:
+  (none)
+
+Trading Logic Changed:
+  **预期 NO。** Phase 0b 已结束不合格 Session，SessionExpireOpenBlocks
+  已过期旧 Session 的 block，本复查按推理不应成为拦截项。
+  若日志出现 HMI-GUARD，说明存在绕过这两处的路径 —— 那是需要追查的缺陷，
+  不是复查在正常工作。
+
+验收要点（签字版）:
+  · 不合格 Session 在本根 Phase 1 不创建 block   —— 0b 先结束，M5BlocksOnFVG 首行返回
+  · Phase 2 不新增 breaker 候选                   —— BrkCandPush 需 g_sess.active 且 id 匹配
+  · Phase 5 不新 ARMED                            —— armable 需 g_sess.active + 本版复查
+  · 已有 ARMED cycle 照常                         —— Phase 4 针对 g_active_cyc，不看 Session
+
+Compile Status:
+  NOT COMPILE VERIFIED
+```

@@ -1381,6 +1381,9 @@ ProcessClosedM5Bar(n):
            Swing 确认 → BOS/CHOCH → Context → TradingRange → Liquidity → POI 生命周期
 
   Phase 0b 已有 Session 生命周期与资格检查（2026-09-24 用户签字新增，v2.38）
+           只读 Phase 0 已同步的状态，不直接读取 H4 序列，因此沿用
+           H4VisibleTo 规则：H4 须在该 M5 **开盘时**已收盘
+           （h4_open + 4h <= m5_open），与当前 M5 同时收盘的 H4 不可见。
            按 Phase 0 刚产出的 H4 context 检查已有 Session，任一成立即结束：
              · 关联 POI 已失效                    → SE_POI_INVALID
              · H4 为 RANGE / TRANSITION           → SE_CONTEXT_NEUTRAL
@@ -1401,12 +1404,21 @@ ProcessClosedM5Bar(n):
   Phase 3  Refinement Session —— 仅新建
            POI Touch 检测 → 新建 Session；Block 候选窗口推进
            （已有 Session 的结束判定已移至 Phase 0b）
+           选 POI 时即排除 context 不合格或方向不一致的候选；
+           通过检查后才修改 POI 状态、增加 Session 次数（BRI-07a）
+           本根新建的 Session **不回头调用 Phase 1**：本根完成的 M5 FVG
+           不为它建 block，最早下一根才可能建。
+           InpM5BlockLookbackFromTouch 只限定「日后建 block 时向前找 OB」
+           的范围，不代表可补用已错过的 FVG
 
   Phase 4  Identification（针对**旧/当前** Cycle，要求 n > cycle.armed_bar_index）
            固定检测顺序：CISD → MSS → BPR → PA ENGULFING → PA REJECTION → PA BREAK-RETEST
            各自独立，互不短路（Rule 30 / 42 / 44）
 
   Phase 5  Touch / ARMED 仲裁（8.4）
+           可 ARMED 须同时满足：Session 活跃、block.dir == session.dir、
+           block.session_id == session.id、CtxDirection() == session.dir
+           （后两项为 2026-09-24 签字的复查；若由它们拦下，记 HMI-GUARD）
            若产生新 ARMED：旧 Cycle → CLOSED（未形成模型 = PASS），新 Cycle 建立
            新 Cycle 的 Reference 在此刻冻结（10.1 / 11.1）
            新 Cycle 的确认从 n+1 开始（Rule 18）

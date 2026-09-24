@@ -171,6 +171,24 @@ int M5TouchArbitrate(const int n)
       if(g_blk[i].touched_time == 0) g_blk[i].touched_time = t;
 
       bool armable = (g_sess.active && g_blk[i].dir == g_sess.dir && st != BLOCK_CONFIRMED);
+
+      // Phase 5 re-check (signed boundary 1, 2026-09-24): the block must
+      // belong to THIS session and the session must still agree with the
+      // CURRENT H4 direction. Phase 0b should already have ended any session
+      // that fails this, and SessionExpireOpenBlocks any block that outlived
+      // its session - so if this test is ever the one that says no, some
+      // path around those two has been missed. It says so in the log rather
+      // than quietly doing the right thing and hiding the hole.
+      if(armable && (g_blk[i].session_id != g_sess.id || CtxDirection() != g_sess.dir))
+        {
+         armable = false;
+         if(InpLogSignals)
+            PrintFormat("HMI-GUARD,%s,ARMED_BLOCKED,block=%I64d,blk_sess=%I64d,sess=%I64d,sess_dir=%d,ctx_dir=%d,bar=%s",
+                        _Symbol, g_blk[i].id, g_blk[i].session_id, g_sess.id,
+                        g_sess.dir, CtxDirection(),
+                        TimeToString(CloseTimeOf(g_m5[n].time, PERIOD_M5), TIME_DATE|TIME_MINUTES));
+        }
+
       if(!armable)
         {
          if(st != BLOCK_TOUCHED) { g_blk[i].state = BLOCK_TOUCHED; g_blk[i].vis = -1; }
