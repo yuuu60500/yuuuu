@@ -905,3 +905,46 @@ Reason:
 Trading Logic Changed:
   NO —— 本次只写文档。
 ```
+
+---
+
+## v2.30 — Minor Feature：失效 POI 可隐藏
+
+```
+Version:  v2.30
+Date:     2026-09-24
+
+Changed Functions:
+  OM_SyncAll()   H4 POI 绘制段增加一个提前分支：
+                 dead（INVALIDATED / EXPIRED）且 InpShowDeadH4POI = false 时，
+                 删除该 POI 已有的矩形与标签并标记 vis = -2
+
+Changed States:
+  (none) —— 只动 vis 这个纯绘图字段；
+            state / out_of_window / 去重 / 日志一律不变（AX-6：状态 ≠ 绘图）
+
+New Input:
+  InpShowDeadH4POI = true   （默认保持 v1.00 以来的行为）
+
+Affected Modules:
+  MQL5/Indicators/HMI/HMI_Params.mqh
+  MQL5/Indicators/HMI/HMI_ObjectManager.mqh
+
+Reason:
+  用户反馈图上失效 POI 堆积、影响阅读。POI-04 规定失效后「样式改变、矩形不
+  保留」——这是有意的设计（记录比价位活得久），所以默认值不变，只给一个开关。
+
+  实现上必须**删除**而不是**跳过**：跳过只会让最后一次画出的矩形永远留在图上，
+  这正是 A-15（已扫流动性线不删）与 A-18（旧版本 Trading Range 不删）的同一个
+  坑。因此走 OM_DeleteOwner 并置 vis = -2，与 out_of_window 分支同一套约定。
+
+Trading Logic Changed:
+  NO —— 纯显示。不改任何阈值、过滤、信号时序；同一份 CSV 日志在开关两种取值
+        下逐行相同（Rule 68/69）。
+
+Compile Status:
+  NOT COMPILE VERIFIED   （v2.21/2.22 为最后一次实测 PASS；本版待 F7）
+
+Replay Status:
+  不影响已通过项；建议顺带跑一次 POI-04 确认「开关 = true 时行为与此前一致」
+```

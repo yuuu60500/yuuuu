@@ -56,6 +56,7 @@ input double InpPARetestTolerancePips = 0.5;
 
 input group "=== Display ==="
 input bool   InpShowH4POI             = true;
+input bool   InpShowDeadH4POI         = true;   // false: INVALIDATED / EXPIRED POI 不上图
 input bool   InpShowTradingRange      = true;
 input bool   InpShowLiquidity         = true;
 input int    InpLiqMaxLines            = 10;   // per side; keeps the chart readable

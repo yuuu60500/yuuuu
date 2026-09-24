@@ -469,6 +469,19 @@ void OM_SyncAll()
            }
          int vis = POIVis(g_poi[i]);
          bool dead = (vis == 2);
+
+         // POI-04 keeps an invalidated POI on the chart in a dead style, because
+         // the record outlives the level. When the user does not want that
+         // history drawn, the graphics must be DELETED rather than skipped -
+         // skipping would strand the last rectangle on screen for good, which is
+         // exactly how A-15 and A-18 left superseded objects behind. The record
+         // itself is untouched: state, dedup and the log do not change (AX-6).
+         if(dead && !InpShowDeadH4POI)
+           {
+            if(g_poi[i].vis >= 0) { OM_DeleteOwner(TT_POI, g_poi[i].id, 2); g_poi[i].vis = -2; }
+            continue;
+           }
+
          if(dead && g_poi[i].vis == vis) continue;
          StyleZone zst = POIStyleOf(g_poi[i]);
          datetime t2 = dead ? (g_poi[i].invalid_time > 0 ? g_poi[i].invalid_time : redge) : redge;
