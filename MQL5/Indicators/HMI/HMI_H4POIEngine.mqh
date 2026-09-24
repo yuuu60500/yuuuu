@@ -163,12 +163,21 @@ void POIInvalidateOnBar(const int h)
 
 //--- touch detection runs on CLOSED M5 bars (Spec 4.5) --------------
 // A bar may only touch a POI that was already confirmed when it opened.
+// BRI-07(a): only a POI that agrees with the CURRENT H4 direction may open a
+// session. The filter sits inside the search, not around it: this returns the
+// newest touched POI, so an ineligible newer one would otherwise hide an
+// eligible older one touched on the same bar. An ineligible POI is simply not
+// found - it stays POI_ACTIVE and consumes no session quota, so it is not
+// dressed up as a touch that failed to start anything.
 int POITouchedBy(const int n)
   {
+   int cd = CtxDirection();
+   if(cd == DIR_NONE) return(-1);                            // RANGE / TRANSITION
    int best = -1;
    for(int i = 0; i < g_poi_n; i++)
      {
       if(g_poi[i].state != POI_ACTIVE) continue;
+      if(g_poi[i].dir != cd) continue;                        // opposite leg's POI
       if(g_poi[i].confirm_time > g_m5[n].time) continue;     // anti future-leak
       if(!RangesIntersect(g_m5[n].low, g_m5[n].high, g_poi[i].lo, g_poi[i].hi)) continue;
       if(best < 0 || g_poi[i].confirm_time > g_poi[best].confirm_time) best = i;

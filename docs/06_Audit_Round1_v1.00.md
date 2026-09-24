@@ -926,7 +926,8 @@ Impact:                  在无主导趋势时产出趋势跟随标记
 Historical Repaint:      NO
 Future Leak:             NO
 Business Logic Impact:   **YES —— 修复会改变信号输出**
-Status:                  **OPEN —— 按 Rule 65/69 不擅自修改，见 BRI-07**
+Status:                  **FIXED —— v2.38（Phase 0b，已有 Session）
+                         + v2.39（POITouchedBy 资格过滤，新 Session）**
 Confidence:              HIGH
 ```
 

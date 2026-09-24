@@ -1169,3 +1169,41 @@ Replay Status:
   四品种基线**预期会变**（RANGE / TRANSITION 期间的周期消失）。
   验收应检查：消失的每一条标记，其 ARMED 时刻 H4 context 必为 RANGE / TRANSITION
 ```
+
+---
+
+## v2.39 — BRI-07(a)：新 Session 只接受与当前 H4 同向的 POI
+
+```
+Version:  v2.39
+Date:     2026-09-24
+
+Changed Functions:
+  POITouchedBy()   CtxDirection() == DIR_NONE 时直接返回 -1；
+                   循环内跳过方向与当前 H4 不一致的 POI
+
+Changed States:
+  (none)
+
+Reason:
+  工程师规则决策补充 §5（用户转交，「冲突时以本补充为准」）：
+    H4 RANGE / TRANSITION → 禁止新 session
+    H4 反向趋势           → 只允许新方向
+    禁止时不得把 POI 标记为已触碰、不得消耗 session 配额
+  与 v2.38 一起关闭 A-29。
+
+  过滤放在搜索循环**内部**而非外部：POITouchedBy 返回同根最新被触碰的 POI，
+  守卫若放在外面，一个不合格的新 POI 会遮住同根被触碰的合格旧 POI。
+  被过滤的 POI 保持 POI_ACTIVE、session_count 不变。
+
+Trading Logic Changed:
+  **YES** —— RANGE / TRANSITION 期间及反向趋势中触碰旧方向 POI，
+  不再开启 Session，因而不再产生对应的 block / ARMED / 标记。
+
+Compile Status:
+  NOT COMPILE VERIFIED
+
+Replay Status:
+  与 v2.38 合并验收：四品种基线预期变化，消失的每一条标记，
+  其触碰时刻 H4 context 必为 RANGE / TRANSITION 或与 POI 反向
+```
