@@ -14,6 +14,8 @@
 #          is processed - which also avoids guessing broker symbol suffixes
 #          (EURUSD.a / EURUSDm / EURUSD#).
 #
+#     .\ReloadTest.ps1 -Live                 how many LIVE marks each chart has
+#                                            so far (the wait-for-samples check)
 #     .\ReloadTest.ps1                       list the charts and their blocks
 #     .\ReloadTest.ps1 -LiveVsBuild          future-leak test, all charts
 #     .\ReloadTest.ps1 -Rejects              Rule 6 refusals, all charts
@@ -28,8 +30,8 @@
 #  so blocks interleave. Comparing across sources would be meaningless -
 #  hence the grouping below.
 # ============================================================
-param([string]$Source = "", [switch]$LiveVsBuild, [switch]$Rejects, [int]$Days = 1,
-      [string]$LogDir = "")
+param([string]$Source = "", [switch]$LiveVsBuild, [switch]$Rejects, [switch]$Live,
+      [int]$Days = 1, [string]$LogDir = "")
 
 # Row layout after the tag is stripped:
 #   0 symbol  1 "MODEL"  2 dir  3 cycle_id  4 block_id  5 anchor  6 model
@@ -84,6 +86,37 @@ Write-Host "log file(s): $(($logs | ForEach-Object Name) -join ', ')" -Foregroun
 # Oldest first, so LIVE rows keep their real order relative to the rebuild.
 $all = @()
 foreach ($f in $logs) { $all += Get-Content $f.FullName }
+# -Live is the check you run while waiting for samples: it needs no build
+# block and no -Source, and it discovers the charts from the log itself, so
+# adding symbols does not mean editing a list.
+if ($Live) {
+    $tally = @{}
+    foreach ($l in $all) {
+        if ($l -notmatch 'HMI-(LIVE|BUILD),') { continue }
+        $src = if ($l -match '\(([A-Za-z0-9._#]+,[A-Za-z0-9]+)\)') { $Matches[1] } else { '?' }
+        if (-not $tally.ContainsKey($src)) { $tally[$src] = 0 }
+        if ($l -match 'HMI-LIVE,') { $tally[$src]++ }
+    }
+    if ($tally.Count -eq 0) {
+        Write-Host "`nno HMI rows at all. Is InpLogSignals = true ?" -ForegroundColor Red
+        exit
+    }
+    Write-Host "`nLIVE marks so far:`n" -ForegroundColor Cyan
+    $total = 0
+    foreach ($k in ($tally.Keys | Sort-Object)) {
+        $n = $tally[$k]; $total += $n
+        Write-Host ("  {0,-14} {1,5}" -f $k, $n) -ForegroundColor $(if ($n -gt 0) { 'Green' } else { 'DarkGray' })
+    }
+    Write-Host ("`n  total {0}" -f $total)
+    if ($total -eq 0) {
+        Write-Host "`nnothing yet. Leave the charts running and do NOT reload them." -ForegroundColor Yellow
+    } else {
+        Write-Host "`nnow reload each chart once (switch timeframe away and back)," -ForegroundColor Yellow
+        Write-Host "then run:  .\ReloadTest.ps1 -LiveVsBuild -Days $Days" -ForegroundColor Yellow
+    }
+    exit
+}
+
 $raw = $all | Where-Object { $_ -match 'HMI-BUILD' }
 if ($raw.Count -eq 0) {
     Write-Host "`nno HMI-BUILD lines found." -ForegroundColor Red
@@ -228,6 +261,7 @@ function Show-Reload([string]$src) {
 
 if (-not $LiveVsBuild -and -not $Rejects -and $Source -eq "") {
     Write-Host "`nnothing asked for. Add one of:" -ForegroundColor Yellow
+    Write-Host "  -Live          how many LIVE marks so far (no reload needed)" -ForegroundColor Yellow
     Write-Host "  -LiveVsBuild   future-leak test  (all charts above, or one via -Source)" -ForegroundColor Yellow
     Write-Host "  -Rejects       Rule 6 refusals   (POI-02b)" -ForegroundColor Yellow
     Write-Host "  -Source `"<name>`"   repaint test on that one chart" -ForegroundColor Yellow
