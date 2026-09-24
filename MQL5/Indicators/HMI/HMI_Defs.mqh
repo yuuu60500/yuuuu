@@ -6,7 +6,7 @@
 #ifndef HMI_DEFS_MQH
 #define HMI_DEFS_MQH
 
-#define HMI_VERSION      "2.37"
+#define HMI_VERSION      "2.38"
 #define HMI_PREFIX       "HMI"
 
 //--- direction ------------------------------------------------------
@@ -74,7 +74,8 @@ enum ModelResult { MR_PENDING, MR_CONFIRMED, MR_PASS, MR_NA };
 
 enum SessionEnd
   {
-   SE_NONE, SE_POI_INVALID, SE_CONTEXT_FLIP, SE_TIMEOUT, SE_NEW_SESSION
+   SE_NONE, SE_POI_INVALID, SE_CONTEXT_FLIP, SE_TIMEOUT, SE_NEW_SESSION,
+   SE_CONTEXT_NEUTRAL      // H4 in RANGE / TRANSITION (BRI-07); appended, not inserted
   };
 
 enum MarginMode { MARGIN_PIPS, MARGIN_POINTS, MARGIN_ATR_FRAC };   // D-6

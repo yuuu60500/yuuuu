@@ -1118,3 +1118,54 @@ Compile Status:
 Replay Status:
   四品种重绘基线（156 / 199 / 52 / 143）需重跑确认未受影响 —— 这是本版的验收条件
 ```
+
+---
+
+## v2.38 — Phase 0b：已有 Session 生命周期与资格检查（A-29 / BRI-07(b)）
+
+```
+Version:  v2.38
+Date:     2026-09-24
+
+Changed Functions:
+  ProcessClosedM5Bar()  新增 Phase 0b（紧随 H4 同步、先于 Phase 1），
+                        SessionMaintain() 从 Phase 3 移至此处
+  SessionMaintain()     context 判定拆成两条：DIR_NONE → SE_CONTEXT_NEUTRAL，
+                        方向不符 → SE_CONTEXT_FLIP
+
+Changed States:
+  SessionEnd 枚举**追加** SE_CONTEXT_NEUTRAL（追加在末尾，既有值编号不变）
+
+Affected Modules:
+  MQL5/Indicators/HMI/H4M5_Identification.mq5
+  MQL5/Indicators/HMI/HMI_M5BlockEngine.mqh
+  MQL5/Indicators/HMI/HMI_Defs.mqh
+  docs/01_Architecture_Spec_v1.00.md   §17.2 冻结相位表新增 Phase 0b
+
+Reason:
+  用户 2026-09-24 签字的 Phase 0b 规格。
+  旧守卫 `CtxDirection() != DIR_NONE && CtxDirection() != g_sess.dir`
+  在 RANGE / TRANSITION 下第一半恒为假，守卫整体失效（A-29）。
+
+Trading Logic Changed:
+  **YES —— 仅限 RANGE / TRANSITION 情形。**
+  逐条对照旧代码：
+    · POI 失效 / 反向翻转 / 超时：旧代码在 Phase 3 结束 Session 时，
+      SessionExpireOpenBlocks() 已把同根 Phase 1 新建的 block 过期，
+      ARMED 在其后的 Phase 5 —— 故**标记输出不变**，仅不再「先建后删」
+    · RANGE / TRANSITION：旧守卫从不触发，Session 一直存活并可 ARMED ——
+      **本版起在进入该状态的那一根即结束**，这是唯一的信号变化
+
+  图形上一处可见差异：超时 / 失效那一根，原本会先被 Phase 2 判为 INVALID
+  的 ACTIVE block，现在在 0b 就被 EXPIRED，Phase 2 跳过它。两者都是死亡样式。
+
+  已核对不会泄漏：BrkCandPush 仅在 g_sess.active && session_id 匹配时触发，
+  0b 结束后同根 Phase 2 不会再生出 breaker 候选。
+
+Compile Status:
+  NOT COMPILE VERIFIED
+
+Replay Status:
+  四品种基线**预期会变**（RANGE / TRANSITION 期间的周期消失）。
+  验收应检查：消失的每一条标记，其 ARMED 时刻 H4 context 必为 RANGE / TRANSITION
+```

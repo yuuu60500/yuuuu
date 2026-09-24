@@ -1380,6 +1380,17 @@ ProcessClosedM5Bar(n):
            处理所有满足 h4_time[h] + 4h <= m5_time[n] 且尚未处理的 H4 K 线：
            Swing 确认 → BOS/CHOCH → Context → TradingRange → Liquidity → POI 生命周期
 
+  Phase 0b 已有 Session 生命周期与资格检查（2026-09-24 用户签字新增，v2.38）
+           按 Phase 0 刚产出的 H4 context 检查已有 Session，任一成立即结束：
+             · 关联 POI 已失效                    → SE_POI_INVALID
+             · H4 为 RANGE / TRANSITION           → SE_CONTEXT_NEUTRAL
+             · H4 方向与 Session 不一致           → SE_CONTEXT_FLIP
+             · Session 超时                       → SE_TIMEOUT
+           结束时：过期该 Session 尚未 ARMED 的 block，清除 breaker 候选；
+                   已 ARMED cycle 保持原生命周期（Rule 15）
+           必须位于 Phase 1 之前：M5BlocksOnFVG 只检查 g_sess.active，
+           Session 若在此存活，会在已不允许的 context 下产出 block
+
   Phase 1  M5 Structure Update
            bar n 的 M5 Swing 确认（滞后 R 根）、FVG 确认、OB/Breaker Candidate 登记
 
@@ -1387,8 +1398,9 @@ ProcessClosedM5Bar(n):
            用 bar n 的 close 判定 H4 POI（用 H4 close，见 4.5）/ M5 Block 失效
            → 失效的 Block 在本根不可能 ARMED
 
-  Phase 3  Refinement Session 维护
-           POI Touch 检测 → 新建 / 结束 Session；Block 候选窗口推进
+  Phase 3  Refinement Session —— 仅新建
+           POI Touch 检测 → 新建 Session；Block 候选窗口推进
+           （已有 Session 的结束判定已移至 Phase 0b）
 
   Phase 4  Identification（针对**旧/当前** Cycle，要求 n > cycle.armed_bar_index）
            固定检测顺序：CISD → MSS → BPR → PA ENGULFING → PA REJECTION → PA BREAK-RETEST

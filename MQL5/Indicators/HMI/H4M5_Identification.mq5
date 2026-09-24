@@ -9,7 +9,7 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "2.37"
+#property version   "2.38"
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window
@@ -100,6 +100,12 @@ void ProcessClosedM5Bar(const int n)
       g_h4_cursor++;
      }
 
+   //--- Phase 0b: existing session lifecycle & eligibility ----------
+   // Must see the context Phase 0 just produced and act before Phase 1:
+   // M5BlocksOnFVG only checks g_sess.active, so a session left alive here
+   // would mint blocks under a context that no longer permits them.
+   SessionMaintain(n);
+
    //--- Phase 1: M5 structure ---------------------------------------
    SwingDetect(g_m5, n, PERIOD_M5, InpM5SwingLeft, InpM5SwingRight,
                g_m5sw, g_m5sw_n, MAX_M5_SWINGS);
@@ -122,8 +128,8 @@ void ProcessClosedM5Bar(const int n)
         }
      }
 
-   //--- Phase 3: refinement session ---------------------------------
-   SessionMaintain(n);
+   //--- Phase 3: refinement session (new sessions only) --------------
+   // Existing-session checks moved to Phase 0b.
    POIReArmCheck(n);                          // A-06, no-op while InpPOIMaxSessions == 1
    int pi = POITouchedBy(n);
    if(pi >= 0)

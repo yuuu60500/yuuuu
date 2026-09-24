@@ -45,7 +45,7 @@ void SessionEndNow(const SessionEnd reason, const datetime t)
    SessionExpireOpenBlocks();     // ARMED blocks / cycles are NOT touched (Rule 15)
 
    // A-06 (opt-in, default off): only a TIMEOUT may hand the POI back.
-   // POI_INVALID / CONTEXT_FLIP / NEW_SESSION never re-arm.
+   // POI_INVALID / CONTEXT_FLIP / CONTEXT_NEUTRAL / NEW_SESSION never re-arm.
    if(reason != SE_TIMEOUT || InpPOIMaxSessions <= 1) return;
    int pi = POIFindById(g_sess.poi_id);
    if(pi < 0) return;
@@ -69,6 +69,16 @@ void SessionStart(const int poi_idx, const int n)
    g_poi[poi_idx].session_count++;
   }
 
+// Phase 0b (signed 2026-09-24): runs right after H4 sync, BEFORE Phase 1
+// can create a block under a session the new context no longer allows.
+// Ending here expires the session's un-ARMED blocks and clears breaker
+// candidates (SessionExpireOpenBlocks); ARMED cycles keep their lifecycle.
+//
+// The old flip guard read `CtxDirection() != DIR_NONE && ...`. RANGE and
+// TRANSITION return DIR_NONE, so its first half was false there and the
+// guard did nothing - a session survived into a market with no trend to
+// follow (A-29). Neutral and opposite are now tested separately so the
+// log can tell them apart.
 void SessionMaintain(const int n)
   {
    if(!g_sess.active) return;
@@ -78,7 +88,10 @@ void SessionMaintain(const int n)
    if(pi >= 0 && g_poi[pi].state == POI_INVALID)     // Spec 5.1: INVALIDATED only
      { SessionEndNow(SE_POI_INVALID, t); return; }
 
-   if(CtxDirection() != DIR_NONE && CtxDirection() != g_sess.dir)
+   int cd = CtxDirection();
+   if(cd == DIR_NONE)
+     { SessionEndNow(SE_CONTEXT_NEUTRAL, t); return; }
+   if(cd != g_sess.dir)
      { SessionEndNow(SE_CONTEXT_FLIP, t); return; }
 
    if(n - g_sess.start_index > InpM5RefinementMaxBars)
