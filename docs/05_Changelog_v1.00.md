@@ -1070,3 +1070,51 @@ Compile Status:
 Replay Status:
   不影响任何已通过项
 ```
+
+---
+
+## v2.36 — 阶段 0：数据一致性与对象登记前置修复
+
+```
+Version:  v2.36
+Date:     2026-09-24
+
+Changed Functions:
+  OM_Register()      按名查重后再登记（需求书 §9.1）
+  SeriesAppend()     新增返回码 SA_RELOAD / SA_NOT_READY / SA_NONE；
+                     「终端尚未交付」不再与「没有新 K 线」共用 0（A-30）；
+                     重新读取最后一根已知 K 线并比对 OHLC，
+                     发现被就地修正则要求重建（A-32）；
+                     部分交付（got < want）一律不追加，下一 tick 重试
+  OnCalculate()      prev_calculated == 0 触发重建（需求书 §9.3）；
+                     H4 返回 SA_NOT_READY 时**不推进 M5**
+
+Changed States:
+  (none) —— 状态字段与阈值均未改动
+
+Affected Modules:
+  MQL5/Indicators/HMI/HMI_ObjectManager.mqh
+  MQL5/Indicators/HMI/HMI_Series.mqh
+  MQL5/Indicators/HMI/H4M5_Identification.mq5
+
+Reason:
+  工程师需求书 §9 的前置修复，本版完成剩余三项
+  （§9.1 登记去重、§9.2 跨周期同步、§9.3 历史修正重建）。
+  §9.4 参数校验已于 v2.35 完成，§9.5 脚本已于 v2.34 完成。
+
+  A-30 的关键在于：H4 滞后时 SeriesAppend 旧实现返回 0，与「没有新 K 线」
+  无法区分，于是 M5 照常推进、用的却是尚未到达那根 H4 的旧 Context，
+  且这些 M5 永不重算 —— 实时与重建必然分叉，正是 Rule 51 要防的情形。
+  现在 H4 未就绪时直接等下一 tick：M5 K 线不会丢，晚一点没有代价。
+
+Trading Logic Changed:
+  NO —— 未改动任何阈值、过滤或信号时序。
+  但**实时输出的时机**会变：H4 未就绪时本 tick 不再处理 M5，
+  改为下一 tick 处理。产出的标记内容不变，这正是 Rule 51 的要求。
+
+Compile Status:
+  NOT COMPILE VERIFIED
+
+Replay Status:
+  四品种重绘基线（156 / 199 / 52 / 143）需重跑确认未受影响 —— 这是本版的验收条件
+```

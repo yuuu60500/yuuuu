@@ -45,17 +45,46 @@ bool SeriesLoad(const ENUM_TIMEFRAMES tf, MqlRates &r[], int &cnt, double &atr[]
 
 //--- append bars that closed since the last stored one --------------
 //--- returns number appended, or -1 when a full reload is required   |
+// Return codes. "Not ready" used to be indistinguishable from "nothing new",
+// which is what let a lagging H4 feed leave M5 advancing on a stale context
+// with no catch-up (A-30). Callers must treat them differently.
+#define SA_RELOAD     (-1)   // history changed underneath us: rebuild
+#define SA_NOT_READY  (-2)   // the terminal has not delivered the bars yet
+#define SA_NONE         0    // genuinely nothing new has closed
+
 int SeriesAppend(const ENUM_TIMEFRAMES tf, MqlRates &r[], int &cnt, double &atr[])
   {
-   if(cnt <= 0) return(-1);
+   if(cnt <= 0) return(SA_RELOAD);
    datetime last = r[cnt-1].time;
+
    int sh = iBarShift(_Symbol, tf, last, true);
-   if(sh < 0)  return(-1);          // bar vanished (history refresh) -> reload
-   if(sh <= 1) return(0);           // nothing new closed
+   if(sh < 0)  return(SA_RELOAD);   // bar vanished (history refresh) -> reload
+
+   // A-32: a broker may revise a bar in place without removing any bar, so
+   // iBarShift still finds it and nothing below would notice. Re-read that
+   // same bar and compare: if the terminal now reports values other than the
+   // ones this build was made from, the build is stale.
+   // Copied BY POSITION on purpose - the start_time overload's direction is
+   // easy to misread, and a check that silently reads the wrong bar is worse
+   // than no check.
+   // Exact comparison is correct here: any revision at all invalidates the
+   // build, so this is change detection, not a price-level test.
+   MqlRates chk[];
+   if(CopyRates(_Symbol, tf, sh, 1, chk) == 1)
+     {
+      if(chk[0].time  != r[cnt-1].time  ||
+         chk[0].open  != r[cnt-1].open  || chk[0].high  != r[cnt-1].high ||
+         chk[0].low   != r[cnt-1].low   || chk[0].close != r[cnt-1].close)
+         return(SA_RELOAD);
+     }
+   if(sh <= 1) return(SA_NONE);     // nothing new closed
    int want = sh - 1;
    MqlRates tmp[];
    int got = CopyRates(_Symbol, tf, 1, want, tmp);
-   if(got <= 0) return(0);
+   // A partial batch is a sync hiccup, not a short history: iBarShift just
+   // found bar `sh`, so bars 1..sh-1 all exist. Appending half of them would
+   // leave the engine mid-update, so take nothing and retry next tick.
+   if(got < want) return(SA_NOT_READY);
    int old = cnt;
    ArrayResize(r, old + got);
    for(int i = 0; i < got; i++) r[old + i] = tmp[i];

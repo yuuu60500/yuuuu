@@ -32,6 +32,12 @@ string OM_Name(const string tt, const long owner, const int sub)
 
 void OM_Register(const string name)
   {
+   // Unique by name, whatever the caller believes about ObjectCreate's return
+   // value (9.1). A registry that can hold the same name twice makes OM_Trim
+   // delete a real object for every phantom entry, and the callers are spread
+   // over six sites - making the invariant hold here is the only place it
+   // cannot be forgotten.
+   for(int i = 0; i < g_obj_n; i++) if(g_obj[i] == name) return;
    if(g_obj_n >= MAX_OBJREG) return;
    g_obj[g_obj_n] = name;
    g_obj_n++;

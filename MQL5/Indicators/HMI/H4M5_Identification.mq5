@@ -9,7 +9,7 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "2.35"
+#property version   "2.36"
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window
@@ -281,6 +281,11 @@ int OnCalculate(const int rates_total,
                 const int &spread[])
   {
    //--- first run / rebuild ----------------------------------------
+   // prev_calculated == 0 is the terminal telling us it has re-read or
+   // refreshed history for this chart. The build we are holding was made
+   // from data that may no longer exist (A-32 / 9.3).
+   if(prev_calculated == 0) g_ready = false;
+
    if(!g_ready)
      {
       if(!SeriesInit()) return(rates_total);      // data not ready: retry next tick
@@ -292,8 +297,18 @@ int OnCalculate(const int rates_total,
 
    //--- H4 first, so Phase 0 can consume it -------------------------
    int ah = SeriesAppend(PERIOD_H4, g_h4, g_h4_n, g_h4_atr);
+   if(ah == SA_RELOAD) { g_ready = false; return(rates_total); }
+
+   // A-30: H4 not delivered yet is NOT the same as no new H4. Advancing M5
+   // now would evaluate those bars against a context the H4 bar has not
+   // reached, and nothing ever re-runs them - so live and rebuild diverge,
+   // which is precisely what Rule 51 forbids. Wait instead; the M5 bars are
+   // still there on the next tick and nothing is lost by being late.
+   if(ah == SA_NOT_READY) return(rates_total);
+
    int am = SeriesAppend(PERIOD_M5, g_m5, g_m5_n, g_m5_atr);
-   if(ah < 0 || am < 0) { g_ready = false; return(rates_total); }
+   if(am == SA_RELOAD)    { g_ready = false; return(rates_total); }
+   if(am == SA_NOT_READY) return(rates_total);
 
    if(am > 0)
      {
