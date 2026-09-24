@@ -1065,7 +1065,7 @@ Trading Logic Changed:
         CSV 信号日志逐行不变。
 
 Compile Status:
-  NOT COMPILE VERIFIED
+  PASS — 0 errors / 0 warnings（用户实测，2026-09-24，3138 ms，AVX2 + FMA3；v2.40 构建，涵盖 v2.34–v2.40）
 
 Replay Status:
   不影响任何已通过项
@@ -1113,7 +1113,7 @@ Trading Logic Changed:
   改为下一 tick 处理。产出的标记内容不变，这正是 Rule 51 的要求。
 
 Compile Status:
-  NOT COMPILE VERIFIED
+  PASS — 0 errors / 0 warnings（用户实测，2026-09-24，3138 ms，AVX2 + FMA3；v2.40 构建，涵盖 v2.34–v2.40）
 
 Replay Status:
   四品种重绘基线（156 / 199 / 52 / 143）需重跑确认未受影响 —— 这是本版的验收条件
@@ -1163,7 +1163,7 @@ Trading Logic Changed:
   0b 结束后同根 Phase 2 不会再生出 breaker 候选。
 
 Compile Status:
-  NOT COMPILE VERIFIED
+  PASS — 0 errors / 0 warnings（用户实测，2026-09-24，3138 ms，AVX2 + FMA3；v2.40 构建，涵盖 v2.34–v2.40）
 
 Replay Status:
   四品种基线**预期会变**（RANGE / TRANSITION 期间的周期消失）。
@@ -1201,7 +1201,7 @@ Trading Logic Changed:
   不再开启 Session，因而不再产生对应的 block / ARMED / 标记。
 
 Compile Status:
-  NOT COMPILE VERIFIED
+  PASS — 0 errors / 0 warnings（用户实测，2026-09-24，3138 ms，AVX2 + FMA3；v2.40 构建，涵盖 v2.34–v2.40）
 
 Replay Status:
   与 v2.38 合并验收：四品种基线预期变化，消失的每一条标记，
@@ -1252,5 +1252,5 @@ Trading Logic Changed:
   · 已有 ARMED cycle 照常                         —— Phase 4 针对 g_active_cyc，不看 Session
 
 Compile Status:
-  NOT COMPILE VERIFIED
+  PASS — 0 errors / 0 warnings（用户实测，2026-09-24，3138 ms，AVX2 + FMA3；v2.40 构建，涵盖 v2.34–v2.40）
 ```

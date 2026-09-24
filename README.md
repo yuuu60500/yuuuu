@@ -77,7 +77,7 @@ H4 Context
 | Phase 2 — Conflict Resolution / Business Rule Sign-off | **COMPLETE** (D-1..D-7 signed off 2026-09-22) |
 | Phase 3 — MQL5 Implementation | **COMPLETE** (v1.00, ~2560 lines) |
 | Phase 4 — Audit (P0–P3) | **ROUND 4** (10 fixed, 5 potential risks, 1 withdrawn) |
-| Phase 5 — MetaEditor Compile | **PASS** — v2.21, 0 errors / 0 warnings (2026-09-23) |
+| Phase 5 — MetaEditor Compile | **PASS** — v2.40, 0 errors / 0 warnings (2026-09-24) |
 | Phase 6 — Visual Replay / Repaint Test | **进行中** —— POI-01 / POI-02a（接受侧）/ POI-02b（否决侧）、四品种重绘一致性、图表周期独立性均已 PASS；Future Leak（LIVE vs BUILD）待测 |
 
 ## 源码
