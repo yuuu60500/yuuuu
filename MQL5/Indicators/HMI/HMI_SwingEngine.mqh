@@ -22,8 +22,14 @@ void SwingPush(HSwing &arr[], int &cnt, const int cap, const HSwing &s)
 void SwingDetect(const MqlRates &r[], const int n, const ENUM_TIMEFRAMES tf,
                  const int L, const int R, HSwing &arr[], int &cnt, const int cap)
   {
+   // A-28: L and R come straight from inputs and MQL5 enforces no range.
+   // R < 1 makes c = n - R land at or past n: the right-side loop then never
+   // runs, so the fractal is "confirmed" with no confirmation at all, and at
+   // the newest bar c indexes past the end of the array. A fractal needs at
+   // least one bar on each side by definition.
+   if(L < 1 || R < 1) return;
    int c = n - R;
-   if(c - L < 0 || c <= 0) return;
+   if(c - L < 0 || c <= 0 || c >= n) return;
 
    bool hi_ok = true, lo_ok = true;
    for(int j = c - L; j < c && (hi_ok || lo_ok); j++)
