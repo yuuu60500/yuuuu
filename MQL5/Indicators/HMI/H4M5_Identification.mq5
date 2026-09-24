@@ -9,7 +9,7 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "2.36"
+#property version   "2.37"
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window
@@ -233,6 +233,20 @@ void BuildHistory()
 int OnInit()
   {
    StylesInit();                 // resolve all style inputs before anything draws
+   // Reject illegal parameters loudly. SwingDetect already refuses L/R < 1
+   // (A-28), but silently: the indicator would load, draw a panel and simply
+   // never find a swing, which looks like a quiet market rather than a bad
+   // setting. A wrong number the user can see is worth more than a safe
+   // internal guard they cannot.
+   if(InpH4SwingLeft < 1 || InpH4SwingRight < 1 ||
+      InpM5SwingLeft < 1 || InpM5SwingRight < 1)
+     {
+      PrintFormat("HMI: swing left/right must be >= 1 "
+                  "(H4 %d/%d, M5 %d/%d) - a fractal needs a bar on each side",
+                  InpH4SwingLeft, InpH4SwingRight, InpM5SwingLeft, InpM5SwingRight);
+      return(INIT_FAILED);
+     }
+
    KZInit();                     // resolve kill zone windows (display only)
 
    if(!OM_ClaimInstance())
