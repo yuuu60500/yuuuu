@@ -236,8 +236,14 @@ function Show-LiveVsBuild([string]$src) {
     # same future bars every time and stays self-consistent. Live rows were
     # emitted bar by bar with only the past available, so a mark that does
     # not survive into the rebuild - or changes - is the real signal.
+    # $all, NOT $raw. $raw is filtered to lines containing HMI-BUILD, and an
+    # HMI-LIVE line contains no such substring, so scanning $raw made $live
+    # structurally impossible to fill: every run reported "live rows: 0"
+    # whatever the market had done. A test that can only ever return one
+    # answer is worse than no test - it was read as "nothing confirmed live
+    # yet" for days.
     $live = @()
-    foreach ($l in $raw) {
+    foreach ($l in $all) {
         $s2 = if ($l -match '\(([A-Za-z0-9._#]+,[A-Za-z0-9]+)\)') { $Matches[1] } else { '?' }
         if ($s2 -eq $src -and $l -match 'HMI-LIVE,(.*)$') { $live += $Matches[1] }
     }

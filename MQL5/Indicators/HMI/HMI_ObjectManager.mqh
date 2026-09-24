@@ -587,6 +587,10 @@ void OM_Preview()
   {
    string nm = OM_Name(TT_PRV, 0, 0);
    ObjectDelete(0, nm);
+   OM_Unregister(nm);          // A-26: without this the redraw below re-registers
+                               // the SAME name every time it runs - up to 20x a
+                               // second - and OM_Trim then deletes real marks from
+                               // the head of the registry to make room for them.
    if(!g_sess.active || !M5LayerOn()) return;
    double bid = SymbolInfoDouble(_Symbol, SYMBOL_BID);
    if(bid <= 0.0) return;
