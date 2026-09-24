@@ -798,3 +798,251 @@ Confidence:              HIGH
 状态:
   **RESOLVED — v2.32**
 ```
+
+---
+
+## Audit Round 7 —— 外部评审来件（2026-09-24）
+
+> 来件共 8 条。以下逐条以代码查证，**不照单全收**：
+> 有证据的记 Confirmed Bug，只有推理的记 Potential Risk，
+> 属业务语义的按 Rule 65 转 BUSINESS RULE ISSUE，
+> 机制描述有出入的照实更正。
+
+### A-26 —— **预览标签的重复登记挤掉真实标记**（来件第 1 条，成立）
+
+```
+Severity:                P1
+Location:                HMI_ObjectManager.mqh  OM_Preview()
+Trigger:                 Session 活跃且价格位于某个 Block 区间内
+Expected Behavior:       登记表条目数 == 实际对象数
+Actual Behavior:         OM_Preview() 删除自己的标签却未调用 OM_Unregister：
+                           ObjectDelete(0, nm);        // 缺 OM_Unregister(nm)
+                           ...
+                           OM_Text(nm, ...);           // 删过了 -> 创建成功 -> 再登记一次
+                         它由定时器驱动（H4M5_Identification.mq5:310，
+                         下限 50 ms），**每秒可重复登记十余次**。
+                         g_obj_n 涨过 InpObjectHistoryLimit（500）后，
+                         OM_Trim() 从表头删起，表头正是最老的真实对象
+                         （POI / M5 Block / ARMED / 模型标签），
+                         而 OM_Protected() 只保护 MARK / CTX / KZ / LIQ。
+                         → 一个预览标签的重复登记，换掉一个真实信号标签。
+                         另：MAX_OBJREG = 1024，两根 M5 之间可能有数千次预览，
+                         打满后 OM_Register 静默返回，新对象再也进不了表。
+Evidence:                源码直读。全仓 6 处 ObjectDelete，其余 5 处
+                         （OM_DeleteOwner / KZ / 面板 / Trim / DeleteOwnAll）
+                         均已注销或整表清零，仅此一处漏掉。
+Impact:                  图表上的信号标记被逐个删除 —— 指标唯一的输出
+Historical Repaint:      NO（状态不变，只是对象被删）
+Future Leak:             NO
+Business Logic Impact:   NO
+Recommended Fix:         删除后补 OM_Unregister(nm)
+Status:                  **FIXED — v2.34**
+Confidence:              HIGH
+
+更正：来件称「重复登记」。后果完全属实，机制是**删除时漏注销**，
+不是双重登记 —— OM_Rect / OM_Text / OM_Level 都只在 ObjectCreate
+成功时登记，本身没有重复登记的路径。
+```
+
+### A-27 —— **验证脚本把实时行全过滤掉了（我自己的缺陷）**（来件第 5 条，成立）
+
+```
+Severity:                P0（使 Future Leak 测试恒为假阴性）
+Location:                tools/ReloadTest.ps1  Show-LiveVsBuild()
+Trigger:                 任何一次 -LiveVsBuild
+Expected Behavior:       扫描全部日志行，统计 HMI-LIVE
+Actual Behavior:         $raw = $all | Where-Object { $_ -match 'HMI-BUILD' }
+                         而实时扫描迭代的正是 $raw。
+                         'HMI-LIVE,' 不含子串 'HMI-BUILD'，
+                         **$live 结构上永远为空**。
+Evidence:                源码直读 + 用户实测复现（日志确有 LIVE 记录，
+                         脚本仍报 0 条）。
+Impact:                  2026-09-23 至 09-24 期间所有「live rows: 0」
+                         的结论**全部作废**。我据此判断「行情安静、继续挂」，
+                         **该判断没有依据**。
+                         受影响的还有我在 docs/04 写下的那段
+                         「重建的最后一条标记时间可用于区分引擎没产出
+                         与实时路径坏了」—— 该推理本身仍成立，
+                         但当时用来支撑它的 live=0 是无效输入。
+Recommended Fix:         改为迭代 $all
+Status:                  **FIXED — v2.34 同批（脚本层）**
+Confidence:              HIGH
+
+教训：-Live 模式迭代 $all 是对的，-LiveVsBuild 迭代 $raw 是错的，
+两处相隔 150 行、写于不同版本。**同一份数据的两条读取路径必须共用
+一个取数函数**，否则迟早分叉 —— 与 ConnectionGapPts / RangesADRUsedPct
+是同一个教训，这次我没有及时套用。
+```
+
+### A-28 —— **SwingLeft / SwingRight 小于 1 时越界**（来件第 7 条，成立）
+
+```
+Severity:                P3（需用户填入非默认值才能触发）
+Location:                HMI_SwingEngine.mqh  SwingDetect()
+Trigger:                 InpH4SwingRight <= 0 或 InpM5SwingRight <= 0
+Actual Behavior:         int c = n - R;
+                         R = 0  -> c = n，右侧确认循环不执行，
+                                   分形在「无右侧确认」下成立，违反 AX-3
+                         R < 0  -> c > n，同上，且在最新一根时
+                                   r[c] 读出数组末尾之外
+Evidence:                源码直读；MQL5 的 input int 无范围约束
+Impact:                  非默认设置下可能越界读或产生不可确认的摆动点
+Historical Repaint:      可能（无右侧确认的摆动点会被后续 K 线推翻）
+Future Leak:             R<0 时读取 h 之后的 K 线 —— 是
+Business Logic Impact:   NO（默认值 2/2 下行为不变）
+Recommended Fix:         L < 1 || R < 1 直接返回；并要求 c < n
+Status:                  **FIXED — v2.35**
+Confidence:              HIGH
+```
+
+### A-29 —— **RANGE / TRANSITION 下旧 POI 仍能开启识别周期**（来件第 3 条，成立）
+
+```
+Severity:                P1（会产出 Rule 2 不该存在的标记）
+Location:                H4M5_Identification.mq5:128-135（Phase 3 触碰分支）
+                         HMI_M5BlockEngine.mqh:57 SessionStart()
+                         HMI_M5BlockEngine.mqh:81 SessionMaintain()
+Expected Behavior:       Rule 2：v1.00 仅顺势。
+                         CtxDirection() 自己的注释即写明：
+                           return(DIR_NONE);   // RANGE / TRANSITION: no new setups
+Actual Behavior:         两处都没有拦住：
+                         1) SessionStart() 内无任何 Context 判断，
+                            Phase 3 只要 POITouchedBy(n) >= 0 就调用它。
+                            POIOnBar() 有 `if(dir != CtxDirection()) return;`
+                            所以 RANGE/TRANSITION 下不会**新建** POI，
+                            但此前趋势中建立、仍为 POI_ACTIVE 的旧 POI
+                            被触碰时照样开 Session。
+                         2) SessionMaintain() 的翻转守卫是
+                              if(CtxDirection() != DIR_NONE &&
+                                 CtxDirection() != g_sess.dir) ...
+                            RANGE / TRANSITION 下 CtxDirection() == DIR_NONE，
+                            第一个条件为假，**守卫整体不生效**，
+                            已有 Session 可以一路存活进 RANGE。
+                         → Session -> M5 Block -> ARMED -> 识别周期 -> 标记
+Evidence:                源码直读。代码自身的注释「no new setups」
+                         即为作者意图，实现未落实。
+Impact:                  在无主导趋势时产出趋势跟随标记
+Historical Repaint:      NO
+Future Leak:             NO
+Business Logic Impact:   **YES —— 修复会改变信号输出**
+Status:                  **OPEN —— 按 Rule 65/69 不擅自修改，见 BRI-07**
+Confidence:              HIGH
+```
+
+### A-30 —— **H4 尚未就绪时 M5 按旧 Context 计算且不补算**（来件第 2 条，Potential Risk）
+
+```
+Severity:                P1（若成立）
+Location:                H4M5_Identification.mq5:294-300
+Trigger:                 终端交付 H4 新 K 线晚于 M5
+Reasoning:               int ah = SeriesAppend(PERIOD_H4, ...);
+                         int am = SeriesAppend(PERIOD_M5, ...);
+                         if(ah < 0 || am < 0) { g_ready = false; return; }
+                         if(am > 0) { for(...) ProcessClosedM5Bar(n); }
+
+                         H4 数据滞后时 SeriesAppend 返回 0（不是负数），
+                         不触发重建。随后的 M5 K 线被处理，Phase 0 只能
+                         消费 g_h4 里已有的 H4 —— 即**旧 Context**。
+                         H4 补到之后由游标消费，但**那几根 M5 不会重算**。
+                         重建时两条序列都完整 → 结果可能不同，
+                         这正是 Rule 51（Historical Build ≈ Live Replay）
+                         要防的情形。
+Evidence:                **仅源码推理，无运行时证据。**
+                         是否真的发生取决于券商与终端的 H4 交付时序。
+Impact:                  实时与重建结果不一致
+Status:                  **Potential Risk —— 待实测**
+Confidence:              MEDIUM
+
+如何证伪/证实：这恰好就是 LIVE vs BUILD 测试的目标。
+该测试此前因 A-27 恒为假阴性，修复后才具备检出能力。
+```
+
+### A-31 —— **重载后实时周期标签可能消失**（来件第 4 条，判定为 A-30 的症状）
+
+```
+Severity:                —
+Reasoning:               ResetEngine() 先 OM_DeleteOwnAll() 再 BuildHistory()，
+                         所有图形都从重建后的状态重画。因此「实时留下的标签
+                         重载后消失」当且仅当**重建没有复现那些周期**。
+                         而重建为何可能不复现，正是 A-30；
+                         在 A-26 修复前也可能是标记已被 OM_Trim 删除。
+Status:                  **不单列 —— 归入 A-30（成因）与 A-26（已修）**
+Confidence:              MEDIUM
+
+若 A-26 / A-30 都处理完仍出现此现象，再作为独立缺陷重开。
+```
+
+### A-32 —— **历史修正不触发重建**（来件第 6 条，Potential Risk）
+
+```
+Severity:                P2
+Location:                HMI_Series.mqh  SeriesAppend()
+Reasoning:               仅当 iBarShift(...) < 0（最后一根已知 K 线消失）
+                         才返回 -1 触发重建。若券商修正的是更早一根的
+                         OHLC 而不删除任何 K 线，则无任何检测，
+                         g_h4 / g_m5 里留着旧值，而重建会读到新值。
+Evidence:                源码直读。真实发生频率未知。
+Impact:                  实时与重建不一致
+Status:                  **Potential Risk —— 待实测**
+Confidence:              MEDIUM
+```
+
+### BRI-07 —— **BUSINESS RULE ISSUE：RANGE / TRANSITION 下的 Session 处置**
+
+```
+关联: A-29
+
+规则原文:
+  Rule 2 —— v1.00 仅顺势，不做逆势
+  CtxDirection() 注释 —— "RANGE / TRANSITION: no new setups"
+
+缺口:
+  规格说明了「不产生新 setup」，但没有写明两件事：
+
+  (a) RANGE / TRANSITION 期间，价格触碰一个**此前趋势中建立的**旧 POI，
+      是否允许开启新的 Refinement Session？
+  (b) 一个在趋势中开启、期间 Context 转入 RANGE / TRANSITION 的
+      **已有** Session，应当立即结束，还是允许跑完？
+
+  这两问的答案会改变信号输出，因此不由我裁决。
+
+我的建议（仅供参考，未实施）:
+  (a) 不允许。代码自身注释已写 "no new setups"，
+      SessionStart() 加一道 CtxDirection() 判断即可，与 POIOnBar() 一致。
+  (b) 立即结束，理由 SE_CONTEXT_FLIP 已存在且语义贴合；
+      但也可以论证「TRANSITION 只是待定、允许跑完更合理」——
+      这正是我不替你决定的原因。
+
+  若选「立即结束」，SessionMaintain() 的守卫需改为：
+      if(CtxDirection() != g_sess.dir) SessionEndNow(SE_CONTEXT_FLIP, t);
+  去掉 `!= DIR_NONE` 这半个条件 —— 正是它让守卫在 RANGE 下失效。
+
+需要你裁决: (a) 与 (b) 各选一个。
+```
+
+### BRI-08 —— **BUSINESS RULE ISSUE：缓慢穿越突破缓冲区时的破坏判定**（来件第 8 条）
+
+```
+关联: CISD / MSS / BOS 全部走 BreakUp / BreakDown
+
+规则现状:
+  破坏要求单根收盘价越过「参考价位 ± margin」。
+
+缺口:
+  价格若以小于 margin 的幅度逐根爬过参考价位，
+  每一根的收盘都在 level 与 level+margin 之间，
+  则**永远不判定为破坏**，尽管价格早已实质穿越。
+  之后该摆动点可能被消费或随窗口滑出，破坏就此漏报。
+
+两种可能的业务定义（我不替你选）:
+  (a) 维持现状 —— margin 是「单根收盘必须一次性越过」的强度门槛，
+      爬过去本就不算有效破坏
+  (b) 改为「首次收盘越过 level 即记为破坏，margin 仅用于过滤
+      同一根内的假突破」
+
+影响范围:
+  Context 的 BOS/CHOCH、CISD、MSS 全部受影响 —— 这是**核心信号定义**，
+  按 Rule 65 绝不由我擅自更改。
+
+需要你裁决: (a) 还是 (b)？若选 (b)，需要重跑全部已通过的 replay 测试。
+```
