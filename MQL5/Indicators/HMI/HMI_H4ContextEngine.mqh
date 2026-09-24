@@ -19,6 +19,9 @@ void CtxEnter(const CtxState st, const int pending, const datetime t)
    g_ctx_pending = pending;
    g_ctx_time    = t;
    g_ctx_bars    = 0;
+   g_ctx_messy   = false;   // BRI-06: quality is per context leg, like strength.
+                            // The failed-transition branch sets it AFTER calling
+                            // this, so the new leg is born carrying the mark.
   }
 
 // Classify the raw break for bar h and drive the state machine.

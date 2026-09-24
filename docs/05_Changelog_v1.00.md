@@ -989,3 +989,41 @@ Compile Status:
 Replay Status:
   不影响任何已通过项（CSV 日志逐行不变）
 ```
+
+---
+
+## v2.32 — 裁决 BRI-06：MESSY 按 Context 腿复位
+
+```
+Version:  v2.32
+Date:     2026-09-24
+
+Changed Functions:
+  CtxEnter()   新增 g_ctx_messy = false
+
+Changed States:
+  g_ctx_messy 的**生命周期**：由「只在 OnInit 复位」改为
+  「每次建立新 Context 腿时复位」。不参与任何判定。
+
+Affected Modules:
+  MQL5/Indicators/HMI/HMI_H4ContextEngine.mqh
+
+Reason:
+  规格只写「出现过至少一次失败的 TRANSITION」，未写作用范围（BRI-06）。
+  已向用户提出两个选项，用户答 No preference 并授权裁决，采用「每条腿独立」：
+    - 与并列的 strength 一致（CtxEnter 时重置为 1），两字段描述同一段结构
+    - 否则 500 根 H4 里必然出现过失败 TRANSITION，字段恒为真、不承载信息
+  语义：这条 Context 腿是否从一次失败的 TRANSITION 中诞生。
+
+  顺序要点：TRANSITION 失败分支自身调用 CtxEnter，所以 v2.31 加的置位
+  必须排在 CtxEnter 之后 —— 已确认（HMI_H4ContextEngine.mqh:98-101）。
+
+Trading Logic Changed:
+  NO —— g_ctx_messy 全仓只被面板两行文字读取，不被任何引擎读取。
+
+Compile Status:
+  NOT COMPILE VERIFIED
+
+Replay Status:
+  不影响任何已通过项（CSV 日志逐行不变）
+```

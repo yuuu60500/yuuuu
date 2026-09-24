@@ -1,6 +1,6 @@
 # H4 Context → M5 Identification Indicator
 
-**Version:** spec v1.00 (frozen baseline) / code v2.30
+**Version:** spec v1.00 (frozen baseline) / code v2.32
 **Platform:** MetaTrader 5 / MQL5 Custom Indicator
 **Mode:** Trend-Following Only
 **Purpose:** MARK ONLY — Detect / Confirm / Track / Mark / Invalidate
