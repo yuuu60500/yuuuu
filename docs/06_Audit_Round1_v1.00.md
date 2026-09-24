@@ -699,3 +699,76 @@ Recommended Fix:         输出文件名带上品种与周期
 Status:                  **FIXED — v2.22（已按 poi_rejects_<SYM>_<TF>.txt 命名）**
 Confidence:              HIGH
 ```
+
+---
+
+## Audit Round 6（2026-09-24，用户询问面板字段含义时发现）
+
+### A-25 —— **MESSY 的置位条件与规格不符**
+
+```
+Severity:                P2（仅显示，不影响任何判定）
+Rule Violated:           规格 docs/01 §Context（第 202-204 行）
+Location:                HMI_H4ContextEngine.mqh:62, 73
+Trigger:                 任意一次 CHOCH
+Expected Behavior:       规格原文：
+                           quality = { CLEAN, MESSY }
+                                     MESSY : 出现过至少一次**失败的 TRANSITION**
+                         即只有 CTX_TRANSITION 分支里 brk != g_ctx_pending
+                         （原趋势恢复）那一条才应置位。
+Actual Behavior:         置位发生在 CTX_BULLISH / CTX_BEARISH 遇到反向破坏时，
+                         也就是**每一次 CHOCH**：
+
+                           ev = EV_CHOCH_DOWN;
+                           g_ctx_messy = true;          // <-- 这里
+                           CtxEnter(CTX_TRANSITION, DIR_BEAR, t);
+
+                         而真正的「TRANSITION 失败」分支完全没有碰这个变量。
+                         CHOCH 之后 TRANSITION 可能成功（趋势正常反转，属健康
+                         结构）也可能失败；规格只想标记后者，实现标记了全部。
+Evidence:                源码直读 + 规格原文；另有运行时佐证 ——
+                         用户 USDCAD,M5 面板同时显示 `str 17` 与 `MESSY`。
+                         strength 表示本轮 17 次同向 BOS、期间零 CHOCH，
+                         若二者描述同一段结构则不可能同时成立。
+Impact:                  面板质量字段几乎恒为 MESSY，失去区分能力
+Historical Repaint:      NO
+Future Leak:             NO
+Business Logic Impact:   NO —— 全仓 grep，g_ctx_messy 只被面板的两行文字读取
+                         （HMI_ObjectManager.mqh:360, 376），不参与任何判定
+Recommended Fix:         置位移到 CTX_TRANSITION 的失败分支；
+                         CHOCH 本身不再置位。
+Status:                  **OPEN —— 未修改，等待用户裁决（见 BRI-06）**
+Confidence:              HIGH
+```
+
+### BRI-06 —— **BUSINESS RULE ISSUE：MESSY 的作用范围未定义**
+
+```
+规则原文（docs/01 第 202-204 行）:
+  quality = { CLEAN, MESSY }
+            MESSY : 出现过至少一次失败的 TRANSITION
+
+冲突/缺口:
+  「出现过」的范围没有写明，有两种互斥的读法：
+
+  (a) 本轮 Context 之内 —— 与相邻的 strength 一致（strength 在
+      CtxEnter 时重置为 1），两个字段描述同一段结构。
+  (b) 整个加载的历史之内 —— 当前实现的行为（只在 OnInit 复位）。
+
+  按 (b)，500 根 H4 ≈ 4 个月里必然出现过 CHOCH / 失败 TRANSITION，
+  因此 MESSY 事实上恒为真，该字段不再承载信息。
+  按 (a)，需要在 CtxEnter 时一并复位 g_ctx_messy。
+
+影响范围:
+  仅面板显示。不涉及 POI / Session / ARMED / 六个模型 / 日志。
+
+我未擅自选择:
+  这是业务语义问题，按 Rule 65 不由我决定。
+  A-25（置位条件）与本条（作用范围）是两个独立问题，
+  按 Rule 68 应分别裁决、分别修改。
+
+需要你裁决:
+  1. MESSY 应在**失败的 TRANSITION** 时置位，还是保持现在的**每次 CHOCH**？
+  2. 它应在新 Context 建立时**复位**（每轮趋势独立评价），
+     还是**永不复位**（整段历史的累计标记）？
+```
