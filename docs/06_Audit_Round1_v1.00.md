@@ -1047,3 +1047,82 @@ Confidence:              MEDIUM
 
 需要你裁决: (a) 还是 (b)？若选 (b)，需要重跑全部已通过的 replay 测试。
 ```
+
+---
+
+## Audit Round 8 —— 工程师需求书附带的技术论断（2026-09-24）
+
+### A-33 —— **单次推进被重复计为多次 BOS**（需求书 §4.1，成立）
+
+```
+Severity:                P1
+Location:                HMI_SwingEngine.mqh   SwingLastUnswept()
+                         HMI_H4StructureEngine.mqh  H4ConsumeSwing()
+Trigger:                 一根 H4 收盘同时越过多个同向、已确认、未扫的摆动点
+Expected Behavior:       一次结构推进 = 一次 BOS
+Actual Behavior:         SwingLastUnswept() 从新往老返回**第一个**符合条件的点，
+                         H4ConsumeSwing() 只把**那一个**标记为 swept。
+                         同次穿越下方/上方的其余旧摆动点仍是未扫状态，
+                         于是后续 K 线即便**没有任何新推进**也能逐根消费它们。
+
+失效场景（已确认未扫高点 1.1000 / 1.1010 / 1.1020）:
+    收盘 1.1050 -> 取 1.1020 -> BOS        strength +1
+    收盘 1.1045 -> 取 1.1010 -> BOS        strength +1   (价格在下跌)
+    收盘 1.1040 -> 取 1.1000 -> BOS        strength +1   (继续下跌)
+  一次推进产出三次 BOS，且期间价格是回落的。
+
+Evidence:                源码直读 + 上述可推演场景。
+                         旁证：用户 USDCAD 面板显示 str 17，
+                         数值高得反常，与本缺陷方向一致。
+Impact:                  1) g_ctx_strength 系统性虚高 —— 面板强度不可信
+                         2) 每次 BOS 触发 TRNewVersion()，Trading Range 版本虚增
+                         3) 旧摆动点被提前消费，之后真正跌破该水平时不再产生事件
+                         4) CTX_TRANSITION 下可用一个**早已被越过**的旧水平
+                            确认反转（需求书 §4.2 称为「回退补计」）
+                            —— 这会改变 Context 状态，进而改变 CtxDirection()，
+                            进而改变 POIOnBar() 是否建 POI
+Historical Repaint:      NO
+Future Leak:             NO
+Business Logic Impact:   **YES —— 修复会改变 Context 与全部下游信号**
+Status:                  **OPEN —— 属 v2.00 级变更，见下方评估**
+Confidence:              HIGH
+```
+
+### A-34 —— **面板 ATR 游标与结构引擎游标不一致**（需求书 §3，成立）
+
+```
+Severity:                P2
+Location:                HMI_Ranges.mqh RangesATRText()   使用 g_h4_atr[g_h4_n - 1]
+                         H4M5_Identification.mq5 Phase 0  使用 g_h4_cursor
+Actual Behavior:         SeriesAppend() 把新 H4 追加进 g_h4 后 g_h4_n 立即增大，
+                         但 Phase 0 只在 H4VisibleTo() 允许时才推进 g_h4_cursor。
+                         两者之间存在窗口：面板显示的是**尚未送入结构引擎**
+                         的那根 H4 的 ATR，而 Context / strength / messy
+                         仍停留在旧游标的状态。
+Impact:                  面板同一行里混合了两个时点的数据
+Business Logic Impact:   NO（仅显示）
+Recommended Fix:         面板一律读 g_h4_cursor - 1，与结构状态同源
+Status:                  **OPEN**
+Confidence:              HIGH
+```
+
+### 对需求书 §9.1 的更正
+
+```
+需求书称「ObjectCreate 返回 true 不代表首次创建」。
+
+我无法从这里查证 MQL5 的确切语义（本环境无 MT5），但有反证：
+  若 ObjectCreate 对已存在对象返回 true，则 OM_Rect / OM_Text / OM_Level
+  的 `else OM_Register(name)` 会在**每次同步**重新登记每一个对象。
+  用户对象列表中有 321 个对象，而 InpObjectHistoryLimit = 500 ——
+  两次同步内 g_obj_n 就会越过 500，OM_Trim 将持续删除标记，
+  图表从第一天起就不可能稳定。实测并非如此。
+
+  故 ObjectCreate 对已存在对象**大概率返回 false**，
+  A-26 的机制（OM_Preview 删除后漏注销）成立，
+  而「每次创建都重复登记」不成立。
+
+不过：**按名唯一登记本身是正确的防御性要求，与语义无关。**
+无论 ObjectCreate 如何返回，OM_Register 都应先查重。
+建议采纳该要求，本条更正只针对机制描述，不反对该修改。
+```
