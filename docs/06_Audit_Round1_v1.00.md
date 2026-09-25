@@ -340,8 +340,8 @@ Object Management:     PASS (static) / NOT VERIFIED (replay)
 Multi-instance:        PARTIAL PASS  (2026-09-23 实测：四个实例同时写同一日志，
                                      按 (SYMBOL,TF) 分组后各自结果互不污染；
                                      同图表多实例仍未测)
-Historical vs Live:    PARTIAL PASS  (重建可复现已证；LIVE vs BUILD 待测 ——
-                                     此前的 live=0 因 A-27 全部作废，v2.34 后重采)
+Historical vs Live:    PARTIAL PASS  (重建可复现已证；LIVE vs BUILD 首条样本通过 ——
+                                     2026-09-25 USDJPY,M5 BPR，n=1，仅证明方法可用)
 MetaEditor:            PASS          (v2.40, 0 errors / 0 warnings, 2026-09-24)
                        注：v2.04 / v2.10 因 A-19 实际不可编译，已于 v2.11 修复并复验
 Replay:                NOT VERIFIED
