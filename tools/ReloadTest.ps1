@@ -285,58 +285,72 @@ function Show-Rejects([string]$src) {
 }
 
 function Show-LiveVsBuild([string]$src) {
-    # A reload test cannot see a future leak: a leaking build re-reads the
-    # same future bars every time and stays self-consistent. Live rows were
-    # emitted bar by bar with only the past available, so a mark that does
-    # not survive into the rebuild - or changes - is the real signal.
-    # $all, NOT $raw. $raw is filtered to lines containing HMI-BUILD, and an
-    # HMI-LIVE line contains no such substring, so scanning $raw made $live
-    # structurally impossible to fill: every run reported "live rows: 0"
-    # whatever the market had done. A test that can only ever return one
-    # answer is worse than no test - it was read as "nothing confirmed live
-    # yet" for days.
-    $live = @()
-    foreach ($l in $all) {
-        $s2 = if ($l -match '\(([A-Za-z0-9._#]+,[A-Za-z0-9]+)\)') { $Matches[1] } else { '?' }
-        if ($s2 -eq $src -and $l -match 'HMI-LIVE,(.*)$') { $live += $Matches[1] }
+    # A live row can only be checked against a rebuild that (a) came AFTER it,
+    # (b) was made by the SAME indicator version, and (c) covers its bar.
+    # Anything else is not evidence either way, and treating it as "missing"
+    # reports a leak that is only ordering, an upgrade or the window sliding.
+    # So walk the log in order, keeping track of which version each line of
+    # this chart came from, and sort every live row into one of four piles.
+    $ic  = [Globalization.CultureInfo]::InvariantCulture
+    $ver = '?'; $live = @(); $lastBegin = -1; $bVer = ''; $bFrom = ''; $bTo = ''
+    for ($i = 0; $i -lt $all.Count; $i++) {
+        $l = $all[$i]
+        if ($l -notmatch '\(([A-Za-z0-9._#]+,[A-Za-z0-9]+)\)') { continue }
+        if ($Matches[1] -ne $src) { continue }
+        if ($l -match 'HMI v(\S+) starting on') { $ver = $Matches[1]; continue }
+        if ($l -match 'HMI-BUILD-BEGIN,.*from=([0-9.: ]+),to=([0-9.: ]+)') {
+            $lastBegin = $i; $bVer = $ver; $bFrom = $Matches[1].Trim(); $bTo = $Matches[2].Trim(); continue
+        }
+        if ($l -match 'HMI-LIVE,(.*)$') {
+            $live += [pscustomobject]@{ Idx = $i; Ver = $ver; Row = $Matches[1]; Conf = (($Matches[1] -split ',')[7]) }
+        }
     }
     $sel2 = @($blocks | Where-Object { $_.Src -eq $src })
     Write-Host "`n--- $src : LIVE vs BUILD ---" -ForegroundColor Cyan
-    if ($sel2.Count -lt 1) { Write-Host "  no build block for this chart." -ForegroundColor Red; return }
+    if ($sel2.Count -lt 1 -or $lastBegin -lt 0) { Write-Host "  no build block for this chart." -ForegroundColor Red; return }
     $build = $sel2[-1].Rows
-    Write-Host "  live rows  : $($live.Count)"
-    Write-Host "  build rows : $($build.Count)  ($($sel2[-1].Head))"
-    if ($live.Count -eq 0) {
-        Write-Host "  no HMI-LIVE rows yet. Leave the chart running until new marks" -ForegroundColor Yellow
-        Write-Host "  confirm live, then reload once and run this again." -ForegroundColor Yellow
+    Write-Host "  rebuild    : v$bVer  from=$bFrom  to=$bTo   ($($build.Count) rows)"
+
+    # The rebuild's last bar OPENS at `to`; a mark's printed time is its bar's
+    # CLOSE. So a mark is inside the window iff its close <= to + 5 minutes.
+    $edge = [datetime]::ParseExact($bTo, 'yyyy.MM.dd HH:mm', $ic).AddMinutes(5)
+    $from = [datetime]::ParseExact($bFrom, 'yyyy.MM.dd HH:mm', $ic)
+    $after = @(); $other = @(); $aged = @(); $ok = @()
+    foreach ($r in $live) {
+        $t = [datetime]::MinValue
+        [void][datetime]::TryParseExact($r.Conf, 'yyyy.MM.dd HH:mm:ss', $ic, [Globalization.DateTimeStyles]::None, [ref]$t)
+        if     ($r.Idx -gt $lastBegin) { $after += $r }      # emitted after this rebuild
+        elseif ($r.Ver -ne $bVer)      { $other += $r }      # another version's rules
+        elseif ($t -lt $from)          { $aged  += $r }      # slid out of the window
+        elseif ($t -gt $edge)          { $after += $r }      # beyond the window's end
+        else                           { $ok    += $r }
+    }
+    Write-Host ("  live rows  : {0} total  ->  comparable {1}  |  after rebuild {2}  |  other version {3}  |  aged out {4}" -f `
+                $live.Count, $ok.Count, $after.Count, $other.Count, $aged.Count)
+    if ($after.Count -gt 0) {
+        Write-Host "  (after-rebuild rows are checked by the NEXT reload, not this one)" -ForegroundColor DarkGray
+    }
+    if ($ok.Count -eq 0) {
+        Write-Host "  nothing comparable yet. Let live marks accumulate, THEN reload once, THEN run this." -ForegroundColor Yellow
         return
     }
-    # cycle_id / block_id are g_next_id sequence numbers, reset to 1 on every
-    # init. A live session keeps appending to the window it started with; a
-    # rebuild takes the most recent 5000 M5 bars, so the oldest bars - and the
-    # ids allocated in them - are gone, and every later id shifts down. Those
-    # two columns therefore CANNOT match across live and rebuild, and comparing
-    # whole rows would report a future leak that is only renumbering.
-    # The event's identity is the rest: dir, anchor, model, confirm time,
-    # price, reference time and level.
-    $liveKey  = @{}
-    foreach ($r in $live)  { $liveKey[(Key $r)] = $r }
+
+    # cycle_id / block_id are init-relative sequence numbers (A-20); compare
+    # the event itself.
     $buildKey = @{}
     foreach ($r in $build) { $buildKey[(Key $r)] = $r }
-
+    $liveKey = @{}
+    foreach ($r in $ok) { $liveKey[(Key $r.Row)] = $r.Row }
     $missing = @($liveKey.Keys | Where-Object { -not $buildKey.ContainsKey($_) })
-    Write-Host "  distinct live marks : $($liveKey.Count)   (ids ignored)"
     if ($missing.Count -eq 0) {
-        Write-Host "  ALL $($liveKey.Count) LIVE MARKS SURVIVED THE REBUILD." -ForegroundColor Green
-        Write-Host "  every field but the sequence ids is identical - no sign of a future leak." -ForegroundColor Green
+        Write-Host "  ALL $($liveKey.Count) COMPARABLE LIVE MARKS SURVIVED THE REBUILD - no sign of a future leak." -ForegroundColor Green
     } else {
-        Write-Host "  $($missing.Count) LIVE mark(s) do NOT appear in the rebuild:" -ForegroundColor Red
+        Write-Host "  $($missing.Count) comparable LIVE mark(s) do NOT appear in the rebuild:" -ForegroundColor Red
         $missing | Select-Object -First 20 | ForEach-Object { Write-Host "    $($liveKey[$_])" }
         $out = Join-Path $dir ("live_vs_build_diff_" + ($src -replace '[^A-Za-z0-9]','_') + ".txt")
         $missing | ForEach-Object { $liveKey[$_] } | Set-Content $out
         Write-Host "  written to $out" -ForegroundColor Red
-        Write-Host "  check the oldest one first: if it predates the rebuild window" -ForegroundColor Yellow
-        Write-Host "  (see from= in the BEGIN line) it simply aged out - not a leak." -ForegroundColor Yellow
+        Write-Host "  same version, emitted before the rebuild, inside its window: this IS the signal." -ForegroundColor Red
     }
 }
 

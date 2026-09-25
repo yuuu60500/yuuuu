@@ -1127,3 +1127,28 @@ Confidence:              HIGH
 无论 ObjectCreate 如何返回，OM_Register 都应先查重。
 建议采纳该要求，本条更正只针对机制描述，不反对该修改。
 ```
+
+### A-35 —— **测试工具缺陷：LIVE vs BUILD 把不可比的实时行也算作缺失**
+
+```
+Severity:                P1（会把排序问题误报为未来函数）
+Location:                tools/ReloadTest.ps1  Show-LiveVsBuild()
+Trigger:                 2026-09-25 首次 v2.40 实测，USDJPY,M5
+Actual Behavior:         重建窗口 to=2026.09.25 15:50（最后一根 15:55 收盘），
+                         实时 BPR 确认于 16:00（15:55 开盘那根）。
+                         重建发生在该 K 线收盘之前，不可能包含它，
+                         脚本却报「1 LIVE mark do NOT appear in the rebuild」。
+                         同类问题还有两种：旧版本（v2.21）留下的实时行
+                         与新版本重建比较；窗口滑动后已移出窗口的实时行。
+Evidence:                用户实测截图；时间关系可逐根推算。
+Future Leak:             NO —— 该条不构成未来函数证据
+Recommended Fix:         按日志先后与版本给每条实时行分类，只比对
+                         「同版本、早于最后一次重建、落在重建窗口内」的行；
+                         其余分别报告为 after rebuild / other version / aged out。
+Status:                  **FIXED —— 脚本层**
+Confidence:              HIGH
+```
+
+附带排除一个疑点：v2.36 的 OHLC 校验读取的是 g_m5 / g_h4 中最后一根
+**已收盘** K 线（SeriesLoad / SeriesAppend 均从 shift 1 取数），
+不会因当前 K 线跳动而每 tick 触发重建。
