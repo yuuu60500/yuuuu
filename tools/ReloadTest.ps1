@@ -132,10 +132,19 @@ if ($Ctx) {
         if ($c.Count -lt 11) { continue }
         $f = @{}
         foreach ($p in $c[2..($c.Count-1)]) { $kv = $p -split '=', 2; if ($kv.Count -eq 2) { $f[$kv[0]] = $kv[1] } }
+        # Prices go through InvariantCulture on purpose: on a pt-BR / de-DE
+        # machine the decimal separator is a comma, and a plain [double] cast
+        # would read "158.125" as 158125 - every price comparison below would
+        # be silently wrong.
+        $ic = [Globalization.CultureInfo]::InvariantCulture
+        $swp = 0.0; $cls = 0.0
+        [void][double]::TryParse([string]$f['swing_px'], [Globalization.NumberStyles]::Float, $ic, [ref]$swp)
+        [void][double]::TryParse([string]$f['close'],    [Globalization.NumberStyles]::Float, $ic, [ref]$cls)
         $rows += [pscustomobject]@{
             Sym = $c[0]; Kind = $c[1]; Dir = $f['dir']; Live = $f['live']
             Ctx = $f['ctx']; Str = [int]$f['str']; Messy = $f['messy']
-            Bar = $f['bar']; Swing = $f['swing']; Raw = $Matches[1]
+            Bar = $f['bar']; Swing = $f['swing']; SwPx = $swp; Close = $cls
+            Raw = $Matches[1]
             Key = "$($c[0])|$($c[1])|$($f['bar'])|$($f['swing'])"
         }
     }
@@ -152,21 +161,65 @@ if ($Ctx) {
         foreach ($k in ($g.Group | Group-Object Kind | Sort-Object Name)) {
             Write-Host ("      {0,-14} {1,4}" -f $k.Name, $k.Count)
         }
+        $ev = @($g.Group | Sort-Object Bar)
+
+        # Every CHOCH opens a TRANSITION, and a TRANSITION ends exactly one way:
+        # TRANS_OK, TRANS_FAIL or TIMEOUT. So CHOCH - (OK+FAIL+TIMEOUT) must be
+        # 0 or 1 (1 = one still open now). Anything else means the state
+        # machine or its log lost track of a transition.
+        $nCh = @($ev | Where-Object Kind -eq 'CHOCH').Count
+        $nOk = @($ev | Where-Object Kind -eq 'TRANS_OK').Count
+        $nFl = @($ev | Where-Object Kind -eq 'TRANS_FAIL').Count
+        $nTo = @($ev | Where-Object Kind -eq 'TIMEOUT').Count
+        $open = $nCh - ($nOk + $nFl + $nTo)
+        $acct = "      transitions  opened {0} = ok {1} + fail {2} + timeout {3} + still open {4}" -f $nCh, $nOk, $nFl, $nTo, $open
+        Write-Host $acct -ForegroundColor $(if ($open -eq 0 -or $open -eq 1) { 'Green' } else { 'Red' })
+
+        # A-33 signature. A BOS whose level an EARLIER close in the same leg had
+        # already carried price past is not a new push: it is an old swing that
+        # was left unswept and is only now being counted. Legs restart on
+        # anything that is not a plain continuation BOS. This sees only closes
+        # at logged events, so the count is a LOWER bound.
+        $stale = 0; $bosN = 0; $ext = $null; $ldir = ''
+        foreach ($e in $ev) {
+            if ($e.Kind -eq 'BOS' -and $e.Str -gt 1 -and $ext -ne $null -and $e.Dir -eq $ldir) {
+                $bosN++
+                if (($ldir -eq 'UP'   -and $e.SwPx -le $ext) -or
+                    ($ldir -eq 'DOWN' -and $e.SwPx -ge $ext)) { $stale++ }
+                if ($ldir -eq 'UP')   { $ext = [Math]::Max($ext, $e.Close) }
+                else                  { $ext = [Math]::Min($ext, $e.Close) }
+            }
+            elseif ($e.Kind -eq 'BOS' -or $e.Kind -eq 'TRANS_OK' -or $e.Kind -eq 'TRANS_FAIL') {
+                $ext = $e.Close; $ldir = $e.Dir       # a leg begins here
+            }
+            else { $ext = $null; $ldir = '' }        # CHOCH / SAMELEG / TIMEOUT
+        }
+        if ($bosN -gt 0) {
+            Write-Host ("      A-33 stale BOS  {0} of {1} continuation BOS ({2}%) re-count a level already crossed" -f `
+                        $stale, $bosN, [int](100.0 * $stale / $bosN)) -ForegroundColor $(if ($stale -gt 0) { 'Yellow' } else { 'Green' })
+        }
+
         # Strength is sampled at each BOS: the value that break left behind.
-        $sv = @($g.Group | Where-Object Kind -eq 'BOS' | ForEach-Object { $_.Str } | Sort-Object)
+        # NOTE: until A-33 is fixed these counts are inflated - do not set bands on them.
+        $sv = @($ev | Where-Object Kind -eq 'BOS' | ForEach-Object { $_.Str } | Sort-Object)
+        $last = $ev[-1]
         if ($sv.Count -ge 5) {
             function Pct([int[]]$a, [double]$p) { $a[[int][Math]::Floor(($a.Count - 1) * $p)] }
-            $cur = ($g.Group | Sort-Object Bar | Select-Object -Last 1).Str
-            Write-Host ("      strength  n={0}  min={1}  P33={2}  median={3}  P67={4}  P90={5}  max={6}   latest={7}" -f `
-                        $sv.Count, $sv[0], (Pct $sv 0.33), (Pct $sv 0.50), (Pct $sv 0.67), (Pct $sv 0.90), $sv[-1], $cur) -ForegroundColor Green
-            $below = @($sv | Where-Object { $_ -lt $cur }).Count
-            Write-Host ("      latest {0} sits above {1}% of this chart's own history" -f $cur, [int](100.0 * $below / $sv.Count)) -ForegroundColor Green
+            Write-Host ("      strength  n={0}  min={1}  P33={2}  median={3}  P67={4}  P90={5}  max={6}" -f `
+                        $sv.Count, $sv[0], (Pct $sv 0.33), (Pct $sv 0.50), (Pct $sv 0.67), (Pct $sv 0.90), $sv[-1]) -ForegroundColor Green
+            if ($last.Ctx -eq 'BULLISH' -or $last.Ctx -eq 'BEARISH') {
+                $below = @($sv | Where-Object { $_ -lt $last.Str }).Count
+                Write-Host ("      now {0}  str {1}  - above {2}% of this chart's own history" -f `
+                            $last.Ctx, $last.Str, [int](100.0 * $below / $sv.Count)) -ForegroundColor Green
+            } else {
+                Write-Host ("      now {0}  - not rated (no trend to measure)" -f $last.Ctx) -ForegroundColor DarkGray
+            }
         } else {
             Write-Host "      strength  too few BOS samples yet" -ForegroundColor DarkGray
         }
     }
     $out = Join-Path $dir "ctx_events.csv"
-    $rows | Select-Object Sym, Kind, Dir, Live, Ctx, Str, Messy, Bar, Swing |
+    $rows | Select-Object Sym, Kind, Dir, Live, Ctx, Str, Messy, Bar, Swing, SwPx, Close |
             Sort-Object Sym, Bar | Export-Csv -NoTypeInformation -Encoding UTF8 $out
     Write-Host "`nwritten to $out" -ForegroundColor Green
     exit

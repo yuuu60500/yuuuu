@@ -326,6 +326,32 @@ v2.34 修复后需重新采样。
 
 ---
 
+### ✅ Context 状态机账目 —— PASS（2026-09-25，8 品种，v2.40，825 个事件）
+
+每个 CHOCH 打开一个 TRANSITION，其结局只有 TRANS_OK / TRANS_FAIL / TIMEOUT 三种，
+故 `CHOCH − (OK + FAIL + TIMEOUT)` 只能为 0 或 1（1 = 当前仍在 TRANSITION）。
+
+| 品种 | CHOCH | OK + FAIL + TIMEOUT | 未结束 |
+|---|---|---|---|
+| AUDUSD | 16 | 8 + 7 + 1 | 0 |
+| EURUSD | 12 | 5 + 5 + 2 | 0 |
+| GBPUSD | 11 | 4 + 7 + 0 | 0 |
+| NZDUSD | 14 | 8 + 6 + 0 | 0 |
+| USDCAD | 10 | 4 + 5 + 1 | 0 |
+| USDCHF | 16 | 8 + 7 + 1 | 0 |
+| USDJPY | 10 | 6 + 3 + 1 | 0 |
+| XAUUSD | 14 | 6 + 4 + 3 | **1** |
+
+XAUUSD 的 1 与其最新事件 `str=0`（TRANSITION 中强度清零）一致。
+交叉核对：USDJPY 图表面板 `str 12 CLEAN` == 日志最新 `str=12`；
+面板由 MESSY 变为 CLEAN，是 v2.31 / v2.32 修复首次在实盘面板上可见。
+
+**强度分布首次实测**（中位数 3–6、P90 8–18、最大 11–24）**不得用于定档** ——
+这是 A-33 修复前的计数，包含重复计数造成的虚高。
+脚本 `-Ctx` 已加入 A-33 特征检测（下界计数），修复前后对比用。
+
+---
+
 ### Future Leak 测试 —— LIVE vs BUILD
 
 ```
