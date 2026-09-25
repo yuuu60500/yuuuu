@@ -292,14 +292,24 @@ function Show-LiveVsBuild([string]$src) {
     # So walk the log in order, keeping track of which version each line of
     # this chart came from, and sort every live row into one of four piles.
     $ic  = [Globalization.CultureInfo]::InvariantCulture
+    # Only a COMPLETE build counts - one whose END line has also reached the
+    # log. MT5 buffers its log, so a rebuild's BEGIN can be on disk while its
+    # rows and END are not yet; taking that BEGIN as "the rebuild" while the
+    # rows came from the previous complete block compared a mark against a
+    # build that did not contain its bar (A-35b).
     $ver = '?'; $live = @(); $lastBegin = -1; $bVer = ''; $bFrom = ''; $bTo = ''
+    $pBegin = -1; $pVer = ''; $pFrom = ''; $pTo = ''
     for ($i = 0; $i -lt $all.Count; $i++) {
         $l = $all[$i]
         if ($l -notmatch '\(([A-Za-z0-9._#]+,[A-Za-z0-9]+)\)') { continue }
         if ($Matches[1] -ne $src) { continue }
         if ($l -match 'HMI v(\S+) starting on') { $ver = $Matches[1]; continue }
         if ($l -match 'HMI-BUILD-BEGIN,.*from=([0-9.: ]+),to=([0-9.: ]+)') {
-            $lastBegin = $i; $bVer = $ver; $bFrom = $Matches[1].Trim(); $bTo = $Matches[2].Trim(); continue
+            $pBegin = $i; $pVer = $ver; $pFrom = $Matches[1].Trim(); $pTo = $Matches[2].Trim(); continue
+        }
+        if ($l -match 'HMI-BUILD-END,') {
+            if ($pBegin -ge 0) { $lastBegin = $pBegin; $bVer = $pVer; $bFrom = $pFrom; $bTo = $pTo; $pBegin = -1 }
+            continue
         }
         if ($l -match 'HMI-LIVE,(.*)$') {
             $live += [pscustomobject]@{ Idx = $i; Ver = $ver; Row = $Matches[1]; Conf = (($Matches[1] -split ',')[7]) }
@@ -307,8 +317,11 @@ function Show-LiveVsBuild([string]$src) {
     }
     $sel2 = @($blocks | Where-Object { $_.Src -eq $src })
     Write-Host "`n--- $src : LIVE vs BUILD ---" -ForegroundColor Cyan
-    if ($sel2.Count -lt 1 -or $lastBegin -lt 0) { Write-Host "  no build block for this chart." -ForegroundColor Red; return }
+    if ($sel2.Count -lt 1 -or $lastBegin -lt 0) { Write-Host "  no complete build block for this chart." -ForegroundColor Red; return }
     $build = $sel2[-1].Rows
+    if ($pBegin -ge 0) {
+        Write-Host "  a newer rebuild has started but its END is not in the log yet - wait a minute and rerun." -ForegroundColor Yellow
+    }
     Write-Host "  rebuild    : v$bVer  from=$bFrom  to=$bTo   ($($build.Count) rows)"
 
     # The rebuild's last bar OPENS at `to`; a mark's printed time is its bar's
