@@ -33,7 +33,7 @@
 #  hence the grouping below.
 # ============================================================
 param([string]$Source = "", [switch]$LiveVsBuild, [switch]$Rejects, [switch]$Live,
-      [switch]$Ctx, [int]$Days = 1, [string]$LogDir = "")
+      [switch]$Ctx, [int]$Days = 1, [string]$LogDir = "", [int]$Warmup = 100)
 
 # Row layout after the tag is stripped:
 #   0 symbol  1 "MODEL"  2 dir  3 cycle_id  4 block_id  5 anchor  6 model
@@ -392,11 +392,72 @@ function Show-Reload([string]$src) {
         Write-Host "  IDENTICAL apart from cycle_id / block_id - $($A.Rows.Count) rows." -ForegroundColor Green
         Write-Host "  the window moved and the sequence ids renumbered. No repaint." -ForegroundColor Green
     } else {
-        Write-Host "  DIFFERENCES: $($diff.Count) of $($A.Rows.Count) rows" -ForegroundColor Red
-        $diff | Select-Object -First 40 | Format-Table SideIndicator, InputObject -AutoSize
+        # Rows differ even with ids set aside. When the window moved, most of
+        # that is explained by where each build STARTS, so classify every
+        # difference instead of dumping the raw diff (whose ids have all
+        # shifted and tell you nothing):
+        #   aged out   - only in the older build, bar is before the new window
+        #   warm-up    - only in the older build, inside the new build's first
+        #                $Warmup bars, where it builds structure but marks nothing
+        #   carried    - only in the older build, from a cycle whose first mark
+        #                already falls before the new build's warm-up ended:
+        #                that cycle began before the new build could see it
+        #   new bars   - only in the newer build, after the older build's end
+        #   LOOK       - anything else. This is where a real repaint would be.
+        $ic = [Globalization.CultureInfo]::InvariantCulture
+        function HeadTime([string]$h, [string]$which) {
+            if ($h -match "$which=([0-9.]+ [0-9:]+)") { return [datetime]::ParseExact($Matches[1], 'yyyy.MM.dd HH:mm', $ic) }
+            return [datetime]::MinValue
+        }
+        function RowTime([string]$r) {
+            $t = [datetime]::MinValue
+            [void][datetime]::TryParseExact((($r -split ',')[7]), 'yyyy.MM.dd HH:mm:ss', $ic, [Globalization.DateTimeStyles]::None, [ref]$t)
+            return $t
+        }
+        $bFrom = HeadTime $B.Head 'from'
+        $aTo   = (HeadTime $A.Head 'to').AddMinutes(5)
+        $wEnd  = $bFrom.AddMinutes(5 * $Warmup)          # approximate: assumes no gap in those bars
+
+        $ka = @{}; foreach ($r in $A.Rows) { $ka[(Key $r)] = $r }
+        $kb = @{}; foreach ($r in $B.Rows) { $kb[(Key $r)] = $r }
+        $first = @{}
+        foreach ($r in $A.Rows) {
+            $cy = ($r -split ',')[3]; $t = RowTime $r
+            if (-not $first.ContainsKey($cy) -or $t -lt $first[$cy]) { $first[$cy] = $t }
+        }
+        $cls = @()
+        foreach ($k in $ka.Keys) {
+            if ($kb.ContainsKey($k)) { continue }
+            $r = $ka[$k]; $t = RowTime $r; $cy = ($r -split ',')[3]
+            $c = 'LOOK'
+            if     ($t -le $bFrom)          { $c = 'aged out' }
+            elseif ($t -le $wEnd)           { $c = 'warm-up' }
+            elseif ($first[$cy] -le $wEnd)  { $c = 'carried' }
+            $cls += [pscustomobject]@{ Side = 'old only'; Class = $c; Time = $t; Row = $r }
+        }
+        foreach ($k in $kb.Keys) {
+            if ($ka.ContainsKey($k)) { continue }
+            $r = $kb[$k]; $t = RowTime $r
+            $c = 'LOOK'
+            if ($t -gt $aTo) { $c = 'new bars' }
+            $cls += [pscustomobject]@{ Side = 'new only'; Class = $c; Time = $t; Row = $r }
+        }
+        $cls = $cls | Sort-Object Time
+        Write-Host ("  {0} rows differ once ids are ignored (warm-up assumed {1} bars, new warm-up ends ~{2})" -f `
+                    $cls.Count, $Warmup, $wEnd.ToString('yyyy.MM.dd HH:mm')) -ForegroundColor Yellow
+        foreach ($g in ($cls | Group-Object Class | Sort-Object Name)) {
+            Write-Host ("    {0,-9} {1,4}" -f $g.Name, $g.Count) -ForegroundColor $(if ($g.Name -eq 'LOOK') { 'Red' } else { 'Green' })
+        }
+        $look = @($cls | Where-Object Class -eq 'LOOK')
+        if ($look.Count -eq 0) {
+            Write-Host "  every difference is explained by where each build starts or ends. No repaint." -ForegroundColor Green
+        } else {
+            Write-Host "  unexplained - inspect these:" -ForegroundColor Red
+            $look | Select-Object -First 20 | ForEach-Object { Write-Host ("    {0}  {1}" -f $_.Side, $_.Row) }
+        }
         $out = Join-Path $dir ("reload_diff_" + ($src -replace '[^A-Za-z0-9]','_') + ".txt")
-        $diff | ForEach-Object { "{0} {1}" -f $_.SideIndicator, $_.InputObject } | Set-Content $out
-        Write-Host "  full diff written to $out" -ForegroundColor Red
+        $cls | ForEach-Object { "{0,-9} {1,-8} {2}" -f $_.Class, $_.Side, $_.Row } | Set-Content $out
+        Write-Host "  classified diff written to $out" -ForegroundColor DarkGray
     }
 }
 
