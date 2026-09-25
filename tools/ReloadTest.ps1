@@ -425,6 +425,15 @@ function Show-Reload([string]$src) {
             $cy = ($r -split ',')[3]; $t = RowTime $r
             if (-not $first.ContainsKey($cy) -or $t -lt $first[$cy]) { $first[$cy] = $t }
         }
+        # The newer build cannot have a counterpart for anything before it has
+        # produced a single mark: after warm-up it still has to touch a POI,
+        # open a session, form a block and ARM before any cycle exists, while
+        # the older build may already be mid-cycle. Rows in that stretch are
+        # 'converging'. The window is only the head of the build, so a repaint
+        # in the middle still lands in LOOK.
+        $bFirst = [datetime]::MaxValue
+        foreach ($r in $B.Rows) { $t = RowTime $r; if ($t -gt [datetime]::MinValue -and $t -lt $bFirst) { $bFirst = $t } }
+
         $cls = @()
         foreach ($k in $ka.Keys) {
             if ($kb.ContainsKey($k)) { continue }
@@ -433,6 +442,7 @@ function Show-Reload([string]$src) {
             if     ($t -le $bFrom)          { $c = 'aged out' }
             elseif ($t -le $wEnd)           { $c = 'warm-up' }
             elseif ($first[$cy] -le $wEnd)  { $c = 'carried' }
+            elseif ($t -lt $bFirst)         { $c = 'converging' }
             $cls += [pscustomobject]@{ Side = 'old only'; Class = $c; Time = $t; Row = $r }
         }
         foreach ($k in $kb.Keys) {
@@ -443,8 +453,8 @@ function Show-Reload([string]$src) {
             $cls += [pscustomobject]@{ Side = 'new only'; Class = $c; Time = $t; Row = $r }
         }
         $cls = $cls | Sort-Object Time
-        Write-Host ("  {0} rows differ once ids are ignored (warm-up assumed {1} bars, new warm-up ends ~{2})" -f `
-                    $cls.Count, $Warmup, $wEnd.ToString('yyyy.MM.dd HH:mm')) -ForegroundColor Yellow
+        Write-Host ("  {0} rows differ once ids are ignored (warm-up assumed {1} bars, new warm-up ends ~{2}, newer build's first mark {3})" -f `
+                    $cls.Count, $Warmup, $wEnd.ToString('yyyy.MM.dd HH:mm'), $bFirst.ToString('yyyy.MM.dd HH:mm')) -ForegroundColor Yellow
         foreach ($g in ($cls | Group-Object Class | Sort-Object Name)) {
             Write-Host ("    {0,-9} {1,4}" -f $g.Name, $g.Count) -ForegroundColor $(if ($g.Name -eq 'LOOK') { 'Red' } else { 'Green' })
         }
