@@ -1152,3 +1152,33 @@ Confidence:              HIGH
 附带排除一个疑点：v2.36 的 OHLC 校验读取的是 g_m5 / g_h4 中最后一根
 **已收盘** K 线（SeriesLoad / SeriesAppend 均从 shift 1 取数），
 不会因当前 K 线跳动而每 tick 触发重建。
+
+### A-36 —— **挂载时同一窗口连续重建 13 次**（2026-09-25 实测，Potential Risk）
+
+```
+Severity:                P3（性能 / 日志噪声；未见结果差异）
+Location:                H4M5_Identification.mq5  OnCalculate() 的两条重建路径：
+                         prev_calculated == 0，或 SeriesAppend() 返回 SA_RELOAD
+Trigger:                 XAUUSD,M5 首次挂载 v2.40（本地 12:24:57）
+Actual Behavior:         `starting on` 1 次，`HMI-BUILD-BEGIN` 16 次。
+                         其中 13 次在 12:24:57.492 – 12:24:58.547 之间（约 1.1 秒），
+                         窗口完全相同（from=09.01 09:10, to=09.25 14:15），
+                         每次 130 行。之后 3 次分别在 to=15:50 / 16:00 / 17:30，
+                         其中 15:50、17:30 与其余所有图表同时发生（终端级事件）。
+Evidence:                用户日志检索（两个计数 + 前 20 行）。
+Future Leak:             NO —— 每次都是完整重建，13 次结果行数相同；
+                         重建不改变已写出的实时行，LIVE vs BUILD 比对不受影响。
+Reasoning:               两条路径都不打印原因，日志无法区分。最可能的解释是
+                         挂载时终端仍在同步 XAUUSD 的历史：同步期间终端反复以
+                         prev_calculated = 0 调用，或缓存中最后一根 K 线被同步
+                         修正而触发 A-32 的 OHLC 校验。两者都是 A-32 设计的正确反应。
+                         另见一个次要竞态：iBarShift 与按位置 CopyRates 之间若恰好
+                         开新 K 线，sh 偏移 1，时间比对不符 → 多一次重建（无害）。
+Impact:                  挂载后约 1 秒的重复计算与图形重画；稳态下未见重复
+                         （之后约 3 小时仅 3 次，2 次为全图表同时）。
+Recommended Fix:         暂不修改。若稳态下出现连续重建，再加一行诊断日志
+                         HMI-RELOAD,<sym>,reason=PREV0|H4_GONE|H4_REVISED|M5_GONE|M5_REVISED
+                         （仅日志，需升版本号，会使现有实时样本归入 other version）。
+Status:                  **Potential Risk —— 观察中**
+Confidence:              MEDIUM（原因为推断，现象为实测）
+```
