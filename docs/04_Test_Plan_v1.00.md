@@ -392,6 +392,8 @@ old only  PA ENGULFING  2026.09.02 16:15:00
 脚本据此新增 `converging` 类：只在旧重建中、且早于新重建第一条标记的差异。
 该规则只覆盖窗口开头，窗口中段的真实重绘仍会落入 LOOK。
 
+用新脚本复跑（用户，2026-09-25）：`converging 1`，LOOK 0，结论行「No repaint.」。
+
 ---
 
 ### Future Leak 测试 —— LIVE vs BUILD
