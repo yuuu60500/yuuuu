@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: #f6f7f9;
+  color: #111827;
+}
+
+@utility btn {
+  @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
+}
+@utility btn-primary {
+  @apply btn bg-indigo-600 text-white hover:bg-indigo-700;
+}
+@utility btn-secondary {
+  @apply btn border border-gray-300 bg-white text-gray-700 hover:bg-gray-50;
+}
+@utility btn-danger {
+  @apply btn border border-red-200 bg-white text-red-600 hover:bg-red-50;
+}
+@utility btn-icon {
+  @apply inline-flex h-7 w-7 items-center justify-center rounded text-gray-500 hover:bg-gray-200 hover:text-gray-900 disabled:opacity-40;
+}
+@utility input {
+  @apply w-full rounded-md border border-gray-300 bg-white px-2.5 py-1.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500;
+}
+@utility label {
+  @apply mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500;
+}
+@utility card {
+  @apply rounded-xl border border-gray-200 bg-white shadow-sm;
+}
