@@ -7,6 +7,7 @@ id so timings never change.
 
 import logging
 from collections.abc import Callable
+from dataclasses import dataclass, field
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
@@ -16,7 +17,6 @@ from ..languages import same_language
 from ..models import GlossaryTerm, Project, Segment
 from .translation import (
     GlossaryEntry,
-    TranslationError,
     TranslationItem,
     TranslationProvider,
     TranslationRequest,
@@ -44,6 +44,14 @@ def load_glossary(db: Session, project: Project, target_language: str) -> list[G
     return [GlossaryEntry(r.term, r.translation, r.note) for r in by_term.values()]
 
 
+@dataclass
+class TranslationOutcome:
+    translated: int = 0
+    # Segments the model returned nothing for, even when asked one at a time.
+    # They keep their previous translation (if any) and can be retranslated later.
+    untranslated: list[str] = field(default_factory=list)
+
+
 def _flatten(text: str) -> str:
     return text.replace("\n", " ")
 
@@ -56,8 +64,13 @@ def translate_segments(
     provider: TranslationProvider | None = None,
     on_progress: Callable[[int, int], None] | None = None,
     extra_glossary: list[GlossaryEntry] | None = None,
-) -> int:
-    """Translate the given segments (all when None). Returns the count translated."""
+    only_missing: bool = False,
+) -> TranslationOutcome:
+    """Translate the given segments (all when None).
+
+    only_missing: skip segments that already have a translation in target_language
+    (used by "Retry Translation" so finished batches are not redone).
+    """
     settings = get_settings()
     all_segments = list(
         db.scalars(
@@ -66,8 +79,13 @@ def translate_segments(
     )
     wanted = set(segment_ids) if segment_ids is not None else None
     targets = [s for s in all_segments if wanted is None or s.id in wanted]
+    if only_missing:
+        targets = [
+            s for s in targets
+            if not s.translated_text or s.translation_language != target_language
+        ]
     if not targets:
-        return 0
+        return TranslationOutcome()
 
     source = project.effective_source_language
     if same_language(source, target_language):
@@ -75,7 +93,7 @@ def translate_segments(
             seg.translated_text = seg.original_text
             seg.translation_language = target_language
         db.commit()
-        return len(targets)
+        return TranslationOutcome(translated=len(targets))
 
     provider = provider or get_translation_provider()
     glossary = load_glossary(db, project, target_language)
@@ -86,6 +104,7 @@ def translate_segments(
     ctx = settings.translation_context_size
     size = max(1, settings.translation_batch_size)
 
+    outcome = TranslationOutcome()
     done = 0
     for b in range(0, len(targets), size):
         batch = targets[b : b + size]
@@ -114,25 +133,33 @@ def translate_segments(
         result = provider.translate_batch(request)
         missing = [k for k in local if not result.get(k)]
         if missing:
-            # One retry for lines the model skipped, translated with the batch as context.
-            retry = TranslationRequest(
-                items=[TranslationItem(k, local[k].original_text) for k in missing],
-                source_language=source,
-                target_language=target_language,
-                domain=project.domain,
-                glossary=glossary,
-                context_before=before + [_flatten(s.original_text) for s in batch],
-                context_after=after,
-            )
-            result.update(provider.translate_batch(retry))
-            still = [k for k in missing if not result.get(k)]
-            if still:
-                raise TranslationError(f"Model did not return translations for {len(still)} line(s).")
+            # Models (especially small local ones) sometimes skip lines in a batch.
+            # Ask again one line at a time, with the whole batch as context.
+            batch_context = before + [_flatten(s.original_text) for s in batch]
+            for k in missing:
+                single = TranslationRequest(
+                    items=[TranslationItem("1", local[k].original_text)],
+                    source_language=source,
+                    target_language=target_language,
+                    domain=project.domain,
+                    glossary=glossary,
+                    context_before=batch_context,
+                    context_after=after,
+                )
+                text = provider.translate_batch(single).get("1")
+                if text:
+                    result[k] = text
         for key, seg in local.items():
-            seg.translated_text = result[key]
-            seg.translation_language = target_language
+            if result.get(key):
+                seg.translated_text = result[key]
+                seg.translation_language = target_language
+                outcome.translated += 1
+            else:
+                outcome.untranslated.append(seg.id)
         db.commit()
         done += len(batch)
         if on_progress:
             on_progress(done, len(targets))
-    return done
+    if outcome.untranslated:
+        log.warning("Project %s: %d line(s) left untranslated", project.id, len(outcome.untranslated))
+    return outcome

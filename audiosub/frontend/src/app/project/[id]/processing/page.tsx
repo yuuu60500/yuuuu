@@ -135,6 +135,7 @@ export default function ProcessingPage() {
                     {status === "skipped" && <span className="ml-2 text-sm text-gray-400">(not needed)</span>}
                   </div>
                   {status === "failed" && step.error && <p className="text-sm text-red-600">{step.error}</p>}
+                  {step?.warning && <p className="text-sm text-amber-700">{step.warning}</p>}
                 </div>
               </li>
             );

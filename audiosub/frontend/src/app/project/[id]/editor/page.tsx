@@ -242,6 +242,9 @@ export default function EditorPage() {
       setProject(res.project);
       const byId = new Map((res.segments ?? []).map((s) => [s.id, s]));
       setSegments((list) => list.map((s) => byId.get(s.id) ?? s));
+      if (res.untranslated.length) {
+        setError(`${res.untranslated.length} line(s) could not be translated. Try ↻ again, or type the translation yourself.`);
+      }
     });
     setTranslatingIds((prev) => {
       const next = new Set(prev);
@@ -306,6 +309,9 @@ export default function EditorPage() {
 
   const hasTranslation = !!project.target_language;
   const translatingAll = project.status === "TRANSLATING";
+  const missingIds = hasTranslation && !translatingAll
+    ? segments.filter((s) => !s.translated_text?.trim() && s.original_text.trim()).map((s) => s.id)
+    : [];
   const staleLanguage =
     hasTranslation && segments.some((s) => s.translated_text && s.translation_language && s.translation_language !== project.target_language);
   const saveLabel = {
@@ -349,6 +355,14 @@ export default function EditorPage() {
         <div className="mb-3 flex items-start justify-between rounded-md bg-red-50 p-3 text-sm text-red-700">
           <span>{error}</span>
           <button className="btn-icon" onClick={() => setError(null)}>✕</button>
+        </div>
+      )}
+      {missingIds.length > 0 && (
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+          <span>{missingIds.length} subtitle(s) have no translation yet.</span>
+          <button className="btn-secondary" disabled={busy} onClick={() => retranslateIds(missingIds)}>
+            ↻ Translate missing lines
+          </button>
         </div>
       )}
       {notice && (

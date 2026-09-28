@@ -45,8 +45,8 @@ def project(client):
 def test_batches_have_context_and_keep_ids(project):
     db, p = project
     rec = Recorder()
-    n = translate_segments(db, p, "zh", provider=rec)
-    assert n == 5
+    outcome = translate_segments(db, p, "zh", provider=rec)
+    assert outcome.translated == 5 and outcome.untranslated == []
     assert [len(r.items) for r in rec.requests] == [2, 2, 1]  # batch size 2 in tests
     second = rec.requests[1]
     assert second.context_before == ["...porque precisava"]  # context size 1
@@ -70,8 +70,31 @@ def test_missing_line_is_retried(project):
     db, p = project
     rec = Recorder(skip_first="2")
     translate_segments(db, p, "zh", provider=rec)
-    assert len(rec.requests[1].items) == 1  # the retry
+    retry = rec.requests[1]
+    assert [i.text for i in retry.items] == ["...porque precisava"]  # asked alone
+    assert retry.context_before[-2:] == ["Eu fui ao banco...", "...porque precisava"]
     assert all(s.translated_text for s in p.segments)
+
+
+class Stubborn(Recorder):
+    """Never translates one particular line."""
+
+    def translate_batch(self, request):
+        out = super().translate_batch(request)
+        return {k: v for k, v in out.items() if "Do IVA." not in v}
+
+
+def test_unreturned_line_is_left_untranslated_not_fatal(project):
+    db, p = project
+    outcome = translate_segments(db, p, "zh", provider=Stubborn())
+    stuck = next(s for s in p.segments if s.original_text == "Do IVA.")
+    assert outcome.untranslated == [stuck.id] and outcome.translated == 4
+    assert stuck.translated_text is None
+    # Retrying only asks for the missing line
+    rec = Recorder()
+    outcome = translate_segments(db, p, "zh", provider=rec, only_missing=True)
+    assert [i.text for r in rec.requests for i in r.items] == ["Do IVA."]
+    assert outcome.translated == 1 and all(s.translated_text for s in p.segments)
 
 
 def test_selected_segments_only(project):

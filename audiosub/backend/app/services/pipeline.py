@@ -62,11 +62,12 @@ class PipelineError(Exception):
 
 
 def set_step(project: Project, step: str, status: StepStatus, error: str | None = None,
-             progress: float | None = None) -> None:
+             progress: float | None = None, warning: str | None = None) -> None:
     steps = dict(project.steps or {})
     entry = dict(steps.get(step) or {})
     entry["status"] = status.value
     entry["error"] = error
+    entry["warning"] = warning
     if progress is not None:
         entry["progress"] = progress
     elif status in (StepStatus.COMPLETED, StepStatus.SKIPPED):
@@ -195,7 +196,8 @@ def step_segmentation(db: Session, project: Project) -> None:
     db.commit()
 
 
-def step_translation(db: Session, project: Project, segment_ids: list[str] | None = None) -> None:
+def step_translation(db: Session, project: Project, segment_ids: list[str] | None = None,
+                     only_missing: bool = False) -> None:
     if not needs_translation(project):
         set_step(project, "translation", StepStatus.SKIPPED)
         db.commit()
@@ -208,10 +210,18 @@ def step_translation(db: Session, project: Project, segment_ids: list[str] | Non
         set_step(project, "translation", StepStatus.RUNNING, progress=done / total)
         db.commit()
 
-    translate_segments(
-        db, project, project.target_language, segment_ids=segment_ids, on_progress=on_progress
+    outcome = translate_segments(
+        db, project, project.target_language, segment_ids=segment_ids,
+        on_progress=on_progress, only_missing=only_missing,
     )
-    set_step(project, "translation", StepStatus.COMPLETED)
+    warning = None
+    if outcome.untranslated:
+        n = len(outcome.untranslated)
+        warning = (
+            f"{n} line(s) could not be translated. Use Retry Translation, or the "
+            "↻ button on those lines in the editor."
+        )
+    set_step(project, "translation", StepStatus.COMPLETED, warning=warning)
     db.commit()
 
 
@@ -239,7 +249,7 @@ def media_storage():
 # ---------------------------------------------------------------- orchestration
 
 
-def _run(project_id: str, steps: list[str]) -> None:
+def _run(project_id: str, steps: list[str], step_kwargs: dict | None = None) -> None:
     db = SessionLocal()
     current = None
     try:
@@ -247,7 +257,7 @@ def _run(project_id: str, steps: list[str]) -> None:
         if project is None:
             return
         for current in steps:
-            STEP_FUNCS[current](db, project)
+            STEP_FUNCS[current](db, project, **(step_kwargs or {}).get(current, {}))
         current = "finalize"
         step_finalize(db, project)
     except Exception as exc:  # record the failure on the step; keep earlier results
@@ -276,7 +286,8 @@ def prepare_steps(db: Session, project: Project, steps: list[str]) -> None:
     db.commit()
 
 
-def start(db: Session, project: Project, from_step: str = "audio", only: list[str] | None = None) -> None:
+def start(db: Session, project: Project, from_step: str = "audio", only: list[str] | None = None,
+          step_kwargs: dict | None = None) -> None:
     """Run steps from `from_step` to the end (or exactly `only`)."""
     if only is not None:
         steps = only
@@ -301,15 +312,17 @@ def start(db: Session, project: Project, from_step: str = "audio", only: list[st
         raise
 
     if get_settings().run_jobs_in_background:
-        _executor.submit(_run, project.id, steps)
+        _executor.submit(_run, project.id, steps, step_kwargs)
     else:
-        _run(project.id, steps)
+        _run(project.id, steps, step_kwargs)
 
 
 def first_failed_step(project: Project) -> str | None:
     for name in PROCESSABLE_STEPS:
         if (project.steps or {}).get(name, {}).get("status") == StepStatus.FAILED.value:
             return name
+    if (project.steps or {}).get("translation", {}).get("warning"):
+        return "translation"  # finished, but some lines are still untranslated
     for name in PROCESSABLE_STEPS:
         if (project.steps or {}).get(name, {}).get("status") != StepStatus.COMPLETED.value:
             return name

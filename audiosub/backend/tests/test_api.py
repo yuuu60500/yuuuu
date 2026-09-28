@@ -222,3 +222,34 @@ def test_delete_project(client, mp3_file):
     upload(client, p["id"], mp3_file)
     assert client.delete(f"/api/projects/{p['id']}").status_code == 204
     assert client.get(f"/api/projects/{p['id']}").status_code == 404
+
+
+def test_partial_translation_completes_with_warning_and_retry_fills_gaps(client, mp3_file, monkeypatch):
+    p = create(client, source_language="pt-PT", target_language="zh")
+    upload(client, p["id"], mp3_file)
+    orig = MockTranslationProvider.translate_batch
+    calls = []
+
+    def skip_iva(self, request):
+        calls.append([i.text for i in request.items])
+        return {k: v for k, v in orig(self, request).items() if "IVA" not in v}
+
+    monkeypatch.setattr(MockTranslationProvider, "translate_batch", skip_iva)
+    client.post(f"/api/projects/{p['id']}/process")
+    p = client.get(f"/api/projects/{p['id']}").json()
+    assert p["status"] == "READY"
+    assert p["steps"]["translation"]["status"] == "completed"
+    assert "1 line(s) could not be translated" in p["steps"]["translation"]["warning"]
+    segs = client.get(f"/api/projects/{p['id']}/segments").json()
+    assert [s["translated_text"] is None for s in segs].count(True) == 1
+
+    monkeypatch.setattr(MockTranslationProvider, "translate_batch", orig)
+    calls.clear()
+    monkeypatch.setattr(MockTranslationProvider, "translate_batch",
+                        lambda self, r: (calls.append([i.text for i in r.items]), orig(self, r))[1])
+    client.post(f"/api/projects/{p['id']}/retry")
+    p = client.get(f"/api/projects/{p['id']}").json()
+    assert p["steps"]["translation"]["warning"] is None
+    assert len(calls) == 1 and len(calls[0]) == 1 and "IVA" in calls[0][0]
+    segs = client.get(f"/api/projects/{p['id']}/segments").json()
+    assert all(s["translated_text"] for s in segs)

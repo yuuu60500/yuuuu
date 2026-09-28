@@ -173,8 +173,10 @@ def retry(project: Project = Depends(get_project_or_404), db: Session = Depends(
         raise HTTPException(400, "Nothing to retry.")
     if step == "transcription" and not project.audio_key:
         step = "audio"
+    # Retrying translation keeps lines that were already translated.
+    kwargs = {"translation": {"only_missing": True}} if step == "translation" else None
     try:
-        pipeline.start(db, project, from_step=step)
+        pipeline.start(db, project, from_step=step, step_kwargs=kwargs)
     except pipeline.PipelineError as exc:
         raise HTTPException(409, str(exc)) from exc
     db.refresh(project)
@@ -243,7 +245,9 @@ def translate(
 
     if body.segment_ids is not None:
         try:
-            translate_segments(db, project, project.target_language, segment_ids=body.segment_ids)
+            outcome = translate_segments(
+                db, project, project.target_language, segment_ids=body.segment_ids
+            )
         except TranslationError as exc:
             raise HTTPException(502, str(exc)) from exc
         segments = db.scalars(
@@ -252,6 +256,7 @@ def translate(
         return {
             "project": project_out(db, project),
             "segments": [SegmentOut.model_validate(s) for s in segments],
+            "untranslated": outcome.untranslated,
         }
 
     try:
@@ -259,7 +264,7 @@ def translate(
     except pipeline.PipelineError as exc:
         raise HTTPException(409, str(exc)) from exc
     db.refresh(project)
-    return {"project": project_out(db, project), "segments": None}
+    return {"project": project_out(db, project), "segments": None, "untranslated": []}
 
 
 # ------------------------------------------------------------------ export

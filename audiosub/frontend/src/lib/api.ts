@@ -25,7 +25,7 @@ export interface Project {
   domain: string;
   subtitle_mode: SubtitleMode;
   status: ProjectStatus;
-  steps: Record<StepName, { status: StepStatus; error: string | null; progress?: number }>;
+  steps: Record<StepName, { status: StepStatus; error: string | null; warning?: string | null; progress?: number }>;
   progress: number;
   error_message: string | null;
   segment_count: number;
@@ -122,7 +122,7 @@ export const api = {
   process: (id: string) => request<Project>(`/api/projects/${id}/process`, { method: "POST" }),
   retry: (id: string) => request<Project>(`/api/projects/${id}/retry`, { method: "POST" }),
   translate: (id: string, body: { target_language?: string; domain?: string; segment_ids?: string[] }) =>
-    request<{ project: Project; segments: Segment[] | null }>(`/api/projects/${id}/translate`, {
+    request<{ project: Project; segments: Segment[] | null; untranslated: string[] }>(`/api/projects/${id}/translate`, {
       method: "POST",
       body: json(body),
     }),
