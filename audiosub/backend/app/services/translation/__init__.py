@@ -14,6 +14,10 @@ def get_translation_provider(name: str | None = None) -> TranslationProvider:
         from .claude_provider import ClaudeTranslationProvider
 
         return ClaudeTranslationProvider()
+    if name == "ollama":
+        from .ollama_provider import OllamaTranslationProvider
+
+        return OllamaTranslationProvider()
     if name == "mock":
         from .mock_provider import MockTranslationProvider
 

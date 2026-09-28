@@ -71,6 +71,14 @@ uvicorn app.main:app --reload --port 8000
   (model `TRANSLATION_MODEL`, default `claude-opus-5`; server-side refusal
   fallback is enabled). `TRANSLATION_PROVIDER=mock` prefixes lines with the
   target language code.
+- **Offline translation (no API key):** install [Ollama](https://ollama.com)
+  (`winget install Ollama.Ollama` on Windows), run `ollama pull qwen2.5:7b`,
+  and set `TRANSLATION_PROVIDER=ollama` (`OLLAMA_MODEL` to change the model;
+  `qwen2.5:3b` for low-RAM machines, `qwen2.5:14b` for better quality).
+  Free and private, but slower on CPU and lower quality than Claude; the same
+  prompt (PT-PT rules, domain, glossary) is used, but small models follow it
+  less reliably. Lower `TRANSLATION_BATCH_SIZE` (e.g. 8) if batches time out
+  or lines go missing.
 - **Storage:** local files under `./data/storage` by default. For production
   set `STORAGE_BACKEND=s3`, `S3_BUCKET`, and for Cloudflare R2 `S3_ENDPOINT_URL`
   (`pip install boto3`). Only storage keys are kept in the database.

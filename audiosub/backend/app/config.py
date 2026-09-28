@@ -25,11 +25,15 @@ class Settings(BaseSettings):
     openai_asr_model: str = "whisper-1"
     openai_api_key: str | None = None
 
-    translation_provider: str = "claude"  # claude | mock
+    translation_provider: str = "claude"  # claude | ollama | mock
     translation_model: str = "claude-opus-5"
     # Read from .env here: values in .env are not exported to os.environ, so
     # SDK clients must be given the key explicitly.
     anthropic_api_key: str | None = None
+    # Local, offline translation through Ollama (https://ollama.com)
+    ollama_url: str = "http://localhost:11434"
+    ollama_model: str = "qwen2.5:7b"
+    ollama_timeout: float = 900.0
     translation_batch_size: int = 15
     translation_context_size: int = 3
 

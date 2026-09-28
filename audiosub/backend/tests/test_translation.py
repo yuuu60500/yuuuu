@@ -153,3 +153,48 @@ def test_claude_provider_reads_key_from_settings(monkeypatch):
     monkeypatch.setattr(get_settings(), "anthropic_api_key", "sk-ant-test")
     provider = ClaudeTranslationProvider()
     assert provider.client.api_key == "sk-ant-test"
+
+
+def _ollama(handler):
+    import httpx
+
+    from app.services.translation.ollama_provider import OllamaTranslationProvider
+
+    return OllamaTranslationProvider(
+        client=httpx.Client(transport=httpx.MockTransport(handler)), model="qwen2.5:7b"
+    )
+
+
+def test_ollama_provider_request_and_parsing():
+    import json
+
+    import httpx
+
+    seen = {}
+
+    def handler(request):
+        seen.update(json.loads(request.content))
+        content = json.dumps({"translations": [{"id": 1, "text": " 你好 "}, {"id": "7", "text": "x"}]})
+        return httpx.Response(200, json={"message": {"role": "assistant", "content": content}})
+
+    req = TranslationRequest(items=[TranslationItem("1", "Olá")], source_language="pt-PT",
+                             target_language="zh", glossary=[GlossaryEntry("IVA", "IVA")])
+    assert _ollama(handler).translate_batch(req) == {"1": "你好"}
+    assert seen["model"] == "qwen2.5:7b" and seen["stream"] is False
+    assert seen["format"]["required"] == ["translations"]
+    assert "IVA => IVA" in seen["messages"][1]["content"]
+
+
+def test_ollama_provider_errors():
+    import httpx
+
+    req = TranslationRequest(items=[TranslationItem("1", "Olá")], source_language="pt-PT",
+                             target_language="zh")
+    with pytest.raises(TranslationError, match="ollama pull qwen2.5:7b"):
+        _ollama(lambda r: httpx.Response(404, json={"error": "model not found"})).translate_batch(req)
+
+    def refuse(r):
+        raise httpx.ConnectError("refused")
+
+    with pytest.raises(TranslationError, match="Is Ollama installed and running"):
+        _ollama(refuse).translate_batch(req)
