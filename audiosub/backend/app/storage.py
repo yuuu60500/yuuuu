@@ -83,11 +83,18 @@ class LocalStorage(Storage):
 
 
 class S3Storage(Storage):
-    def __init__(self, bucket: str, endpoint_url: str | None, region: str | None):
+    def __init__(self, bucket: str, endpoint_url: str | None, region: str | None,
+                 access_key_id: str | None = None, secret_access_key: str | None = None):
         import boto3  # optional dependency
 
         self.bucket = bucket
-        self.client = boto3.client("s3", endpoint_url=endpoint_url, region_name=region)
+        self.client = boto3.client(
+            "s3",
+            endpoint_url=endpoint_url,
+            region_name=region,
+            aws_access_key_id=access_key_id,
+            aws_secret_access_key=secret_access_key,
+        )
 
     def save(self, key: str, fileobj: BinaryIO) -> int:
         self.client.upload_fileobj(fileobj, self.bucket, key)
@@ -133,7 +140,10 @@ def get_storage() -> Storage:
         if s.storage_backend == "s3":
             if not s.s3_bucket:
                 raise RuntimeError("S3_BUCKET must be set when STORAGE_BACKEND=s3")
-            _storage = S3Storage(s.s3_bucket, s.s3_endpoint_url, s.s3_region)
+            _storage = S3Storage(
+                s.s3_bucket, s.s3_endpoint_url, s.s3_region,
+                s.aws_access_key_id, s.aws_secret_access_key,
+            )
         else:
             _storage = LocalStorage(s.local_storage_dir)
     return _storage

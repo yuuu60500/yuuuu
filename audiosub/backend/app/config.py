@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     s3_bucket: str | None = None
     s3_endpoint_url: str | None = None
     s3_region: str | None = None
+    aws_access_key_id: str | None = None
+    aws_secret_access_key: str | None = None
 
     ffmpeg_binary: str = "ffmpeg"
 
@@ -21,9 +23,13 @@ class Settings(BaseSettings):
     whisper_device: str = "auto"
     whisper_compute_type: str = "default"
     openai_asr_model: str = "whisper-1"
+    openai_api_key: str | None = None
 
     translation_provider: str = "claude"  # claude | mock
     translation_model: str = "claude-opus-5"
+    # Read from .env here: values in .env are not exported to os.environ, so
+    # SDK clients must be given the key explicitly.
+    anthropic_api_key: str | None = None
     translation_batch_size: int = 15
     translation_context_size: int = 3
 

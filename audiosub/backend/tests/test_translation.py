@@ -141,3 +141,15 @@ def test_claude_provider_refusal():
                              target_language="zh")
     with pytest.raises(TranslationError):
         provider.translate_batch(req)
+
+
+def test_claude_provider_reads_key_from_settings(monkeypatch):
+    from app.config import get_settings
+
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setattr(get_settings(), "anthropic_api_key", None)
+    with pytest.raises(TranslationError, match="ANTHROPIC_API_KEY is not set"):
+        ClaudeTranslationProvider()
+    monkeypatch.setattr(get_settings(), "anthropic_api_key", "sk-ant-test")
+    provider = ClaudeTranslationProvider()
+    assert provider.client.api_key == "sk-ant-test"

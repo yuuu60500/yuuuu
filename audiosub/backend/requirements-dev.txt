@@ -1,5 +1,3 @@
 -r requirements.txt
 pytest>=8
 httpx>=0.27
-# Provides a bundled ffmpeg binary for tests when ffmpeg is not installed
-imageio-ffmpeg>=0.5

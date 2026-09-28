@@ -12,8 +12,11 @@ class OpenAIWhisperProvider(ASRProvider):
     def transcribe(self, audio_path: str, language: str | None = None) -> TranscriptResult:
         from openai import OpenAI  # optional dependency
 
-        client = OpenAI()
-        model = get_settings().openai_asr_model
+        settings = get_settings()
+        if not settings.openai_api_key:
+            raise RuntimeError("OPENAI_API_KEY is not set. Add it to backend/.env and restart the backend.")
+        client = OpenAI(api_key=settings.openai_api_key)
+        model = settings.openai_asr_model
         with open(audio_path, "rb") as f:
             kwargs = {
                 "model": model,

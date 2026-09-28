@@ -8,6 +8,8 @@ psycopg2-binary>=2.9
 anthropic>=1.0
 # Local speech recognition (default ASR provider). Needs FFmpeg on PATH.
 faster-whisper>=1.0
+# Bundled FFmpeg binary, used automatically when ffmpeg is not on PATH
+imageio-ffmpeg>=0.5
 # Optional: S3 / Cloudflare R2 storage (STORAGE_BACKEND=s3)
 # boto3>=1.34
 # Optional: OpenAI Whisper API ASR provider (ASR_PROVIDER=openai)

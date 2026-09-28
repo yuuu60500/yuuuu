@@ -14,8 +14,15 @@ class ClaudeTranslationProvider(TranslationProvider):
     name = "claude"
 
     def __init__(self, client: anthropic.Anthropic | None = None, model: str | None = None):
-        self.client = client or anthropic.Anthropic()
-        self.model = model or get_settings().translation_model
+        settings = get_settings()
+        if client is None:
+            if not settings.anthropic_api_key:
+                raise TranslationError(
+                    "ANTHROPIC_API_KEY is not set. Add it to backend/.env and restart the backend."
+                )
+            client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+        self.client = client
+        self.model = model or settings.translation_model
 
     def translate_batch(self, request: TranslationRequest) -> dict[str, str]:
         try:
