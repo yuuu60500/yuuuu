@@ -92,28 +92,50 @@ foreach ($f in $logs) { $all += Get-Content $f.FullName }
 # block and no -Source, and it discovers the charts from the log itself, so
 # adding symbols does not mean editing a list.
 if ($Live) {
-    $tally = @{}
+    # A chart with no live rows is either quiet or not running, and the count
+    # alone cannot tell which. Two more columns can: the newest mark ANY build
+    # of that chart has produced (if a rebuild today also stops days ago, live
+    # and build agree the chart has been quiet), and the context state after
+    # the last H4 event (RANGE / TRANSITION mint no setups, Rule 2 / BRI-07).
+    $tally = @{}; $newest = @{}; $ctxNow = @{}
     foreach ($l in $all) {
-        if ($l -notmatch 'HMI-(LIVE|BUILD),') { continue }
+        if ($l -match 'HMI-CTX,') {
+            $src = if ($l -match '\(([A-Za-z0-9._#]+,[A-Za-z0-9]+)\)') { $Matches[1] } else { '?' }
+            if ($l -match 'ctx=([A-Z_]+)') { $c = $Matches[1] } else { $c = '?' }
+            # The event bar is when the state was last TOUCHED, not when it
+            # began - a BOS keeps BULLISH bullish - so print it as such.
+            $kd = if ($l -match 'HMI-CTX,[^,]*,([A-Z_]+),') { $Matches[1] } else { '?' }
+            if ($l -match ',bar=([0-9.: ]+),') { $c = "$c   (last: $kd $($Matches[1].Trim()))" }
+            $ctxNow[$src] = $c
+            continue
+        }
+        if ($l -notmatch 'HMI-(LIVE|BUILD),(.*)$') { continue }
+        $cols = $Matches[2] -split ','
         $src = if ($l -match '\(([A-Za-z0-9._#]+,[A-Za-z0-9]+)\)') { $Matches[1] } else { '?' }
         if (-not $tally.ContainsKey($src)) { $tally[$src] = 0 }
         if ($l -match 'HMI-LIVE,') { $tally[$src]++ }
+        # 'yyyy.MM.dd HH:mm:ss' sorts correctly as text - no culture parsing.
+        if ($cols.Count -gt 7 -and ((-not $newest.ContainsKey($src)) -or $cols[7] -gt $newest[$src])) { $newest[$src] = $cols[7] }
     }
     if ($tally.Count -eq 0) {
         Write-Host "`nno HMI rows at all. Is InpLogSignals = true ?" -ForegroundColor Red
         exit
     }
     Write-Host "`nLIVE marks so far:`n" -ForegroundColor Cyan
+    Write-Host ("  {0,-14} {1,5}   {2,-20} {3}" -f 'chart', 'live', 'newest mark', 'context after last H4 event') -ForegroundColor DarkGray
     $total = 0
     foreach ($k in ($tally.Keys | Sort-Object)) {
         $n = $tally[$k]; $total += $n
-        Write-Host ("  {0,-14} {1,5}" -f $k, $n) -ForegroundColor $(if ($n -gt 0) { 'Green' } else { 'DarkGray' })
+        $nm = if ($newest.ContainsKey($k)) { $newest[$k] } else { '-' }
+        $cx = if ($ctxNow.ContainsKey($k)) { $ctxNow[$k] } else { '-' }
+        Write-Host ("  {0,-14} {1,5}   {2,-20} {3}" -f $k, $n, $nm, $cx) -ForegroundColor $(if ($n -gt 0) { 'Green' } else { 'Gray' })
     }
     Write-Host ("`n  total {0}" -f $total)
     if ($total -eq 0) {
         Write-Host "`nnothing yet. Leave the charts running and do NOT reload them." -ForegroundColor Yellow
     } else {
-        Write-Host "`nnow reload each chart once (switch timeframe away and back)," -ForegroundColor Yellow
+        Write-Host "`nnow reload ONLY the charts with live rows (Ctrl+I -> HMI -> Properties -> OK)," -ForegroundColor Yellow
+        Write-Host "wait a minute for the log to flush," -ForegroundColor Yellow
         Write-Host "then run:  .\ReloadTest.ps1 -LiveVsBuild -Days $Days" -ForegroundColor Yellow
     }
     exit
@@ -342,6 +364,12 @@ function Show-LiveVsBuild([string]$src) {
                 $live.Count, $ok.Count, $after.Count, $other.Count, $aged.Count)
     if ($after.Count -gt 0) {
         Write-Host "  (after-rebuild rows are checked by the NEXT reload, not this one)" -ForegroundColor DarkGray
+    }
+    if ($ok.Count -gt 0) {
+        # Coverage matters as much as the count: a PASS on one model says
+        # nothing about the others' live paths.
+        $bm = $ok | Group-Object { ($_.Row -split ',')[6] } | Sort-Object Name | ForEach-Object { "$($_.Name) $($_.Count)" }
+        Write-Host ("  comparable by model: " + ($bm -join '  |  '))
     }
     if ($ok.Count -eq 0) {
         Write-Host "  nothing comparable yet. Let live marks accumulate, THEN reload once, THEN run this." -ForegroundColor Yellow

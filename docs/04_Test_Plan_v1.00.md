@@ -370,6 +370,28 @@ XAUUSD 的 1 与其最新事件 `str=0`（TRANSITION 中强度清零）一致。
 `comparable 1`，结果不变。其余 9 个图表源当日 `live rows 0`（全部标记来自重建），
 样本数仍为 **n=1**。
 
+### 🟡 Future Leak 第二轮 —— PASS（n=10，2026-09-29，仅 USDJPY,M5，v2.40）
+
+```
+挂载     2026-09-25 → 09-29（跨周末），日志 0923/0924/0925/0928/0929
+实时行   USDJPY,M5 11 条；其余 9 个图表源 0 条
+重建     v2.40  from=2026.09.04 07:35  to=2026.09.29 16:30   (201 行)
+结果     comparable 10 | after rebuild 1 | other version 0 | aged out 0
+         ALL 10 COMPARABLE LIVE MARKS SURVIVED THE REBUILD
+```
+
+判定标准（≥10 条 / ≥3 品种 / 出现过的模型都有样本）只满足第一条：
+**单品种，不能下「Future Leak: PASS」。** 模型分布待新版脚本输出。
+
+其余图表不是没在运行：28–29 日志里 AUDUSD / EURUSD / GBPUSD / NZDUSD 均有
+7–9 次重建、数百条 HMI-CTX 与数十条 HMI-REJECT。且这些图表 09.25 之后各次重建
+行数不变（GBPUSD 52、NZDUSD 81、USDCAD 161、EURUSD 121），USDCHF 降到 0 ——
+重建与实时一致地表明这些品种近期没有新标记。原因（Context 处于 RANGE /
+TRANSITION 时按 BRI-07 不出新 setup，或别的原因）待 `-Live` 新增的两列确认。
+
+脚本随之在 `-Live` 增加「最新标记时间」与「最后一次 H4 事件后的 Context」两列，
+在 `-LiveVsBuild` 增加可比样本的模型分布。
+
 途中暴露并修复的测试工具缺陷（均不涉及指标）：
 
 | 编号 | 问题 | 表现 |
