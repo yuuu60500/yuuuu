@@ -268,10 +268,18 @@ foreach ($l in $raw) {
 
 $sources = $blocks | Group-Object Src
 Write-Host "`nsources found: $($sources.Count)`n" -ForegroundColor Cyan
+# Every block of every chart runs to a hundred lines after a few days, which
+# only ends up in scrolling screenshots. List blocks in full only where they
+# are the point: the plain listing, or the one chart named with -Source.
+$fullList = (-not $LiveVsBuild -and -not $Rejects -and $Source -eq "")
 foreach ($g in $sources) {
-    Write-Host ("  {0}  -> {1} block(s)" -f $g.Name, $g.Count) -ForegroundColor White
-    $i = 0
-    foreach ($b in $g.Group) { Write-Host ("      [{0}] rows={1}  {2}" -f $i, $b.Rows.Count, $b.Head); $i++ }
+    if ($fullList -or $g.Name -eq $Source) {
+        Write-Host ("  {0}  -> {1} block(s)" -f $g.Name, $g.Count) -ForegroundColor White
+        $i = 0
+        foreach ($b in $g.Group) { Write-Host ("      [{0}] rows={1}  {2}" -f $i, $b.Rows.Count, $b.Head); $i++ }
+    } else {
+        Write-Host ("  {0,-14} {1,3} block(s), last rows={2}" -f $g.Name, $g.Count, $g.Group[-1].Rows.Count) -ForegroundColor DarkGray
+    }
 }
 
 # Which charts to work on. Naming one by hand is a trap of its own: brokers
