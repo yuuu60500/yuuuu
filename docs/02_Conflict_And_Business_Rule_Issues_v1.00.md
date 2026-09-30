@@ -652,9 +652,10 @@ margin 沿用逐根计算（动态 ATR），不引入「余量冻结」。日志
 
 ---
 
-## BRI-09 —— 草案：PDH / PDL / PWH / PWL 与 Liquidity Sweep（待签字，计划 v2.42）
+## BRI-09 —— 草案：PDH / PDL / PWH / PWL / PMH / PML 与 Liquidity Sweep（待签字，计划 v2.42）
 
-来源：用户 2026-09-30「加入 PWL、PDL、PDH、PWH 这些重要的流动性，并且添加识别 liquidity sweep」。
+来源：用户 2026-09-30「加入 PWL、PDL、PDH、PWH 这些重要的流动性，并且添加识别 liquidity sweep」；
+同日补充「不能只加 PDH/PDL/PWH/PWL，加入月的」→ 增加 PMH / PML（上月高 / 低）。
 
 与现有规则的关系：
 - 现有 §3.4 Liquidity 只有 H4 Swing 的 BSL / SSL，`SWEPT` = H4 影线越过即算，
@@ -669,8 +670,8 @@ S-1 作用范围
     ★ (a) 只标记 + 日志，不进入 POI / Session / 模型链（Rule 1 / 69 不变）
       (b) 作为标记链的过滤条件 —— 属于业务规则变更，需另行立项
 
-S-2 日 / 周边界
-    ★ (a) 券商服务器时间的 D1 / W1 K 线（多数券商 GMT+2/+3 对齐纽约 17:00 收盘）
+S-2 日 / 周 / 月边界
+    ★ (a) 券商服务器时间的 D1 / W1 / MN1 K 线（多数券商 GMT+2/+3 对齐纽约 17:00 收盘）
       (b) 固定纽约 17:00 自行切分
     附：若券商有周日短 K 线，PDH/PDL 是否跳过它取上一个完整交易日  ★ 跳过
 
@@ -689,10 +690,17 @@ S-5 现有 H4 Swing BSL / SSL 是否改用同一判定
       否 —— 保持原样，只对 PD/PW 水平位做新判定
 
 S-6 显示
-    ★ 只画当前的 PDH / PDL / PWH / PWL 四条线（标签用全称缩写，不写方向含义）；
+    ★ 只画当前的 PDH / PDL / PWH / PWL / PMH / PML 六条线（标签用缩写，不写方向含义）；
+      三组可分别开关（InpShowPD / InpShowPW / InpShowPM）；
       SWEEP / BROKEN 在发生的 K 线上标注，保留最近 InpLiqSweepDays 天（默认 5）
-    日志：HMI-LIQ,<sym>,SWEEP|BROKEN,level=PDH|PDL|PWH|PWL|BSL|SSL,px=,bar=
+    日志：HMI-LIQ,<sym>,SWEEP|BROKEN,level=PDH|PDL|PWH|PWL|PMH|PML|BSL|SSL,px=,bar=
           —— 同样纳入 LIVE vs BUILD 比对（sweep 本身也是标记，必须不重绘）
 ```
 
 不包含：sweep 的方向含义（「扫高 = 看跌」之类）。这属于交易判断，Rule 1 不做。
+
+附（月线专属）：
+- 月初第一天，PMH / PML 取上一个完整月；数据窗口（5000 根 M5 ≈ 26 天）
+  不足一个月不影响，月线水平位直接取 MN1 K 线，不从 M5 推算。
+- 同一价位可能同时是 PDH 与 PWH（或 PMH）—— 各自独立判定、各记一条事件，
+  显示时合并为一条线、标签并列（如「PDH·PWH」）。 ★

@@ -393,7 +393,7 @@ CISD 尚无实时样本。
 
 **Phase 0b 实时验收：** `Select-String -Path .\*.log -Pattern 'HMI-GUARD'`
 覆盖 0923–0929 五个日志，**0 行**。Phase 5 的 ARMED 前复核一次都没有需要拦截的情况 ——
-即 Phase 0b 已在前面结束了所有不合格的 Session。（cycle 494 的历史 ARMED 时间仍待核对。）
+即 Phase 0b 已在前面结束了所有不合格的 Session。（cycle 494 的历史 ARMED 时间：用户 2026-09-30 决定不核对，**未验证、已豁免**。）
 
 其余图表不是没在运行：28–29 日志里 AUDUSD / EURUSD / GBPUSD / NZDUSD 均有
 7–9 次重建、数百条 HMI-CTX 与数十条 HMI-REJECT。且这些图表 09.25 之后各次重建
