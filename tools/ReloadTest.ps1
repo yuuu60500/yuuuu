@@ -29,6 +29,14 @@
 #                                            counted over the latest rebuild
 #     .\ReloadTest.ps1 -Source "USDJPY,M5"   repaint test on that one chart
 #
+#     -SettleHours 24   (reload check) when the two windows start at different
+#                       bars, the first N hours after both warm-ups are PENDING
+#                       REVIEW - reported, never passed and never explained away
+#
+#  Verdicts are strict: a difference inside the comparable region is a
+#  MISMATCH; anything that cannot be compared is PENDING REVIEW; builds of a
+#  different version or parameter digest are never compared as a repaint test.
+#
 #     add  -Days 5  to merge the 5 most recent log files. MT5 starts a NEW
 #     log file every day: a live run that spans days leaves its marks in
 #     yesterday's file while today's reload writes into today's, and reading
@@ -39,7 +47,8 @@
 #  hence the grouping below.
 # ============================================================
 param([string]$Source = "", [switch]$LiveVsBuild, [switch]$Rejects, [switch]$Live,
-      [switch]$Ctx, [switch]$Quiet, [switch]$Chain, [int]$Days = 1, [string]$LogDir = "", [int]$Warmup = 100)
+      [switch]$Ctx, [switch]$Quiet, [switch]$Chain, [int]$Days = 1, [string]$LogDir = "", [int]$Warmup = 100,
+      [int]$SettleHours = 24)
 
 # Row layout after the tag is stripped:
 #   0 symbol  1 "MODEL"  2 dir  3 cycle_id  4 block_id  5 anchor  6 model
@@ -161,7 +170,11 @@ if ($Chain) {
     foreach ($l in $all) {
         if ($l -notmatch '\(([A-Za-z0-9._#]+,[A-Za-z0-9]+)\)\s+(HMI.*)$') { continue }
         $src = $Matches[1]; $msg = $Matches[2]
-        if ($msg -match '^HMI-BUILD-BEGIN,.*from=([0-9.: ]+),to=([0-9.: ]+)') { $cur[$src] = [pscustomobject]@{ From = $Matches[1].Trim(); To = $Matches[2].Trim(); Lines = New-Object System.Collections.ArrayList }; continue }
+        if ($msg -match '^HMI-BUILD-BEGIN,.*from=([0-9.: ]+),to=([0-9.: ]+)') {
+            $w = ''; $fr = $Matches[1].Trim(); $tt = $Matches[2].Trim()
+            if ($msg -match 'warmup_end=([0-9.: ]+)') { $w = $Matches[1].Trim() }
+            $cur[$src] = [pscustomobject]@{ From = $fr; To = $tt; Warm = $w; Lines = New-Object System.Collections.ArrayList }; continue
+        }
         if (-not $cur.ContainsKey($src)) { continue }
         if ($msg -match '^HMI-BUILD-END,') { $last[$src] = $cur[$src]; $cur.Remove($src); continue }
         [void]$cur[$src].Lines.Add($msg)
@@ -189,6 +202,7 @@ if ($Chain) {
         # counted separately instead of passing for evidence.
         $ic2 = [Globalization.CultureInfo]::InvariantCulture
         $m5Start = [datetime]::ParseExact($last[$src].From, 'yyyy.MM.dd HH:mm', $ic2).AddMinutes(5 * $Warmup)
+        if ($last[$src].Warm) { $m5Start = [datetime]::ParseExact($last[$src].Warm, 'yyyy.MM.dd HH:mm', $ic2) }   # v2.44+: logged, not estimated
         $ws = $m5Start.ToString('yyyy.MM.dd HH:mm', $ic2)
         $nm = if ($marks.Count) { @($marks | Sort-Object)[-1].Substring(0, 16) } else { $ws }
         if ($nm -lt $ws) { $nm = $ws }
@@ -444,13 +458,58 @@ if ($raw.Count -eq 0) {
 # MT5 prefixes every line with wall-clock time and the source tag:
 #   2026.09.23 01:06:17.843  H4M5_Identification (USDJPY,M5)  HMI-BUILD,...
 # The timestamp differs between runs, so only the payload is compared.
-$blocks = @()
-$open   = @{}
-foreach ($l in $raw) {
+#
+# Each build carries its identity from v2.44 on: version, a digest of every
+# input that can change an event, the instance, a build id and the REAL
+# warm-up end. Two builds are comparable only when version and digest agree;
+# nothing about comparability is inferred from what rows a build contains.
+# Older builds lack the digest: they can still be compared, but never PASS.
+$icx = [Globalization.CultureInfo]::InvariantCulture
+function PT16([string]$v) {
+    $d = [datetime]::MinValue
+    if ($v) { [void][datetime]::TryParseExact($v.Trim(), 'yyyy.MM.dd HH:mm', $icx, [Globalization.DateTimeStyles]::None, [ref]$d) }
+    return $d
+}
+function RowTime([string]$r) {
+    $t = [datetime]::MinValue
+    $c = $r -split ','
+    if ($c.Count -gt 7) { [void][datetime]::TryParseExact($c[7], 'yyyy.MM.dd HH:mm:ss', $icx, [Globalization.DateTimeStyles]::None, [ref]$t) }
+    return $t
+}
+$blocks = @(); $open = @{}; $verNow = @{}; $liveAll = @()
+for ($i = 0; $i -lt $all.Count; $i++) {
+    $l = $all[$i]
+    if ($l -notmatch 'HMI') { continue }
     $src = if ($l -match '\(([A-Za-z0-9._#]+,[A-Za-z0-9]+)\)') { $Matches[1] } else { '?' }
-    if     ($l -match 'HMI-BUILD-BEGIN,(.*)$') { $open[$src] = [pscustomobject]@{ Src=$src; Head=$Matches[1]; Rows=@(); Tail='' } }
-    elseif ($l -match 'HMI-BUILD-END,(.*)$')   { if ($open[$src]) { $open[$src].Tail=$Matches[1]; $blocks+=$open[$src]; $open.Remove($src) } }
-    elseif ($l -match 'HMI-BUILD,(.*)$')       { if ($open[$src]) { $open[$src].Rows += $Matches[1] } }
+    if ($l -match 'HMI v(\S+) starting on') { $verNow[$src] = $Matches[1]; continue }
+    if ($l -match 'HMI-BUILD-BEGIN,(.*)$') {
+        $h = $Matches[1]; $m = @{}
+        foreach ($p in ($h -split ',')) { $kv = $p -split '=', 2; if ($kv.Count -eq 2) { $m[$kv[0]] = $kv[1] } }
+        $v = '?'
+        if ($m.ContainsKey('ver')) { $v = $m['ver'] } elseif ($verNow.ContainsKey($src)) { $v = $verNow[$src] }
+        $prm = '?'; if ($m.ContainsKey('params')) { $prm = $m['params'] }
+        $ins = '?'; if ($m.ContainsKey('inst'))   { $ins = $m['inst'] }
+        $bid = '?'; if ($m.ContainsKey('build'))  { $bid = $m['build'] }
+        $from = PT16 $m['from']; $to = PT16 $m['to']
+        $we = [datetime]::MinValue; $west = $false
+        if ($m.ContainsKey('warmup_end')) { $we = PT16 $m['warmup_end'] }
+        else { $we = $from.AddMinutes(5 * $Warmup); $west = $true }     # pre-v2.44: estimate, flagged
+        $open[$src] = [pscustomobject]@{ Src = $src; Head = $h; Rows = (New-Object System.Collections.ArrayList); Tail = '';
+                                          Ver = $v; Params = $prm; Inst = $ins; Build = $bid; From = $from; To = $to;
+                                          WarmEnd = $we; WarmEst = $west; BeginIdx = $i; EndIdx = -1 }
+        continue
+    }
+    if ($l -match 'HMI-BUILD-END,(.*)$') {
+        if ($open.ContainsKey($src)) { $bk = $open[$src]; $bk.Tail = $Matches[1]; $bk.EndIdx = $i; $blocks += $bk; $open.Remove($src) }
+        continue
+    }
+    if ($l -match 'HMI-BUILD,(.*)$') { if ($open.ContainsKey($src)) { [void]$open[$src].Rows.Add($Matches[1]) }; continue }
+    if ($l -match 'HMI-LIVE,(.*)$')  { $liveAll += [pscustomobject]@{ Src = $src; Idx = $i; Row = $Matches[1] } }
+}
+function BlockLabel($b) {
+    $w = $b.WarmEnd.ToString('yyyy.MM.dd HH:mm'); if ($b.WarmEst) { $w = "~$w (estimated)" }
+    return ("v{0} params={1} build={2} from={3} to={4} warmup_end={5} rows={6}" -f $b.Ver, $b.Params, $b.Build,
+            $b.From.ToString('yyyy.MM.dd HH:mm'), $b.To.ToString('yyyy.MM.dd HH:mm'), $w, $b.Rows.Count)
 }
 
 $sources = $blocks | Group-Object Src
@@ -463,7 +522,7 @@ foreach ($g in $sources) {
     if ($fullList -or $g.Name -eq $Source) {
         Write-Host ("  {0}  -> {1} block(s)" -f $g.Name, $g.Count) -ForegroundColor White
         $i = 0
-        foreach ($b in $g.Group) { Write-Host ("      [{0}] rows={1}  {2}" -f $i, $b.Rows.Count, $b.Head); $i++ }
+        foreach ($bk in $g.Group) { Write-Host ("      [{0}] {1}" -f $i, (BlockLabel $bk)); $i++ }
     } else {
         Write-Host ("  {0,-14} {1,3} block(s), last rows={2}" -f $g.Name, $g.Count, $g.Group[-1].Rows.Count) -ForegroundColor DarkGray
     }
@@ -501,93 +560,77 @@ function Show-Rejects([string]$src) {
     Write-Host "`n  written to $out" -ForegroundColor Green
 }
 
+# Multiset difference with the init-relative ids (A-20) set aside: a key
+# that occurs twice on one side and once on the other is still a difference.
+function DiffRows($ra, $rb) {
+    $ca = @{}; $sa = @{}; $cb = @{}; $sb = @{}
+    foreach ($r in $ra) { $k = Key $r; if ($ca.ContainsKey($k)) { $ca[$k]++ } else { $ca[$k] = 1; $sa[$k] = $r } }
+    foreach ($r in $rb) { $k = Key $r; if ($cb.ContainsKey($k)) { $cb[$k]++ } else { $cb[$k] = 1; $sb[$k] = $r } }
+    $out = @()
+    foreach ($k in $ca.Keys) { $n = $ca[$k]; if ($cb.ContainsKey($k)) { $n -= $cb[$k] }
+        for ($j = 0; $j -lt $n; $j++) { $out += [pscustomobject]@{ Side = 'A only'; Row = $sa[$k]; Time = (RowTime $sa[$k]) } } }
+    foreach ($k in $cb.Keys) { $n = $cb[$k]; if ($ca.ContainsKey($k)) { $n -= $ca[$k] }
+        for ($j = 0; $j -lt $n; $j++) { $out += [pscustomobject]@{ Side = 'B only'; Row = $sb[$k]; Time = (RowTime $sb[$k]) } } }
+    return @($out | Sort-Object Time)
+}
+function RowLabel([string]$r) { $c = $r -split ','; if ($c[1] -eq 'LIQ') { return "LIQ $($c[5]) $($c[6])" } return $c[6] }
+
 function Show-LiveVsBuild([string]$src) {
-    # A live row can only be checked against a rebuild that (a) came AFTER it,
-    # (b) was made by the SAME indicator version, and (c) covers its bar.
-    # Anything else is not evidence either way, and treating it as "missing"
-    # reports a leak that is only ordering, an upgrade or the window sliding.
-    # So walk the log in order, keeping track of which version each line of
-    # this chart came from, and sort every live row into one of four piles.
-    $ic  = [Globalization.CultureInfo]::InvariantCulture
-    # Only a COMPLETE build counts - one whose END line has also reached the
-    # log. MT5 buffers its log, so a rebuild's BEGIN can be on disk while its
-    # rows and END are not yet; taking that BEGIN as "the rebuild" while the
-    # rows came from the previous complete block compared a mark against a
-    # build that did not contain its bar (A-35b).
-    $ver = '?'; $live = @(); $lastBegin = -1; $bVer = ''; $bFrom = ''; $bTo = ''
-    $pBegin = -1; $pVer = ''; $pFrom = ''; $pTo = ''
-    for ($i = 0; $i -lt $all.Count; $i++) {
-        $l = $all[$i]
-        if ($l -notmatch '\(([A-Za-z0-9._#]+,[A-Za-z0-9]+)\)') { continue }
-        if ($Matches[1] -ne $src) { continue }
-        if ($l -match 'HMI v(\S+) starting on') { $ver = $Matches[1]; continue }
-        if ($l -match 'HMI-BUILD-BEGIN,.*from=([0-9.: ]+),to=([0-9.: ]+)') {
-            $pBegin = $i; $pVer = $ver; $pFrom = $Matches[1].Trim(); $pTo = $Matches[2].Trim(); continue
-        }
-        if ($l -match 'HMI-BUILD-END,') {
-            if ($pBegin -ge 0) { $lastBegin = $pBegin; $bVer = $pVer; $bFrom = $pFrom; $bTo = $pTo; $pBegin = -1 }
-            continue
-        }
-        if ($l -match 'HMI-LIVE,(.*)$') {
-            $live += [pscustomobject]@{ Idx = $i; Ver = $ver; Row = $Matches[1]; Conf = (($Matches[1] -split ',')[7]) }
-        }
-    }
-    $sel2 = @($blocks | Where-Object { $_.Src -eq $src })
+    # Every pair of consecutive complete builds of this chart brackets a live
+    # stretch: A ended, the chart ran live, B rebuilt everything. Over the
+    # bars that stretch provably covered - after A's last bar, before B's
+    # last bar - live and rebuild must agree IN BOTH DIRECTIONS:
+    #   live only   the rebuild lost an event the live run produced
+    #   build only  the rebuild has an event the live run never produced
+    # Either one is a failure. A pair whose version or parameter digest
+    # differs, or is not logged, is PENDING REVIEW, never a pass.
     Write-Host "`n--- $src : LIVE vs BUILD ---" -ForegroundColor Cyan
-    if ($sel2.Count -lt 1 -or $lastBegin -lt 0) { Write-Host "  no complete build block for this chart." -ForegroundColor Red; return }
-    $build = $sel2[-1].Rows
-    if ($pBegin -ge 0) {
-        Write-Host "  a newer rebuild has started but its END is not in the log yet - wait a minute and rerun." -ForegroundColor Yellow
+    $sel = @($blocks | Where-Object { $_.Src -eq $src })
+    $lv  = @($liveAll | Where-Object { $_.Src -eq $src })
+    if ($sel.Count -lt 2) { Write-Host "  fewer than two complete builds - nothing brackets a live stretch yet." -ForegroundColor Yellow; return }
+    $pairs = 0; $cmp = 0; $pend = 0; $liveN = 0; $bad = @(); $okRows = @(); $pendWhy = @()
+    for ($k = 1; $k -lt $sel.Count; $k++) {
+        $A = $sel[$k - 1]; $B = $sel[$k]
+        $rows = @($lv | Where-Object { $_.Idx -gt $A.EndIdx -and $_.Idx -lt $B.BeginIdx })
+        $cs = $A.To.AddMinutes(10); $ce = $B.To
+        if ($B.WarmEnd.AddMinutes(5) -gt $cs) { $cs = $B.WarmEnd.AddMinutes(5) }
+        $bIn = @($B.Rows | Where-Object { $t = RowTime $_; $t -ge $cs -and $t -le $ce })
+        if ($rows.Count -eq 0 -and $bIn.Count -eq 0) { continue }
+        $pairs++
+        $why = ''
+        if ($A.Ver -ne $B.Ver)                          { $why = "version $($A.Ver) -> $($B.Ver)" }
+        elseif ($A.Params -eq '?' -or $B.Params -eq '?') { $why = 'parameter digest not logged (pre-v2.44)' }
+        elseif ($A.Params -ne $B.Params)                 { $why = "parameters changed ($($A.Params) -> $($B.Params))" }
+        if ($ce -lt $cs)                                 { $why = 'no fully covered bar between the two builds' }
+        if ($why) { $pend++; $pendWhy += "build $($A.Build)->$($B.Build): $why ($($rows.Count) live row(s))"; continue }
+        $cmp++
+        $lIn  = @($rows | Where-Object { $t = RowTime $_.Row; $t -ge $cs -and $t -le $ce } | ForEach-Object { $_.Row })
+        $lOut = $rows.Count - $lIn.Count
+        if ($lOut -gt 0) { $pendWhy += "build $($A.Build)->$($B.Build): $lOut live row(s) on an edge bar, not provably covered" }
+        $liveN += $lIn.Count
+        $okRows += $lIn
+        foreach ($d in (DiffRows $lIn $bIn)) {
+            $side = 'build only'; if ($d.Side -eq 'A only') { $side = 'live only' }
+            $bad += [pscustomobject]@{ Side = $side; Row = $d.Row; Pair = "$($A.Build)->$($B.Build)" }
+        }
     }
-    Write-Host "  rebuild    : v$bVer  from=$bFrom  to=$bTo   ($($build.Count) rows)"
-
-    # The rebuild's last bar OPENS at `to`; a mark's printed time is its bar's
-    # CLOSE. So a mark is inside the window iff its close <= to + 5 minutes.
-    $edge = [datetime]::ParseExact($bTo, 'yyyy.MM.dd HH:mm', $ic).AddMinutes(5)
-    $from = [datetime]::ParseExact($bFrom, 'yyyy.MM.dd HH:mm', $ic)
-    $after = @(); $other = @(); $aged = @(); $ok = @()
-    foreach ($r in $live) {
-        $t = [datetime]::MinValue
-        [void][datetime]::TryParseExact($r.Conf, 'yyyy.MM.dd HH:mm:ss', $ic, [Globalization.DateTimeStyles]::None, [ref]$t)
-        if     ($r.Idx -gt $lastBegin) { $after += $r }      # emitted after this rebuild
-        elseif ($r.Ver -ne $bVer)      { $other += $r }      # another version's rules
-        elseif ($t -lt $from)          { $aged  += $r }      # slid out of the window
-        elseif ($t -gt $edge)          { $after += $r }      # beyond the window's end
-        else                           { $ok    += $r }
+    Write-Host ("  build pairs with a live stretch: {0}   comparable: {1}   pending review: {2}" -f $pairs, $cmp, $pend)
+    foreach ($w in $pendWhy) { Write-Host "    pending: $w" -ForegroundColor Yellow }
+    if ($cmp -eq 0) { Write-Host "  nothing comparable yet - no PASS can be given." -ForegroundColor Yellow; return }
+    Write-Host ("  live events compared: {0}" -f $liveN)
+    if ($okRows.Count) {
+        $bm = $okRows | Group-Object { RowLabel $_ } | Sort-Object Name | ForEach-Object { "$($_.Name) $($_.Count)" }
+        Write-Host ("  by model: " + ($bm -join '  |  '))
     }
-    Write-Host ("  live rows  : {0} total  ->  comparable {1}  |  after rebuild {2}  |  other version {3}  |  aged out {4}" -f `
-                $live.Count, $ok.Count, $after.Count, $other.Count, $aged.Count)
-    if ($after.Count -gt 0) {
-        Write-Host "  (after-rebuild rows are checked by the NEXT reload, not this one)" -ForegroundColor DarkGray
-    }
-    if ($ok.Count -gt 0) {
-        # Coverage matters as much as the count: a PASS on one model says
-        # nothing about the others' live paths.
-        $bm = $ok | Group-Object { $c = $_.Row -split ','; if ($c[1] -eq 'LIQ') { "LIQ $($c[5]) $($c[6])" } else { $c[6] } } |
-              Sort-Object Name | ForEach-Object { "$($_.Name) $($_.Count)" }
-        Write-Host ("  comparable by model: " + ($bm -join '  |  '))
-    }
-    if ($ok.Count -eq 0) {
-        Write-Host "  nothing comparable yet. Let live marks accumulate, THEN reload once, THEN run this." -ForegroundColor Yellow
-        return
-    }
-
-    # cycle_id / block_id are init-relative sequence numbers (A-20); compare
-    # the event itself.
-    $buildKey = @{}
-    foreach ($r in $build) { $buildKey[(Key $r)] = $r }
-    $liveKey = @{}
-    foreach ($r in $ok) { $liveKey[(Key $r.Row)] = $r.Row }
-    $missing = @($liveKey.Keys | Where-Object { -not $buildKey.ContainsKey($_) })
-    if ($missing.Count -eq 0) {
-        Write-Host "  ALL $($liveKey.Count) COMPARABLE LIVE MARKS SURVIVED THE REBUILD - no sign of a future leak." -ForegroundColor Green
+    if ($bad.Count -eq 0) {
+        Write-Host "  AGREE BOTH WAYS on every covered bar (live -> rebuild and rebuild -> live)." -ForegroundColor Green
+        if ($pend -gt 0) { Write-Host "  (the pending pairs above are NOT included in this result)" -ForegroundColor Yellow }
     } else {
-        Write-Host "  $($missing.Count) comparable LIVE mark(s) do NOT appear in the rebuild:" -ForegroundColor Red
-        $missing | Select-Object -First 20 | ForEach-Object { Write-Host "    $($liveKey[$_])" }
+        Write-Host "  $($bad.Count) MISMATCH(ES) on covered bars:" -ForegroundColor Red
+        $bad | Select-Object -First 20 | ForEach-Object { Write-Host ("    {0,-10} [{1}] {2}" -f $_.Side, $_.Pair, $_.Row) }
         $out = Join-Path $dir ("live_vs_build_diff_" + ($src -replace '[^A-Za-z0-9]','_') + ".txt")
-        $missing | ForEach-Object { $liveKey[$_] } | Set-Content $out
+        $bad | ForEach-Object { "{0,-10} {1} {2}" -f $_.Side, $_.Pair, $_.Row } | Set-Content $out
         Write-Host "  written to $out" -ForegroundColor Red
-        Write-Host "  same version, emitted before the rebuild, inside its window: this IS the signal." -ForegroundColor Red
     }
 }
 
@@ -596,111 +639,74 @@ function Show-Reload([string]$src) {
     Write-Host "`n--- $src : comparing the last two builds ---" -ForegroundColor Cyan
     if ($sel.Count -lt 2) {
         Write-Host "  only $($sel.Count) block(s); 2 are needed." -ForegroundColor Red
-        Write-Host "  force a rebuild on THAT chart: switch timeframe away and back." -ForegroundColor Yellow
+        Write-Host "  force a rebuild on THAT chart: Ctrl+I -> HMI -> Properties -> OK." -ForegroundColor Yellow
         return
     }
     $A = $sel[-2]; $B = $sel[-1]
-    Write-Host "  run1 $($A.Head)"
-    Write-Host "  run2 $($B.Head)"
-    # Across the v2.42 upgrade only one side has LIQ rows. That is the new
-    # feature, not a repaint - compare the MODEL rows, which BRI-09 S-1 says
-    # must be untouched, and say so.
-    $la = @($A.Rows | Where-Object { $_ -match '^[^,]*,LIQ,' }).Count
-    $lb = @($B.Rows | Where-Object { $_ -match '^[^,]*,LIQ,' }).Count
-    if (($la -eq 0) -ne ($lb -eq 0)) {
-        Write-Host "  only one build has LIQ rows (version upgrade) - comparing MODEL rows only" -ForegroundColor Yellow
-        $A = [pscustomobject]@{ Src = $A.Src; Head = $A.Head; Tail = $A.Tail; Rows = @($A.Rows | Where-Object { $_ -match '^[^,]*,MODEL,' }) }
-        $B = [pscustomobject]@{ Src = $B.Src; Head = $B.Head; Tail = $B.Tail; Rows = @($B.Rows | Where-Object { $_ -match '^[^,]*,MODEL,' }) }
+    Write-Host "  A  $(BlockLabel $A)"
+    Write-Host "  B  $(BlockLabel $B)"
+
+    if ($A.Ver -ne $B.Ver) {
+        # Not a repaint test at all. The MODEL rows are still worth comparing
+        # as a regression check of the upgrade, labelled as exactly that.
+        Write-Host "  DIFFERENT VERSIONS - this is not a repaint test." -ForegroundColor Yellow
+        $ma = @($A.Rows | Where-Object { $_ -match '^[^,]*,MODEL,' }); $mb = @($B.Rows | Where-Object { $_ -match '^[^,]*,MODEL,' })
+        $rs = $A.WarmEnd; if ($B.WarmEnd -gt $rs) { $rs = $B.WarmEnd }
+        $rs = $rs.AddMinutes(5); $re = $A.To; if ($B.To -lt $re) { $re = $B.To }; $re = $re.AddMinutes(5)
+        $d = @(DiffRows ($ma | Where-Object { $t = RowTime $_; $t -ge $rs -and $t -le $re }) ($mb | Where-Object { $t = RowTime $_; $t -ge $rs -and $t -le $re }))
+        Write-Host ("  upgrade regression, MODEL rows between both warm-ups and both ends: {0} difference(s)" -f $d.Count) -ForegroundColor $(if ($d.Count) { 'Yellow' } else { 'Green' })
+        $d | Select-Object -First 20 | ForEach-Object { Write-Host "    $($_.Side)  $($_.Row)" }
+        return
     }
-    if ($A.Head -ne $B.Head) {
-        Write-Host "  WINDOW MOVED between runs - differences at the OLDEST edge are expected," -ForegroundColor Yellow
-        Write-Host "  anywhere else is not." -ForegroundColor Yellow
+    $known = ($A.Params -ne '?' -and $B.Params -ne '?')
+    if ($known -and $A.Params -ne $B.Params) {
+        Write-Host "  DIFFERENT PARAMETERS ($($A.Params) vs $($B.Params)) - builds are not comparable." -ForegroundColor Yellow
+        return
     }
-    $diff = Compare-Object $A.Rows $B.Rows
-    if (-not $diff) {
-        Write-Host "  IDENTICAL - $($A.Rows.Count) rows match exactly. No repaint." -ForegroundColor Green
-    } elseif (-not (Compare-Object ($A.Rows | ForEach-Object { Key $_ }) ($B.Rows | ForEach-Object { Key $_ }))) {
-        # Every event matches once the sequence ids are set aside. That is
-        # renumbering, not a repaint: the window slid, an id-allocating event
-        # dropped off the oldest edge, and every later id shifted down.
-        Write-Host "  IDENTICAL apart from cycle_id / block_id - $($A.Rows.Count) rows." -ForegroundColor Green
-        Write-Host "  the window moved and the sequence ids renumbered. No repaint." -ForegroundColor Green
+
+    # Comparable region: after BOTH real warm-ups, up to the older end. When
+    # the two windows start differently, state carried from before the later
+    # start (a session, a cycle, a context leg) can still differ for a while;
+    # the first -SettleHours are therefore PENDING REVIEW - reported, never
+    # passed - rather than explained away.
+    $rs = $A.WarmEnd; if ($B.WarmEnd -gt $rs) { $rs = $B.WarmEnd }
+    $rs = $rs.AddMinutes(5)
+    $moved = ($A.From -ne $B.From)
+    if ($moved) { $rs = $rs.AddHours($SettleHours) }
+    $re = $A.To; if ($B.To -lt $re) { $re = $B.To }; $re = $re.AddMinutes(5)
+    $why = 'same window'; if ($moved) { $why = "window moved: both warm-ups + $SettleHours h settle" }
+    Write-Host ("  comparable region: {0} .. {1}  ({2})" -f $rs.ToString('yyyy.MM.dd HH:mm'), $re.ToString('yyyy.MM.dd HH:mm'), $why)
+    $inA = @($A.Rows | Where-Object { $t = RowTime $_; $t -ge $rs -and $t -le $re }).Count
+    $inB = @($B.Rows | Where-Object { $t = RowTime $_; $t -ge $rs -and $t -le $re }).Count
+    Write-Host ("  events inside it: A {0} / B {1}" -f $inA, $inB)
+
+    $cls = @()
+    foreach ($d in (DiffRows $A.Rows $B.Rows)) {
+        $c = 'MISMATCH'
+        if     ($d.Time -lt $rs) { $c = 'pending (before region)' }
+        elseif ($d.Time -gt $re) { $c = 'beyond one build' }
+        $cls += [pscustomobject]@{ Class = $c; Side = $d.Side; Time = $d.Time; Row = $d.Row }
+    }
+    foreach ($g in ($cls | Group-Object Class | Sort-Object Name)) {
+        $col = 'Yellow'; if ($g.Name -eq 'MISMATCH') { $col = 'Red' } elseif ($g.Name -eq 'beyond one build') { $col = 'DarkGray' }
+        Write-Host ("    {0,-24} {1,4}" -f $g.Name, $g.Count) -ForegroundColor $col
+    }
+    $mm   = @($cls | Where-Object Class -eq 'MISMATCH')
+    $pend = @($cls | Where-Object Class -eq 'pending (before region)')
+    if ($mm.Count -gt 0) {
+        Write-Host "  $($mm.Count) event(s) differ INSIDE the comparable region - repaint or non-determinism:" -ForegroundColor Red
+        $mm | Select-Object -First 20 | ForEach-Object { Write-Host ("    {0}  {1}" -f $_.Side, $_.Row) }
+    } elseif ($pend.Count -gt 0 -or -not $known -or $A.WarmEst -or $B.WarmEst) {
+        Write-Host "  no difference inside the comparable region - PENDING REVIEW, not a pass:" -ForegroundColor Yellow
+        if ($pend.Count)            { Write-Host "    $($pend.Count) difference(s) before the region need a look (see file)" -ForegroundColor Yellow }
+        if (-not $known)            { Write-Host "    parameter digest not logged (pre-v2.44 build)" -ForegroundColor Yellow }
+        if ($A.WarmEst -or $B.WarmEst) { Write-Host "    warm-up end estimated, not logged (pre-v2.44 build)" -ForegroundColor Yellow }
     } else {
-        # Rows differ even with ids set aside. When the window moved, most of
-        # that is explained by where each build STARTS, so classify every
-        # difference instead of dumping the raw diff (whose ids have all
-        # shifted and tell you nothing):
-        #   aged out   - only in the older build, bar is before the new window
-        #   warm-up    - only in the older build, inside the new build's first
-        #                $Warmup bars, where it builds structure but marks nothing
-        #   carried    - only in the older build, from a cycle whose first mark
-        #                already falls before the new build's warm-up ended:
-        #                that cycle began before the new build could see it
-        #   new bars   - only in the newer build, after the older build's end
-        #   LOOK       - anything else. This is where a real repaint would be.
-        $ic = [Globalization.CultureInfo]::InvariantCulture
-        function HeadTime([string]$h, [string]$which) {
-            if ($h -match "$which=([0-9.]+ [0-9:]+)") { return [datetime]::ParseExact($Matches[1], 'yyyy.MM.dd HH:mm', $ic) }
-            return [datetime]::MinValue
-        }
-        function RowTime([string]$r) {
-            $t = [datetime]::MinValue
-            [void][datetime]::TryParseExact((($r -split ',')[7]), 'yyyy.MM.dd HH:mm:ss', $ic, [Globalization.DateTimeStyles]::None, [ref]$t)
-            return $t
-        }
-        $bFrom = HeadTime $B.Head 'from'
-        $aTo   = (HeadTime $A.Head 'to').AddMinutes(5)
-        $wEnd  = $bFrom.AddMinutes(5 * $Warmup)          # approximate: assumes no gap in those bars
-
-        $ka = @{}; foreach ($r in $A.Rows) { $ka[(Key $r)] = $r }
-        $kb = @{}; foreach ($r in $B.Rows) { $kb[(Key $r)] = $r }
-        $first = @{}
-        foreach ($r in $A.Rows) {
-            $cy = ($r -split ',')[3]; $t = RowTime $r
-            if (-not $first.ContainsKey($cy) -or $t -lt $first[$cy]) { $first[$cy] = $t }
-        }
-        # The newer build cannot have a counterpart for anything before it has
-        # produced a single mark: after warm-up it still has to touch a POI,
-        # open a session, form a block and ARM before any cycle exists, while
-        # the older build may already be mid-cycle. Rows in that stretch are
-        # 'converging'. The window is only the head of the build, so a repaint
-        # in the middle still lands in LOOK.
-        $bFirst = [datetime]::MaxValue
-        foreach ($r in $B.Rows) { $t = RowTime $r; if ($t -gt [datetime]::MinValue -and $t -lt $bFirst) { $bFirst = $t } }
-
-        $cls = @()
-        foreach ($k in $ka.Keys) {
-            if ($kb.ContainsKey($k)) { continue }
-            $r = $ka[$k]; $t = RowTime $r; $cy = ($r -split ',')[3]
-            $c = 'LOOK'
-            if     ($t -le $bFrom)          { $c = 'aged out' }
-            elseif ($t -le $wEnd)           { $c = 'warm-up' }
-            elseif ($first[$cy] -le $wEnd)  { $c = 'carried' }
-            elseif ($t -lt $bFirst)         { $c = 'converging' }
-            $cls += [pscustomobject]@{ Side = 'old only'; Class = $c; Time = $t; Row = $r }
-        }
-        foreach ($k in $kb.Keys) {
-            if ($ka.ContainsKey($k)) { continue }
-            $r = $kb[$k]; $t = RowTime $r
-            $c = 'LOOK'
-            if ($t -gt $aTo) { $c = 'new bars' }
-            $cls += [pscustomobject]@{ Side = 'new only'; Class = $c; Time = $t; Row = $r }
-        }
-        $cls = $cls | Sort-Object Time
-        Write-Host ("  {0} rows differ once ids are ignored (warm-up assumed {1} bars, new warm-up ends ~{2}, newer build's first mark {3})" -f `
-                    $cls.Count, $Warmup, $wEnd.ToString('yyyy.MM.dd HH:mm'), $bFirst.ToString('yyyy.MM.dd HH:mm')) -ForegroundColor Yellow
-        foreach ($g in ($cls | Group-Object Class | Sort-Object Name)) {
-            Write-Host ("    {0,-9} {1,4}" -f $g.Name, $g.Count) -ForegroundColor $(if ($g.Name -eq 'LOOK') { 'Red' } else { 'Green' })
-        }
-        $look = @($cls | Where-Object Class -eq 'LOOK')
-        if ($look.Count -eq 0) {
-            Write-Host "  every difference is explained by where each build starts or ends. No repaint." -ForegroundColor Green
-        } else {
-            Write-Host "  unexplained - inspect these:" -ForegroundColor Red
-            $look | Select-Object -First 20 | ForEach-Object { Write-Host ("    {0}  {1}" -f $_.Side, $_.Row) }
-        }
+        Write-Host "  IDENTICAL inside the comparable region - no repaint found there." -ForegroundColor Green
+    }
+    if ($cls.Count) {
         $out = Join-Path $dir ("reload_diff_" + ($src -replace '[^A-Za-z0-9]','_') + ".txt")
-        $cls | ForEach-Object { "{0,-9} {1,-8} {2}" -f $_.Class, $_.Side, $_.Row } | Set-Content $out
+        $cls | ForEach-Object { "{0,-24} {1,-7} {2}" -f $_.Class, $_.Side, $_.Row } | Set-Content $out
         Write-Host "  classified diff written to $out" -ForegroundColor DarkGray
     }
 }

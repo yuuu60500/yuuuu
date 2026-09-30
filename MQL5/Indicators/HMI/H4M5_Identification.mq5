@@ -9,7 +9,7 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "2.40"
+#property version   "2.44"          // keep equal to HMI_VERSION (HMI_Defs.mqh)
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window
@@ -216,27 +216,66 @@ void ResetEngine()
    OM_RecreateMarker();
   }
 
+//--- build identity for the reload / live-vs-build checks -----------
+// Two builds are only comparable when the same rules ran on the same
+// settings. The digest covers every input that can change a mark, a
+// context event or a liquidity event - and nothing that only changes how
+// they are drawn or alerted - so a colour change does not make two builds
+// "different", while a margin change does.
+int g_build_seq = 0;
+
+string ParamsDigest()
+  {
+   string s = StringFormat("%d|%d|%d|%d|%.8f|%d|%.8f|%d|%.8f|%d|%.8f|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%.8f|%.8f|%.8f|%d|%.8f|%d|%d",
+      InpMaxHistoryBarsM5, InpMaxHistoryBarsH4, InpWarmupSuppressBars,
+      (int)InpBreakMarginMode, InpBreakMarginPips, InpBreakMarginPoints, InpBreakMarginATRFrac,
+      InpH4OBtoFVGMaxBars, InpH4ConnectTolerancePips, InpM5OBtoFVGMaxBars, InpM5ConnectTolerancePips,
+      InpH4SwingLeft, InpH4SwingRight, InpH4MaxPOIs, InpH4POIMaxAgeBars, InpH4TransitionMaxBars,
+      InpPOIMaxSessions, InpM5SwingLeft, InpM5SwingRight, InpM5RefinementMaxBars,
+      InpM5BlockLookbackFromTouch, InpM5MaxBlocks, (int)InpEnableBreaker,
+      InpCISDLookbackBars, InpSetupWindowBars, (int)InpBPRRequireBothLegsAfterArmed,
+      (int)InpBPREarlyLegFromSessionStart, (int)InpPAAllowArmedBarConfirm,
+      (int)InpStopIdentificationOnBlockInvalidation, InpMaxCyclesKept,
+      InpPAEngulfMinBodyRatio, InpPARejWickToBody, InpPARejWickToRange,
+      InpPABreakRetestMaxBars, InpPARetestTolerancePips,
+      InpLiqSweepReclaimBars, (int)InpPDSkipSunday);
+   uint h = (uint)0x811C9DC5;               // FNV-1a, 32 bit (offset basis)
+   for(int i = 0; i < StringLen(s); i++)
+     {
+      h ^= (uint)StringGetCharacter(s, i);
+      h *= 16777619;
+     }
+   return(StringFormat("%08X", h));
+  }
+
 void BuildHistory()
   {
    g_live = false;
    g_log_count = 0;
+   g_build_seq++;
 
    // Bracketing the build makes the reload comparison self-verifying: the
    // two markers delimit each run's block, and from=/to= expose a window
    // that slid because a new M5 bar closed between runs - which would
    // otherwise look like a repaint at the oldest edge.
+   // warmup_end is the OPEN time of the first bar allowed to mark - read
+   // from the data, not estimated as from + N x 5 min, which a weekend or
+   // any gap in the M5 feed would make wrong.
+   int wi = MathMin(MathMax(0, InpWarmupSuppressBars), g_m5_n - 1);
    if(InpLogSignals)
-      PrintFormat("HMI-BUILD-BEGIN,%s,m5_bars=%d,h4_bars=%d,from=%s,to=%s",
+      PrintFormat("HMI-BUILD-BEGIN,%s,m5_bars=%d,h4_bars=%d,from=%s,to=%s,ver=%s,params=%s,inst=%s,build=%d,warmup_end=%s",
                   _Symbol, g_m5_n, g_h4_n,
                   TimeToString(g_m5[0].time, TIME_DATE|TIME_MINUTES),
-                  TimeToString(g_m5[g_m5_n-1].time, TIME_DATE|TIME_MINUTES));
+                  TimeToString(g_m5[g_m5_n-1].time, TIME_DATE|TIME_MINUTES),
+                  HMI_VERSION, ParamsDigest(), g_inst, g_build_seq,
+                  TimeToString(g_m5[wi].time, TIME_DATE|TIME_MINUTES));
 
    for(int n = 0; n < g_m5_n; n++) ProcessClosedM5Bar(n);
    g_live = true;
 
    if(InpLogSignals)
-      PrintFormat("HMI-BUILD-END,%s,marks=%d,cycles=%d,pois=%d,blocks=%d",
-                  _Symbol, g_log_count, g_cyc_n, g_poi_n, g_blk_n);
+      PrintFormat("HMI-BUILD-END,%s,marks=%d,cycles=%d,pois=%d,blocks=%d,build=%d",
+                  _Symbol, g_log_count, g_cyc_n, g_poi_n, g_blk_n, g_build_seq);
    g_alertq_n = 0;                     // historical build never alerts
    OM_SyncAll();
    OM_Trim();
