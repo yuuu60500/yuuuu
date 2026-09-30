@@ -543,6 +543,16 @@ function Show-Reload([string]$src) {
     $A = $sel[-2]; $B = $sel[-1]
     Write-Host "  run1 $($A.Head)"
     Write-Host "  run2 $($B.Head)"
+    # Across the v2.42 upgrade only one side has LIQ rows. That is the new
+    # feature, not a repaint - compare the MODEL rows, which BRI-09 S-1 says
+    # must be untouched, and say so.
+    $la = @($A.Rows | Where-Object { $_ -match '^[^,]*,LIQ,' }).Count
+    $lb = @($B.Rows | Where-Object { $_ -match '^[^,]*,LIQ,' }).Count
+    if (($la -eq 0) -ne ($lb -eq 0)) {
+        Write-Host "  only one build has LIQ rows (version upgrade) - comparing MODEL rows only" -ForegroundColor Yellow
+        $A = [pscustomobject]@{ Src = $A.Src; Head = $A.Head; Tail = $A.Tail; Rows = @($A.Rows | Where-Object { $_ -match '^[^,]*,MODEL,' }) }
+        $B = [pscustomobject]@{ Src = $B.Src; Head = $B.Head; Tail = $B.Tail; Rows = @($B.Rows | Where-Object { $_ -match '^[^,]*,MODEL,' }) }
+    }
     if ($A.Head -ne $B.Head) {
         Write-Host "  WINDOW MOVED between runs - differences at the OLDEST edge are expected," -ForegroundColor Yellow
         Write-Host "  anywhere else is not." -ForegroundColor Yellow
