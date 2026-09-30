@@ -822,3 +822,30 @@ MQL 实现仍需按下方 v2.46 验收清单实测。
           `-Chain` 各品种「未触碰、INVALID、Context 同向」仍为 0
           v2.43 → v2.46 跨版本：MODEL 行只允许在窗口起点附近变化（M5 起点对齐）
 ```
+
+
+### v2.48 验收清单（替代上面的 v2.46 清单；只验收本轮缺陷修复，不含趋势升级）
+
+```
+0  编译 0 errors / 0 warnings（截图）
+1  版本：每张图 `starting on` 与 BEGIN 行 ver= 均为 2.48
+2  多实例：`Select-String -Path .\20*.log -Pattern ',inst=' | Select-Object -First 3` 有输出；
+          同一品种同一周期挂两个实例时，脚本提示 split as SYMBOL#INSTANCE
+3  共用 M5：BEGIN 行 from= 回到未对齐的原始起点（不再落在 00/04/08… 整点）
+4  流动性回放：`Select-String -Path .\20*.log -Pattern 'HMI-LIQ-REPLAY' | Select-Object -Last 8`
+          have_from 早于或等于 need_from，unknown=0；unknown>0 时说明终端 M5 历史不够远
+5  同版本重载：同一张图重载两次 → `-Source "<图>,M5"`
+          同一窗口：IDENTICAL inside the comparable region
+          窗口移动：区间内 0 MISMATCH；区间前差异为 PENDING REVIEW
+6  实时 vs 重建：挂一段时间后 `-LiveVsBuild`，双向 0 MISMATCH
+7  回归：`HMI-GUARD` 0 行；`-Chain` 各品种「未触碰、INVALID、Context 同向」0
+          v2.43 → v2.48 跨版本：MODEL 行 upgrade regression 0 difference
+          （v2.47 撤销了 M5 裁剪，模型标记应与 v2.43 完全一致）
+```
+
+回放证据（规则层模型 `tools/liq_reload_sim.py`；不替代以上实测）：
+```
+PIPS  v2.42 4/18 · v2.46 0/18 · v2.47 0/18
+ATR   v2.42 4/18 · v2.46 0/18 · v2.47 0/18
+ATR 系数 2.0 定向：v2.46 2/48（PMH BROKEN 仅连续运行有）· v2.47 0/48
+```
