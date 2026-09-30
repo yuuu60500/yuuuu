@@ -778,3 +778,15 @@ Replay:                NOT VERIFIED
 6  回归：v2.40 的 MODEL 标记在 v2.42 重建中不变（S-1 只标记）——
    用 v2.40 与 v2.42 各一次重建的 MODEL 行对比
 ```
+
+
+### ✅ v2.42 回归 —— MODEL 标记不受 BRI-09 影响（2026-09-30，USDJPY,M5）
+
+```
+run1  v2.40  from=2026.09.07 03:40  to=2026.09.30 12:35
+run2  v2.42  from=2026.09.07 05:25  to=2026.09.30 14:20   246 行（MODEL 205 + LIQ 41）
+only one build has LIQ rows (version upgrade) - comparing MODEL rows only
+IDENTICAL apart from cycle_id / block_id - 205 rows. No repaint.
+```
+
+S-1（只标记、不过滤）实测成立：加入 PD/PW/PM 与 sweep 判定后，模型标记逐行不变。
