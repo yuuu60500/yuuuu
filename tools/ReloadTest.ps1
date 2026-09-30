@@ -168,7 +168,14 @@ if ($Chain) {
     }
     if ($last.Count -eq 0) { Write-Host "`nno complete rebuild found." -ForegroundColor Red; exit }
     $any = $false
-    foreach ($src in ($last.Keys | Sort-Object)) {
+    $chainSrc = @($last.Keys | Sort-Object)
+    if ($Source -ne "") {
+        # one chart per run keeps each result to one screen - long output
+        # only ends up in stitched screenshots that mix charts up
+        if ($last.Keys -notcontains $Source) { Write-Host "`n'$Source' has no complete rebuild. Charts: $($chainSrc -join ', ')" -ForegroundColor Red; exit }
+        $chainSrc = @($Source)
+    }
+    foreach ($src in $chainSrc) {
         $L = $last[$src].Lines
         $diag = @($L | Where-Object { $_ -match '^HMI-(POI|SESS|BLK|ARM),' })
         Write-Host "`n--- $src   rebuild to=$($last[$src].To)" -ForegroundColor Cyan
