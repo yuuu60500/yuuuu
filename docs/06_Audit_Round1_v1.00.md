@@ -1210,5 +1210,22 @@ Recommended Fix:         仅加诊断日志（v2.41，不改任何判断）：PO
                          Session 开始/结束及原因，block ARMED。重建会立即输出整个窗口的链条，
                          无需等待实时。需用户签字（会使 Future Leak 样本在 v2.41 重新累积）。
 Status:                  **Potential Risk —— 诊断日志已加入 v2.41（用户 2026-09-30 签字），待实测**
+
+v2.42 首次 `-Chain`（2026-09-30，最近一次完整重建，窗口约 09.04–09.30）：
+  品种     POI(窗口/自最后标记)  Session   Block   ARMED   标记
+  AUDUSD        27 / 1           4 / 0    52 / 0  40 / 0   130
+  EURUSD        26 / 1           3 / 0    46 / 3  41 / 0   121
+  GBPUSD        20 / 3           1 / 0    20 / 0  18 / 0    54
+  NZDUSD        27 / 1           2 / 0    27 / 0  25 / 0    81
+  USDCAD        21 / 1           4 / 0    58 / 0  48 / 0   161
+  USDCHF        21 / —           0 / —     0 / —   0 / —     0
+  XAUUSD        25 / 0           4 / 0    50 / 0  41 / 0   130
+  → 7 个品种中 6 个停在「POI 被触碰 → Session」，XAUUSD 停在「POI 生成」。
+    Session 本身稀少（整窗 0–4 次），POI → Session 是全链最窄的一环。
+  USDCHF：21 个 POI 从未开过 Session；其中 13 个在 ACTIVE（未触碰）状态下被 H4 收盘击穿。
+    被击穿意味着价格穿过了它 —— 若期间 Context 一直与 POI 同向，应当有 M5 触碰。
+  下一步：`-Chain` 新增「POI 去向」，把未触碰即失效的 POI 分成
+    「Context 先离开同向（BRI-07(a) 可解释）」与「Context 全程同向（可疑）」两类。
+  USDJPY 的 v2.42 重建当时尚未完整写入日志，未纳入。
 Confidence:              MEDIUM（现象确定，原因未知）
 ```

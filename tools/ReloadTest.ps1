@@ -177,6 +177,7 @@ if ($Chain) {
         $marks = @($L | Where-Object { $_ -match '^HMI-BUILD,[^,]*,MODEL,' } | ForEach-Object { ($_ -split ',')[8] })
         $liq   = @($L | Where-Object { $_ -match '^HMI-BUILD,[^,]*,LIQ,' })
         $nm = if ($marks.Count) { @($marks | Sort-Object)[-1].Substring(0, 16) } else { '0000' }
+        $nmLabel = if ($marks.Count) { "since $nm" } else { 'since start' }
         function Bar([string]$m) { if ($m -match 'bar=([0-9.: ]+)') { $Matches[1].Trim() } else { '' } }
         $steps = [ordered]@{
             'POI created'              = '^HMI-POI,[^,]*,NEW,'
@@ -184,7 +185,7 @@ if ($Chain) {
             'M5 block (trend dir)'     = '^HMI-BLK,.*,counter=0,'
             'block ARMED'              = '^HMI-ARM,'
         }
-        Write-Host ("  {0,-26} {1,8} {2,14}" -f 'step', 'window', "since $nm") -ForegroundColor DarkGray
+        Write-Host ("  {0,-26} {1,8} {2,14}" -f 'step', 'window', $nmLabel) -ForegroundColor DarkGray
         $stop = ''
         foreach ($k in $steps.Keys) {
             $all1 = @($diag | Where-Object { $_ -match $steps[$k] })
@@ -204,6 +205,42 @@ if ($Chain) {
         $ends = @($diag | Where-Object { $_ -match '^HMI-SESS,[^,]*,END,' -and (Bar $_) -gt $nm } |
                   ForEach-Object { if ($_ -match 'reason=([A-Z_]+)') { $Matches[1] } })
         if ($ends.Count) { Write-Host "  sessions ended since     : $((($ends | Group-Object | ForEach-Object { "$($_.Name) x$($_.Count)" }) -join ', '))" }
+        # POI fate over the whole window. A POI can only be INVALIDATED by an
+        # H4 close beyond its far edge, so price crossed it; if the context
+        # agreed with the POI for its whole life, some M5 bar should have
+        # touched it and opened a session. One that was never touched in that
+        # case is the evidence A-37 is looking for. Where the context left the
+        # POI's direction first, BRI-07(a) explains the missing touch.
+        $ctxEv = @($L | Where-Object { $_ -match '^HMI-CTX,' } | ForEach-Object {
+                     if ($_ -match 'ctx=([A-Z_]+).*,bar=([0-9.: ]+),') { [pscustomobject]@{ Bar = $Matches[2].Trim(); Ctx = $Matches[1] } } })
+        $touched = @{}
+        foreach ($x in $diag) { if ($x -match '^HMI-SESS,[^,]*,START,.*poi=(\d+)') { $touched[$Matches[1]] = $true } }
+        $pois = [ordered]@{}
+        foreach ($x in $diag) {
+            if ($x -match '^HMI-POI,[^,]*,NEW,id=(\d+),dir=(-?\d+),.*bar=([0-9.: ]+)$') {
+                $pois[$Matches[1]] = [pscustomobject]@{ Id = $Matches[1]; Dir = [int]$Matches[2]; Born = $Matches[3].Trim(); End = ''; How = '' }
+            } elseif ($x -match '^HMI-POI,[^,]*,(INVALID|EXPIRED|OUT),id=(\d+),.*bar=([0-9.: ]+)$') {
+                if ($pois.Contains($Matches[2]) -and -not $pois[$Matches[2]].End) { $pois[$Matches[2]].End = $Matches[3].Trim(); $pois[$Matches[2]].How = $Matches[1] }
+            }
+        }
+        $fate = [ordered]@{ 'touched (session)' = 0; 'untouched, context left first' = 0; 'untouched, INVALID, context agreed' = 0; 'untouched, expired / out' = 0; 'still active' = 0 }
+        $sus = @()
+        foreach ($p in $pois.Values) {
+            if ($touched.ContainsKey($p.Id)) { $fate['touched (session)']++; continue }
+            if (-not $p.End)                 { $fate['still active']++; continue }
+            if ($p.How -ne 'INVALID')        { $fate['untouched, expired / out']++; continue }
+            $want = if ($p.Dir -gt 0) { 'BULLISH' } else { 'BEARISH' }
+            $left = @($ctxEv | Where-Object { $_.Bar -gt $p.Born -and $_.Bar -lt $p.End -and $_.Ctx -ne $want }).Count
+            if ($left -gt 0) { $fate['untouched, context left first']++ }
+            else { $fate['untouched, INVALID, context agreed']++; $sus += $p }
+        }
+        Write-Host "  POI fate (whole window):" -ForegroundColor DarkGray
+        foreach ($k in $fate.Keys) {
+            Write-Host ("      {0,-36} {1,4}" -f $k, $fate[$k]) -ForegroundColor $(if ($k -like '*agreed*' -and $fate[$k] -gt 0) { 'Red' } else { 'Gray' })
+        }
+        foreach ($p in ($sus | Select-Object -First 5)) {
+            Write-Host ("        id={0} dir={1} created {2} -> INVALID {3}" -f $p.Id, $p.Dir, $p.Born, $p.End) -ForegroundColor Red
+        }
         if ($stop) { Write-Host "  since the last mark the chain stops at: $stop" -ForegroundColor Yellow }
         else       { Write-Host "  every link fired since the last mark; the model step produced nothing" -ForegroundColor Yellow }
     }
