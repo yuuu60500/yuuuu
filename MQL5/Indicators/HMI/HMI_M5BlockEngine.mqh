@@ -23,6 +23,11 @@ int BlkPush(const M5Block &b)
      }
    g_blk[g_blk_n] = b;
    g_blk_n++;
+   if(InpLogSignals)                     // A-37 diagnostic, log only
+      PrintFormat("HMI-BLK,%s,NEW,id=%I64d,sess=%I64d,dir=%d,type=%s,counter=%d,bar=%s",
+                  _Symbol, b.id, b.session_id, b.dir,
+                  (b.block_type == BT_M5_OB ? "OB" : "BREAKER"),
+                  (b.counter_dir ? 1 : 0), DiagT(b.confirm_time));
    return(g_blk_n - 1);
   }
 
@@ -42,6 +47,9 @@ void SessionEndNow(const SessionEnd reason, const datetime t)
    g_sess.active     = false;
    g_sess.end_time   = t;
    g_sess.end_reason = reason;
+   if(InpLogSignals)                     // A-37 diagnostic, log only
+      PrintFormat("HMI-SESS,%s,END,id=%I64d,poi=%I64d,dir=%d,reason=%s,bar=%s",
+                  _Symbol, g_sess.id, g_sess.poi_id, g_sess.dir, SessEndName(reason), DiagT(t));
    SessionExpireOpenBlocks();     // ARMED blocks / cycles are NOT touched (Rule 15)
 
    // A-06 (opt-in, default off): only a TIMEOUT may hand the POI back.
@@ -67,6 +75,10 @@ void SessionStart(const int poi_idx, const int n)
    g_sess.end_reason  = SE_NONE;
    g_sess.active      = true;
    g_poi[poi_idx].session_count++;
+   if(InpLogSignals)                     // A-37 diagnostic, log only
+      PrintFormat("HMI-SESS,%s,START,id=%I64d,poi=%I64d,dir=%d,bar=%s",
+                  _Symbol, g_sess.id, g_sess.poi_id, g_sess.dir,
+                  DiagT(CloseTimeOf(g_m5[n].time, PERIOD_M5)));
   }
 
 // Phase 0b (signed 2026-09-24): runs right after H4 sync, BEFORE Phase 1

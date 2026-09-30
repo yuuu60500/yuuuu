@@ -28,6 +28,12 @@ void POIPush(const H4POI &p)
       int drop = g_poi_n - cap;                 // oldest still inside the window
       if(SafeIdx(drop, g_poi_n))
         {
+         // A-37 diagnostic: the state it LEAVES in says whether a POI was
+         // pushed out before price ever reached it (ACTIVE) - log only.
+         if(InpLogSignals && !g_poi[drop].out_of_window)
+            PrintFormat("HMI-POI,%s,OUT,id=%I64d,dir=%d,was=%s,bar=%s",
+                        _Symbol, g_poi[drop].id, g_poi[drop].dir,
+                        PoiStateName(g_poi[drop].state), DiagT(p.confirm_time));
          if(g_poi[drop].state != POI_INVALID) g_poi[drop].state = POI_EXPIRED;
          g_poi[drop].out_of_window = true;      // drawing layer will drop its graphics
         }
@@ -49,6 +55,10 @@ void POIPush(const H4POI &p)
 
    g_poi[g_poi_n] = p;
    g_poi_n++;
+   if(InpLogSignals)
+      PrintFormat("HMI-POI,%s,NEW,id=%I64d,dir=%d,lo=%s,hi=%s,origin=%s,bar=%s",
+                  _Symbol, p.id, p.dir, DoubleToString(p.lo, _Digits),
+                  DoubleToString(p.hi, _Digits), DiagT(p.origin_time), DiagT(p.confirm_time));
   }
 
 // A-06 (opt-in): a session that ended on TIMEOUT may re-arm its POI, but
@@ -148,6 +158,9 @@ void POIInvalidateOnBar(const int h)
                   : BreakUp  (g_h4[h].close, g_poi[i].hi, mp);
       if(dead)
         {
+         if(InpLogSignals)
+            PrintFormat("HMI-POI,%s,INVALID,id=%I64d,dir=%d,was=%s,bar=%s",
+                        _Symbol, g_poi[i].id, g_poi[i].dir, PoiStateName(g_poi[i].state), DiagT(t));
          g_poi[i].state        = POI_INVALID;
          g_poi[i].invalid_time = t;
         }
@@ -157,7 +170,12 @@ void POIInvalidateOnBar(const int h)
      {
       if(g_poi[i].state != POI_ACTIVE) continue;
       if((long)(t - g_poi[i].confirm_time) > (long)InpH4POIMaxAgeBars * PeriodSeconds(PERIOD_H4))
+        {
+         if(InpLogSignals)
+            PrintFormat("HMI-POI,%s,EXPIRED,id=%I64d,dir=%d,was=ACTIVE,bar=%s",
+                        _Symbol, g_poi[i].id, g_poi[i].dir, DiagT(t));
          g_poi[i].state = POI_EXPIRED;
+        }
      }
   }
 

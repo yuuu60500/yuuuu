@@ -24,6 +24,9 @@
 #     .\ReloadTest.ps1 -Quiet                why a chart has had no mark lately:
 #                                            its context timeline since the last
 #                                            mark, and the POIs Rule 6 refused
+#     .\ReloadTest.ps1 -Chain                (v2.41+) where the mark chain stops:
+#                                            POI -> session -> block -> ARMED -> mark,
+#                                            counted over the latest rebuild
 #     .\ReloadTest.ps1 -Source "USDJPY,M5"   repaint test on that one chart
 #
 #     add  -Days 5  to merge the 5 most recent log files. MT5 starts a NEW
@@ -36,7 +39,7 @@
 #  hence the grouping below.
 # ============================================================
 param([string]$Source = "", [switch]$LiveVsBuild, [switch]$Rejects, [switch]$Live,
-      [switch]$Ctx, [switch]$Quiet, [int]$Days = 1, [string]$LogDir = "", [int]$Warmup = 100)
+      [switch]$Ctx, [switch]$Quiet, [switch]$Chain, [int]$Days = 1, [string]$LogDir = "", [int]$Warmup = 100)
 
 # Row layout after the tag is stripped:
 #   0 symbol  1 "MODEL"  2 dir  3 cycle_id  4 block_id  5 anchor  6 model
@@ -141,6 +144,61 @@ if ($Live) {
         Write-Host "wait a minute for the log to flush," -ForegroundColor Yellow
         Write-Host "then run:  .\ReloadTest.ps1 -LiveVsBuild -Days $Days" -ForegroundColor Yellow
     }
+    exit
+}
+
+# -Chain (v2.41+): the diagnostic lines HMI-POI / HMI-SESS / HMI-BLK / HMI-ARM
+# trace every link between a trend and a mark. Only the latest COMPLETE
+# rebuild of each chart is read: it covers the whole window in one pass, and
+# sequence ids differ between rebuilds (A-20), so mixing builds would count
+# the same POI twice.
+if ($Chain) {
+    $last = @{}; $cur = @{}
+    foreach ($l in $all) {
+        if ($l -notmatch '\(([A-Za-z0-9._#]+,[A-Za-z0-9]+)\)\s+(HMI.*)$') { continue }
+        $src = $Matches[1]; $msg = $Matches[2]
+        if ($msg -match '^HMI-BUILD-BEGIN,.*to=([0-9.: ]+)') { $cur[$src] = [pscustomobject]@{ To = $Matches[1].Trim(); Lines = New-Object System.Collections.ArrayList }; continue }
+        if (-not $cur.ContainsKey($src)) { continue }
+        if ($msg -match '^HMI-BUILD-END,') { $last[$src] = $cur[$src]; $cur.Remove($src); continue }
+        [void]$cur[$src].Lines.Add($msg)
+    }
+    if ($last.Count -eq 0) { Write-Host "`nno complete rebuild found." -ForegroundColor Red; exit }
+    $any = $false
+    foreach ($src in ($last.Keys | Sort-Object)) {
+        $L = $last[$src].Lines
+        $diag = @($L | Where-Object { $_ -match '^HMI-(POI|SESS|BLK|ARM),' })
+        Write-Host "`n--- $src   rebuild to=$($last[$src].To)" -ForegroundColor Cyan
+        if ($diag.Count -eq 0) { Write-Host "  no v2.41 diagnostic lines in this rebuild (older version on this chart?)" -ForegroundColor Yellow; continue }
+        $any = $true
+        $marks = @($L | Where-Object { $_ -match '^HMI-BUILD,' } | ForEach-Object { ($_ -split ',')[8] })
+        $nm = if ($marks.Count) { @($marks | Sort-Object)[-1].Substring(0, 16) } else { '0000' }
+        function Bar([string]$m) { if ($m -match 'bar=([0-9.: ]+)') { $Matches[1].Trim() } else { '' } }
+        $steps = [ordered]@{
+            'POI created'              = '^HMI-POI,[^,]*,NEW,'
+            'POI touched -> session'   = '^HMI-SESS,[^,]*,START,'
+            'M5 block (trend dir)'     = '^HMI-BLK,.*,counter=0,'
+            'block ARMED'              = '^HMI-ARM,'
+        }
+        Write-Host ("  {0,-26} {1,8} {2,14}" -f 'step', 'window', "since $nm") -ForegroundColor DarkGray
+        $stop = ''
+        foreach ($k in $steps.Keys) {
+            $all1 = @($diag | Where-Object { $_ -match $steps[$k] })
+            $aft  = @($all1 | Where-Object { (Bar $_) -gt $nm })
+            Write-Host ("  {0,-26} {1,8} {2,14}" -f $k, $all1.Count, $aft.Count)
+            if (-not $stop -and $aft.Count -eq 0) { $stop = $k }
+        }
+        Write-Host ("  {0,-26} {1,8} {2,14}" -f 'mark', $marks.Count, 0)
+        # what ended the POIs and sessions since the last mark
+        $out = @($diag | Where-Object { $_ -match '^HMI-POI,[^,]*,(INVALID|EXPIRED|OUT),' -and (Bar $_) -gt $nm } |
+                 ForEach-Object { if ($_ -match '^HMI-POI,[^,]*,([A-Z]+),.*was=([A-Z]+)') { "$($Matches[1]) (was $($Matches[2]))" } })
+        if ($out.Count) { Write-Host "  POIs lost since the mark : $((($out | Group-Object | ForEach-Object { "$($_.Name) x$($_.Count)" }) -join ', '))" }
+        $ends = @($diag | Where-Object { $_ -match '^HMI-SESS,[^,]*,END,' -and (Bar $_) -gt $nm } |
+                  ForEach-Object { if ($_ -match 'reason=([A-Z_]+)') { $Matches[1] } })
+        if ($ends.Count) { Write-Host "  sessions ended since     : $((($ends | Group-Object | ForEach-Object { "$($_.Name) x$($_.Count)" }) -join ', '))" }
+        if ($stop) { Write-Host "  since the last mark the chain stops at: $stop" -ForegroundColor Yellow }
+        else       { Write-Host "  every link fired since the last mark; the model step produced nothing" -ForegroundColor Yellow }
+    }
+    if (-not $any) { Write-Host "`nreload the charts on v2.41 first, then run this again." -ForegroundColor Yellow }
     exit
 }
 

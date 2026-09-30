@@ -1254,3 +1254,56 @@ Trading Logic Changed:
 Compile Status:
   PASS — 0 errors / 0 warnings（用户实测，2026-09-24，3138 ms，AVX2 + FMA3；v2.40 构建，涵盖 v2.34–v2.40）
 ```
+
+---
+
+## v2.41 — A-37 标记链诊断日志（仅日志）
+
+```
+Version:  v2.41
+Date:     2026-09-30
+签字:     用户 2026-09-30「好」（A-37 选项 b）
+
+New Log Lines（全部受 InpLogSignals 控制，任何引擎都不读取）:
+  HMI-POI,<sym>,NEW,id=,dir=,lo=,hi=,origin=,bar=<confirm>
+  HMI-POI,<sym>,OUT,id=,dir=,was=<离窗前状态>,bar=      被挤出 InpH4MaxPOIs 窗口
+  HMI-POI,<sym>,INVALID,id=,dir=,was=,bar=               H4 收盘击穿
+  HMI-POI,<sym>,EXPIRED,id=,dir=,was=ACTIVE,bar=          超过 InpH4POIMaxAgeBars
+  HMI-SESS,<sym>,START,id=,poi=,dir=,bar=                 POI 被触碰、Session 开始
+  HMI-SESS,<sym>,END,id=,poi=,dir=,reason=,bar=           POI_INVALID / CONTEXT_FLIP /
+                                                          CONTEXT_NEUTRAL / TIMEOUT / NEW_SESSION
+  HMI-BLK,<sym>,NEW,id=,sess=,dir=,type=OB|BREAKER,counter=,bar=
+  HMI-ARM,<sym>,block=,sess=,dir=,bar=
+
+Changed Functions（每处只增加一条 PrintFormat）:
+  POIPush()             NEW；离窗降级前记录 OUT（只记第一次离窗）
+  POIInvalidateOnBar()  INVALID / EXPIRED
+  SessionStart()        START
+  SessionEndNow()       END
+  BlkPush()             NEW
+  CycCreate()           ARMED
+  HMI_Util.mqh          新增 PoiStateName / SessEndName / DiagT（仅供日志）
+
+Changed States:
+  (none)
+
+Trading Logic Changed:
+  NO —— 新增代码只有 PrintFormat 与三个只返回字符串的函数。
+
+Reason:
+  A-37：USDCAD / NZDUSD 等 7 个品种趋势持续数日而无任何标记，
+  原日志只覆盖 Context 与 Rule 6 否决，无法判断链条停在哪一环。
+  重建会把整个窗口的链条一次输出，无需等待实时。
+
+Tooling:
+  tools/ReloadTest.ps1 -Chain   读取每个图表最近一次完整重建，按
+                                POI → Session → block → ARMED → 标记 计数，
+                                指出自最后一条标记以来链条停在哪一步
+
+Test Impact:
+  版本号变化：Future Leak 实时样本在 v2.41 上重新累积。
+  v2.40 的结论（USDJPY 10/10 存活）保留在 docs/04，不受影响。
+
+Compile Status:
+  NOT COMPILE VERIFIED（Rule 70）
+```

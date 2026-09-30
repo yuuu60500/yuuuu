@@ -127,6 +127,10 @@ int CycCreate(const int blk_idx, const int A)
    g_blk[blk_idx].state      = BLOCK_ARMED;
    g_blk[blk_idx].armed_time = cy.armed_time;
    g_blk[blk_idx].vis        = -1;
+   if(InpLogSignals)                     // A-37 diagnostic, log only
+      PrintFormat("HMI-ARM,%s,block=%I64d,sess=%I64d,dir=%d,bar=%s",
+                  _Symbol, g_blk[blk_idx].id, g_blk[blk_idx].session_id,
+                  g_blk[blk_idx].dir, DiagT(cy.armed_time));
 
    return(CycPush(cy));
   }

@@ -1209,6 +1209,6 @@ Reasoning:               已排除：
 Recommended Fix:         仅加诊断日志（v2.41，不改任何判断）：POI 生成/触碰/失效/过期/出窗，
                          Session 开始/结束及原因，block ARMED。重建会立即输出整个窗口的链条，
                          无需等待实时。需用户签字（会使 Future Leak 样本在 v2.41 重新累积）。
-Status:                  **Potential Risk —— 待诊断**
+Status:                  **Potential Risk —— 诊断日志已加入 v2.41（用户 2026-09-30 签字），待实测**
 Confidence:              MEDIUM（现象确定，原因未知）
 ```

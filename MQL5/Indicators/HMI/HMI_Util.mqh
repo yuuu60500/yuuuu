@@ -86,6 +86,34 @@ string CtxName(const CtxState c)
    return("RANGE");
   }
 
+//--- v2.41 chain diagnostics (A-37): names for the log only --------
+string PoiStateName(const POIState s)
+  {
+   switch(s)
+     {
+      case POI_ACTIVE:  return("ACTIVE");
+      case POI_TOUCHED: return("TOUCHED");
+      case POI_INVALID: return("INVALID");
+      case POI_EXPIRED: return("EXPIRED");
+     }
+   return("OTHER");
+  }
+
+string SessEndName(const SessionEnd r)
+  {
+   switch(r)
+     {
+      case SE_POI_INVALID:     return("POI_INVALID");
+      case SE_CONTEXT_FLIP:    return("CONTEXT_FLIP");
+      case SE_TIMEOUT:         return("TIMEOUT");
+      case SE_NEW_SESSION:     return("NEW_SESSION");
+      case SE_CONTEXT_NEUTRAL: return("CONTEXT_NEUTRAL");
+     }
+   return("NONE");
+  }
+
+string DiagT(const datetime t) { return(TimeToString(t, TIME_DATE|TIME_MINUTES)); }
+
 bool AlertEnabledFor(const int m)
   {
    switch(m)
