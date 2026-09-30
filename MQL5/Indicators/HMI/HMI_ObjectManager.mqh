@@ -130,7 +130,10 @@ bool OM_Protected(const string name)
           StringFind(name, "_" + TT_CTX  + "_") >= 0 ||
           StringFind(name, "_" + TT_KZ   + "_") >= 0 ||
           StringFind(name, "_" + TT_LIQ  + "_") >= 0 ||
-          StringFind(name, "_" + TT_PL   + "_") >= 0);
+          StringFind(name, "_" + TT_PL   + "_") >= 0 ||
+          StringFind(name, "_" + TT_LQE  + "_") >= 0);     // v2.46: bounded by MAX_LIQEV; trimming
+                                                           // them live but not after a rebuild made
+                                                           // the two show different label sets
   }
 
 void OM_Trim()
@@ -425,6 +428,10 @@ bool PLShown(const int i)
    return(InpShowPM);
   }
 
+// "?" = resolved before M5 coverage began (v2.45 UNKNOWN): taken, but
+// whether as a sweep or a break the data on hand cannot say.
+string PLLabel(const int i) { return(PLName(i) + (g_pl[i].lq_state == LQ_UNKNOWN ? "?" : "")); }
+
 StyleZone PLZone(const int i) { return(ZS_PL[MathMax(0, MathMin(5, i))]); }
 StyleText PLText(const int i) { return(TS_PL[MathMax(0, MathMin(5, i))]); }
 
@@ -434,6 +441,24 @@ bool LiqEventShown(const string name)
    if(name == "PWH" || name == "PWL") return(InpShowPW);
    if(name == "PMH" || name == "PML") return(InpShowPM);
    return(InpShowLiquidity);                 // BSL / SSL
+  }
+
+// v2.46: labels on one bar and one side are one stack. Identical events -
+// same bar, side, price and kind (PDH and PWH are often the same high) -
+// share ONE label ("PDH\x00B7PWH SWEEP"); different ones on that bar and
+// side are offset instead of printed over each other. The log keeps every
+// event separately: this is drawing only.
+bool LiqSameGroup(const int a, const int b)
+  {
+   return(g_liqev[a].bar_time == g_liqev[b].bar_time && g_liqev[a].side == g_liqev[b].side &&
+          g_liqev[a].kind == g_liqev[b].kind && Pts(g_liqev[a].price, g_liqev[b].price) == 0);
+  }
+
+bool LiqIsLeader(const int e)                 // first shown member of its group
+  {
+   for(int j = 0; j < e; j++)
+      if(LiqEventShown(g_liqev[j].name) && LiqSameGroup(j, e)) return(false);
+   return(true);
   }
 
 void OM_SyncAll()
@@ -517,10 +542,10 @@ void OM_SyncAll()
          if(g_pl[j].valid && PLShown(j) && Pts(g_pl[j].price, g_pl[i].price) == 0) { first = false; break; }
       string lnm = OM_Name(TT_PL, owner, i * 2 + 1);
       if(!first) { OM_DeleteName(lnm); continue; }
-      string txt = PLName(i);
+      string txt = PLLabel(i);
       for(int j = i + 1; j < PL_COUNT; j++)
          if(g_pl[j].valid && PLShown(j) && Pts(g_pl[j].price, g_pl[i].price) == 0)
-            txt += "\x00B7" + PLName(j);
+            txt += "\x00B7" + PLLabel(j);
       OM_Text(lnm, t2, g_pl[i].price, txt, PLText(i),
               g_pl[i].side > 0 ? ANCHOR_LEFT_LOWER : ANCHOR_LEFT_UPPER);
      }
@@ -535,15 +560,24 @@ void OM_SyncAll()
    for(int e = 0; e < g_liqev_n; e++)
      {
       bool want = InpShowLiqEvents && M5LayerOn() && LiqEventShown(g_liqev[e].name) &&
-                  g_liqev[e].bar_time >= keep_from;
+                  g_liqev[e].bar_time >= keep_from && LiqIsLeader(e);
       string nm = OM_Name(TT_LQE, g_liqev[e].uid, 0);
       if(want && g_liqev[e].vis < 0)
         {
          bool sw = (g_liqev[e].kind == LQ_SWEPT);
          StyleText lts = TS_LQ_BROKEN;
          if(sw) lts = TS_LQ_SWEEP;
-         OM_Text(nm, g_liqev[e].bar_time, g_liqev[e].price,
-                 g_liqev[e].name + (sw ? " SWEEP" : " BROKEN"), lts,
+         string txt = g_liqev[e].name;
+         for(int f = e + 1; f < g_liqev_n; f++)
+            if(LiqEventShown(g_liqev[f].name) && LiqSameGroup(e, f)) txt += "\x00B7" + g_liqev[f].name;
+         int stack = 0;                             // earlier groups on this bar and side
+         for(int j = 0; j < e; j++)
+            if(LiqEventShown(g_liqev[j].name) && g_liqev[j].bar_time == g_liqev[e].bar_time &&
+               g_liqev[j].side == g_liqev[e].side && LiqIsLeader(j)) stack++;
+         double off = stack * InpLabelStackOffsetPips * PipSize();
+         double py  = (g_liqev[e].side > 0 ? g_liqev[e].price + off : g_liqev[e].price - off);
+         OM_Text(nm, g_liqev[e].bar_time, py,
+                 txt + (sw ? " SWEEP" : " BROKEN"), lts,
                  g_liqev[e].side > 0 ? ANCHOR_LOWER : ANCHOR_UPPER, M5LayerMask());
          g_liqev[e].vis = 0;
         }

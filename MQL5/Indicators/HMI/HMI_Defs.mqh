@@ -6,7 +6,7 @@
 #ifndef HMI_DEFS_MQH
 #define HMI_DEFS_MQH
 
-#define HMI_VERSION      "2.44"
+#define HMI_VERSION      "2.46"
 #define HMI_PREFIX       "HMI"
 
 //--- direction ------------------------------------------------------
@@ -258,9 +258,10 @@ struct LiqPool
    int               type;           // DIR_BULL = BSL, DIR_BEAR = SSL
    double            price;
    datetime          origin_time;
-   bool              swept;          // RESOLVED (v2.42: SWEEP or BROKEN) - the line goes
+   datetime          confirm_time;   // v2.45: close of the H4 bar that confirmed the swing
+   bool              swept;          // RESOLVED (v2.42: SWEEP or BROKEN; v2.45: or UNKNOWN) - the line goes
    datetime          swept_time;     // close of the bar that resolved it
-   int               lq_state;       // LQ_INTACT / LQ_PENDING / LQ_SWEPT / LQ_BROKEN
+   int               lq_state;       // LQ_INTACT / LQ_PENDING / LQ_SWEPT / LQ_BROKEN / LQ_UNKNOWN
    int               pierce_index;   // M5 bar that first went beyond, -1 if none
    int               vis;            // last drawn state (-2 = graphics removed)
   };

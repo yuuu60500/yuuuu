@@ -23,6 +23,7 @@
 #define LQ_PENDING  1
 #define LQ_SWEPT    2
 #define LQ_BROKEN   3
+#define LQ_UNKNOWN  4          // v2.45: resolved before M5 coverage, kind unknown - never fires
 
 #define PL_COUNT    6          // PDH PDL PWH PWL PMH PML, in that order
 
@@ -133,11 +134,43 @@ void PLSet(const int i, const int side, const double px, const datetime from)
    g_pl[i].event_time   = 0;
   }
 
+// v2.45: a level whose period began before the first M5 bar has a stretch
+// no M5 bar can judge. Replay it on the consumed H4 bars of that stretch
+// (all complete: the M5 window starts on an H4 boundary). Any bar beyond the
+// level means it resolved before coverage: UNKNOWN, no event, never again.
+// A period the H4 history does not reach back to is UNKNOWN as well -
+// the one thing a rebuild must not do is assume nothing happened.
+void PLPreScan(const int i)
+  {
+   if(!g_pl[i].valid || g_m5_n <= 0) return;
+   datetime m5first = g_m5[0].time;
+   if(g_pl[i].from >= m5first) return;                  // fully inside M5 coverage
+   if(g_h4_n <= 0 || g_h4[0].time > g_pl[i].from)
+     {
+      g_pl[i].lq_state = LQ_UNKNOWN;                    // history does not reach the period start
+      return;
+     }
+   int mp = MarginM5Pts(0);
+   for(int h = 0; h < g_h4_cursor && h < g_h4_n; h++)
+     {
+      if(g_h4[h].time < g_pl[i].from) continue;
+      if(g_h4[h].time >= m5first) break;
+      bool beyond = (g_pl[i].side > 0) ? BreakUp(g_h4[h].high, g_pl[i].price, mp)
+                                       : BreakDown(g_h4[h].low, g_pl[i].price, mp);
+      if(!beyond) continue;
+      g_pl[i].lq_state   = LQ_UNKNOWN;
+      g_pl[i].event_time = CloseTimeOf(g_h4[h].time, PERIOD_H4);
+      return;
+     }
+  }
+
 void PLPair(const int i, const bool ok, const double hi, const double lo, const datetime from)
   {
    if(!ok) { g_pl[i].valid = false; g_pl[i+1].valid = false; return; }
    PLSet(i,     +1, hi, from);
    PLSet(i + 1, -1, lo, from);
+   PLPreScan(i);
+   PLPreScan(i + 1);
   }
 
 // Previous TRADING day: the newest consumed H4 day before today, skipping a
@@ -195,7 +228,7 @@ void LiqLevelsRoll(const int n)
 //--- when the level resolves on this bar, LQ_INTACT otherwise. -------
 int LiqJudge(const int side, const double level, int &state, int &pierce, const int n)
   {
-   if(state == LQ_SWEPT || state == LQ_BROKEN) return(LQ_INTACT);
+   if(state == LQ_SWEPT || state == LQ_BROKEN || state == LQ_UNKNOWN) return(LQ_INTACT);
    if(state == LQ_INTACT)
      {
       int mp = MarginM5Pts(n);

@@ -123,6 +123,7 @@ void LiqPush(const HSwing &s)
    p.type        = s.dir;
    p.price       = s.price;
    p.origin_time = s.bar_time;
+   p.confirm_time = s.confirm_time;
    p.swept       = false;
    p.swept_time  = 0;
    p.lq_state    = 0;                 // LQ_INTACT (HMI_LiquidityLevels.mqh)
@@ -142,6 +143,30 @@ void LiqOnBar(const int h)
    // any H4 wick through the level - could not tell a sweep from a break.
    // Both pools and PD/PW/PM levels are now judged on closed M5 bars by
    // LiqM5OnBar (HMI_LiquidityLevels.mqh) with one definition.
+   //
+   // v2.45: EXCEPT before M5 coverage begins. An H4 bar that closed before
+   // the first M5 bar can never be judged on M5, and leaving the pool INTACT
+   // would let a rebuild fire it again later, although a run that started
+   // earlier had already resolved it. If such a bar went beyond the pool,
+   // the pool was resolved before coverage - how, M5 would have to say, and
+   // there is none - so it is UNKNOWN: resolved, kind unknown, no event.
+   // The window starts on an H4 boundary (SeriesAlignM5ToH4), so this bar is
+   // complete; the pool's own confirming bar is never tested against it.
+   if(g_m5_n > 0 && t <= g_m5[0].time)
+     {
+      int mp = MarginM5Pts(0);
+      for(int k = 0; k < g_liq_n; k++)
+        {
+         if(g_liq[k].swept || g_liq[k].lq_state != 0) continue;
+         if(g_liq[k].confirm_time > g_h4[h].time) continue;       // confirmed at this bar's close
+         bool beyond = (g_liq[k].type == DIR_BULL) ? BreakUp(g_h4[h].high, g_liq[k].price, mp)
+                                                   : BreakDown(g_h4[h].low, g_liq[k].price, mp);
+         if(!beyond) continue;
+         g_liq[k].lq_state   = 4;                                  // LQ_UNKNOWN
+         g_liq[k].swept      = true;
+         g_liq[k].swept_time = t;
+        }
+     }
   }
 
 #endif // HMI_H4RANGE_MQH

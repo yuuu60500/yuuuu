@@ -1266,3 +1266,41 @@ v2.42 首次 `-Chain`（2026-09-30，最近一次完整重建，窗口约 09.04�
   USDJPY 的 v2.42 重建当时尚未完整写入日志，未纳入。
 Confidence:              MEDIUM（现象确定，原因未知）
 ```
+
+
+## Audit Round 9 —— 工程师审查（2026-09-30）
+
+### A-38 —— **重载测试会放过真实漏标**（审查一.1–一.3，成立，已复现）
+
+```
+Severity:                P1（测试工具给出错误的 PASS）
+Location:                tools/ReloadTest.ps1  Show-Reload / Show-LiveVsBuild
+Actual Behavior:         1) converging / carried / warm-up 分类按时间把差异「解释掉」，
+                            同版本同窗口下真实消失的标记也会被归入
+                         2) 以「一边有 LIQ 行、另一边没有」推断版本升级并改为只比 MODEL 行，
+                            同版本 LIQ 事件整体消失被放过
+                         3) 实时 vs 重建只查「实时有、重建无」
+Evidence:                工程师复现；本地用模拟日志复现 1)、2)（v2.44 脚本判为 MISMATCH）
+Fix:                     见 changelog v2.44 Tooling。构建身份（版本 / 参数摘要 / 实例 / 构建 ID /
+                         真实预热结束）写入日志；比较只在同版本同参数间进行；区间外一律待复核；
+                         实时 vs 重建双向
+Status:                  **FIXED —— 脚本 + v2.44 日志**
+Confidence:              HIGH
+```
+
+此前依赖旧脚本的结论需要按新口径重看：
+- 「EURUSD 170/171 一致，1 条 converging」（2026-09-25）—— 按新口径该条为 PENDING REVIEW，不是 PASS
+- 「USDJPY 10/10 实时存活」—— 只验证了单向；反方向（重建有、实时无）未查
+- 「v2.40 → v2.42 MODEL 205/205 一致」—— 跨版本回归结论不受影响（本就只比 MODEL 行，且版本确实不同）
+
+### A-39 —— **流动性状态重载后丢失**（审查二，成立，模拟复现）
+
+```
+Severity:                P1（重建会出连续运行不会出的事件 → 重绘）
+Location:                HMI_LiquidityLevels.mqh PLSet / LiqM5OnBar；HMI_H4RangeEngine.mqh LiqPush
+Actual Behavior:         M5 窗口之前的周期段与流动性池生命周期从 INTACT 起算
+Evidence:                tools/liq_reload_sim.py：v2.42 规则 24 次重建中 6 次与连续运行不一致
+Fix:                     v2.45（M5 起点对齐 H4 + H4 回放 → LQ_UNKNOWN）；同模拟 0 / 24
+Status:                  **FIXED —— v2.45，待编译实测**
+Confidence:              HIGH（规则层）；MQL 实现待实测
+```

@@ -1386,3 +1386,99 @@ Not in this version（用户决定暂缓）:
 Compile Status:
   NOT COMPILE VERIFIED（Rule 70）
 ```
+
+---
+
+## v2.44 — 构建身份写入日志（仅日志）
+
+```
+Version:  v2.44
+Date:     2026-09-30
+来源:     工程师审查（2026-09-30）一.3 / 三.2
+
+Changed:
+  BuildHistory()  HMI-BUILD-BEGIN 追加
+                    ver=<HMI_VERSION> params=<8 位摘要> inst=<实例> build=<本实例第几次构建>
+                    warmup_end=<第一根允许出标记的 M5 开盘时间，取自数据，不再估算>
+                  HMI-BUILD-END 追加 build=
+  ParamsDigest()  新增。对所有能改变标记 / Context / 流动性事件的输入做 FNV-1a 摘要；
+                  显示、样式、提醒类输入不计入（改颜色不会让两次构建「不可比」）
+  #property version  2.40 → 与 HMI_VERSION 一致（此后每版同步）
+
+Trading Logic Changed:  NO
+
+Tooling（tools/ReloadTest.ps1，同日）:
+  删除 converging / carried / warm-up 自动放行分类（审查一.1，可放过真实漏标）
+  不再按「有没有 LIQ 行」推断版本升级（审查一.2）；版本与参数一律读 BEGIN 行
+  重载比较：仅同版本且同参数摘要才比；比较区间 = 两次真实预热之后 ∩ 两个窗口；
+            窗口起点不同则再加 -SettleHours（默认 24）；区间内任何差异 = MISMATCH，
+            区间外 = 待复核（PENDING REVIEW）；只有区间内一致且无待复核才说
+            「no repaint found」，且只针对该区间
+  实时 vs 重建：每对相邻完整构建之间的实时段，在可证明覆盖的 K 线上
+            双向比对（实时有重建无 / 重建有实时无）；版本或参数不同、未记录 → 待复核
+
+Compile Status:  随 v2.46 一起编译
+```
+
+---
+
+## v2.45 — 流动性状态跨重载保持（审查二）
+
+```
+Version:  v2.45
+Date:     2026-09-30
+
+Problem:
+  周期价位与 H4 流动性池在重建时一律从 INTACT 开始，但 5000 根 M5 未必覆盖
+  本周期早期。月初已扫过的 PMH，重建窗口不含月初时会被当作从未触发，
+  月底再次穿越即再出一次事件 —— 连续运行不会。
+
+Changed:
+  SeriesAlignM5ToH4()  新增。M5 窗口起点对齐到 H4 边界（最多丢弃 47 根，均在预热内），
+                       使第一根 M5 之前的每根 H4 都完整
+  PLPreScan()          新增。周期起点早于第一根 M5 的价位，用已消费的 H4 回放
+                       [周期起点, 第一根 M5)：任一根越过（+margin）→ LQ_UNKNOWN；
+                       H4 历史够不到周期起点 → LQ_UNKNOWN
+  LiqOnBar()           第一根 M5 之前收盘的 H4：对已确认的流动性池做同样的越过检查 → LQ_UNKNOWN
+  LiqJudge()           LQ_UNKNOWN 视为已判定：不再判定、不出事件
+  显示                 UNKNOWN 价位标签加「?」（如 PMH?），线止于越过的那根 H4
+
+LQ_UNKNOWN 的含义:
+  在 M5 覆盖开始之前已被越过 —— 已触发，但当时是 SWEEP 还是 BROKEN 无法判断。
+  这是审查要求的「历史不足时标记未知，不要假定未触发」。
+
+Known limit:
+  InpBreakMarginMode = MARGIN_ATR_FRAC 时，回放用第一根 M5 的 margin（ATR 预热为 0 → 回退 pips），
+  与逐根 M5 的 ATR margin 可能略有差别。PIPS / POINTS 模式完全一致。
+
+Verification（离线模拟，与 MQL 逻辑逐条对应）:
+  见 docs/04「v2.45 流动性重载一致性模拟」
+
+Trading Logic Changed:
+  标记链 NO。M5 窗口起点对齐会使窗口最前 ≤47 根 M5 不再参与 —— 均在预热内，
+  同版本两次构建之间无影响；与旧版本比较时窗口起点附近的差异属预期。
+
+Compile Status:  随 v2.46 一起编译
+```
+
+---
+
+## v2.46 — 流动性标签显示（审查三）
+
+```
+Version:  v2.46
+Date:     2026-09-30
+
+Changed:
+  OM_SyncAll()     同一根 K 线、同方向、同价位、同类型的 SWEEP/BROKEN 合并为一个标签
+                   （如「PDH·PWH SWEEP」）；同根同方向的其它标签按
+                   InpLabelStackOffsetPips 逐层错开，不再重叠。日志仍逐条记录
+  OM_Protected()   SWEEP/BROKEN 标签（LE）不参与对象裁剪 —— 数量上限 64；
+                   实时运行中被裁剪、重建后又画出，会让两者显示不同的标签集合
+  #property version  2.46
+
+Trading Logic Changed:  NO（仅显示）
+
+Compile Status:
+  NOT COMPILE VERIFIED（Rule 70）
+```

@@ -790,3 +790,35 @@ IDENTICAL apart from cycle_id / block_id - 205 rows. No repaint.
 ```
 
 S-1（只标记、不过滤）实测成立：加入 PD/PW/PM 与 sweep 判定后，模型标记逐行不变。
+
+
+### v2.45 流动性重载一致性模拟（2026-09-30，离线，`tools/liq_reload_sim.py`）
+
+```
+模型   随机游走 M5 → 聚合 H4 → 已消费 H4 求 PD/PW/PM → S-3 判定 → v2.45 H4 回放
+比较   连续运行（07.01 起） vs 三个较晚起点的重建，8 组随机种子，共 24 次重建
+区间   重建的真实预热结束 + 24 h 之后
+v2.45 (H4 pre-scan)    rebuilds 24  mismatching 0
+v2.42 (no pre-scan)    rebuilds 24  mismatching 6
+       例：seed 4，重建起点 09.09 → 重建独有 09.18 01:00 PMH SWEEP
+           （连续运行中 PMH 在窗口之前已被越过，重建当作从未触发，再次出事件）
+```
+
+该模拟复现了审查二的问题，并验证修复后的规则层行为。**它不替代编译和实盘运行**：
+MQL 实现仍需按下方 v2.46 验收清单实测。
+
+### v2.46 验收清单（审查一至三 + Phase 0b / BRI-07 回归）
+
+```
+1  编译 0 errors
+2  版本：每张图 `starting on` 与 BEGIN 行 ver= 均为 2.46；属性页版本 2.46
+3  同版本重载：`.\ReloadTest.ps1 -Source "<图>,M5"`（先重载该图两次）
+     期望：同一窗口 → IDENTICAL inside the comparable region
+           窗口移动 → 区间内 0 MISMATCH；区间前差异列为 PENDING REVIEW
+4  实时 vs 重建：`-LiveVsBuild` 双向 0 MISMATCH；按版本 / 参数分开
+5  流动性：带「?」的价位（PMH? 等）= M5 覆盖前已被越过；重载前后同一价位不得出现两次事件
+6  标签：同根同价的 PDH/PWH 等合并为一个标签；同根不同类型逐层错开
+7  回归：Phase 0b / BRI-07 —— `Select-String -Path .\*.log -Pattern 'HMI-GUARD'` 仍为 0；
+          `-Chain` 各品种「未触碰、INVALID、Context 同向」仍为 0
+          v2.43 → v2.46 跨版本：MODEL 行只允许在窗口起点附近变化（M5 起点对齐）
+```
