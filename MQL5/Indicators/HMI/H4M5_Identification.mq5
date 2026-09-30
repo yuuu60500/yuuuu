@@ -243,7 +243,7 @@ string ParamsDigest()
    for(int i = 0; i < StringLen(s); i++)
      {
       h ^= (uint)StringGetCharacter(s, i);
-      h *= 16777619;
+      h *= (uint)16777619;                  // FNV prime
      }
    return(StringFormat("%08X", h));
   }
