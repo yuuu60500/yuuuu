@@ -1182,3 +1182,33 @@ Recommended Fix:         暂不修改。若稳态下出现连续重建，再加�
 Status:                  **Potential Risk —— 观察中**
 Confidence:              MEDIUM（原因为推断，现象为实测）
 ```
+
+### A-37 —— **趋势持续数日而无任何标记**（2026-09-30 实测，Potential Risk）
+
+```
+Severity:                P1 若为引擎停滞；P4 若为行情本身（待定）
+Location:                标记链：Context → H4 POI(同向, ACTIVE) → 价格触碰 → Session
+                         → M5 block → ARMED → 模型。日志只覆盖第一环与 POI 否决。
+Trigger:                 `-Live` / `-Quiet`，v2.40，日志 0924–0930
+Actual Behavior:         自最后一条标记起（build 与 live 一致，均无新标记）：
+                           USDCAD  09.24 起 143 h，BULLISH 100%，BOS ×9，Rule 6 否决 0
+                           NZDUSD  09.22 起 185 h，BEARISH  93%，BOS ×7，否决 0
+                           USDCHF  09.04 起 621 h，趋势 69%（BULLISH 397 h），否决 2
+                           AUDUSD  09.18 起 289 h，趋势 57%，09.23 起连续 BEARISH，否决 1
+                           GBPUSD 57% / XAUUSD 50% / EURUSD 48%
+                         同期 USDJPY,M5 正常出标记（09.25–09.30 共 11 条实时）。
+Evidence:                用户 `-Quiet` 输出。
+Future Leak:             NO —— 重建与实时一致地没有标记。
+Reasoning:               已排除：
+                         - Context 中性（USDCAD / NZDUSD 几乎全程趋势）
+                         - Rule 6 否决过多（0–2 次）
+                         - POI 方向与 Context 方向约定不一致（CtxDirection 与 FVG dir 同为 DIR_BULL/BEAR）
+                         - A-33 的重复 BOS 影响标记链（Trading Range 仅用于显示，不参与标记链）
+                         未能排除：同向 POI 未生成 / 已失效 / 超出 12 个窗口 / 价格未回到 POI /
+                         Session 被 Phase 0b 提前结束 / block 未 ARMED。日志中无一可见。
+Recommended Fix:         仅加诊断日志（v2.41，不改任何判断）：POI 生成/触碰/失效/过期/出窗，
+                         Session 开始/结束及原因，block ARMED。重建会立即输出整个窗口的链条，
+                         无需等待实时。需用户签字（会使 Future Leak 样本在 v2.41 重新累积）。
+Status:                  **Potential Risk —— 待诊断**
+Confidence:              MEDIUM（现象确定，原因未知）
+```
