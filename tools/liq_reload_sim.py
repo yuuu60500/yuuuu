@@ -1,102 +1,201 @@
-"""Offline model of the v2.45 liquidity lifecycle (HMI_LiquidityLevels.mqh).
+"""Offline model of the liquidity lifecycle across a reload (BRI-09 / A-39).
 
-Checks the reload requirement: a rebuild whose M5 window starts later must
-produce exactly the events a run that started earlier produced, inside the
-rebuild's comparable region (after its warm-up + 24 h). Random-walk M5 bars,
-H4 aggregated from them, PD/PW/PM levels from consumed H4 bars, S-3 judgement
-(beyond by margin, close back within N bars = SWEEP, else BROKEN), and the
-v2.45 H4 pre-scan for the stretch before the first M5 bar.
+A rebuild whose M5 window starts later must hold the same level state, and
+so produce the same SWEEP / BROKEN events, as a run that started earlier -
+inside the rebuild's comparable region (real warm-up end + 24 h).
 
-    python3 tools/liq_reload_sim.py            # v2.45 vs the v2.42 behaviour
-It models the rules, not MQL5 itself: a pass here does not replace compiling
-and running the indicator.
+Three ways of handling the stretch before the first M5 bar are modelled:
+  v2.42  none: every level starts INTACT at the window start
+  v2.46  M5 window trimmed to an H4 boundary + H4 pre-scan, threshold taken
+         from window bar 0 (ATR 0 there -> pips fallback)
+  v2.47  shared M5 untouched; replay on the M5 bars before the window, each
+         with its own ATR(14); window bars 0..13 borrow replay bars for ATR
+under two margin modes (PIPS, ATR_FRAC). Levels: PDH/PDL/PWH/PWL/PMH/PML from
+H4 aggregated from the M5 bars; S-3 judgement (beyond by margin, close back
+within N bars = SWEEP, else BROKEN).
+
+    python3 tools/liq_reload_sim.py
+
+It models the rules, not MQL5: a pass here does not replace compiling and
+running the indicator.
 """
 import datetime as dt
-CORE = r'''
-import random, datetime as dt
-random.seed(SEED)
-PT=0.00001; MP=3; N=3; WARM=100
-# synthetic M5 bars, weekdays only, from 2026-06-01
-bars=[]; t=dt.datetime(2026,6,1); px=1.1000
-while t < dt.datetime(2026,9,30):
-    if t.weekday()<5:
-        o=px; c=o+random.gauss(0,0.0004); h=max(o,c)+abs(random.gauss(0,0.0002)); l=min(o,c)-abs(random.gauss(0,0.0002))
-        bars.append((t,o,h,l,c)); px=c
-    t+=dt.timedelta(minutes=5)
-def h4_of(b):
-    out={}
-    for (t,o,h,l,c) in b:
-        k=t.replace(hour=t.hour//4*4,minute=0)
-        if k not in out: out[k]=[k,o,h,l,c]
-        else: out[k][2]=max(out[k][2],h); out[k][3]=min(out[k][3],l); out[k][4]=c
-    return [tuple(v) for v in sorted(out.values())]
-H4=h4_of(bars)
-pts=lambda a,b: round((a-b)/PT)
-def day(t): return t.replace(hour=0,minute=0)
-def wk(t): d=day(t); return d-dt.timedelta(days=(d.weekday()+1)%7)   # Sunday start
-def mon(t): return t.replace(day=1,hour=0,minute=0)
-def prevmon(t): m=mon(t); return (m-dt.timedelta(days=1)).replace(day=1)
-def run(m5start):
-    m5=[b for b in bars if b[0]>=m5start]
-    # align to H4 boundary
-    while m5[0][0].hour%4 or m5[0][0].minute: m5=m5[1:]
-    first=m5[0][0]; h4=[x for x in H4 if x[0]>=m5start-dt.timedelta(days=83)]
-    keys=[None]*3; lv={}; ev=[]
-    def consumed(t): return [x for x in h4 if x[0]+dt.timedelta(hours=4)<=t]
-    def hilo(a,b,cons):
-        if not h4 or h4[0][0]>a: return None
-        s=[x for x in cons if a<=x[0]<b]
-        return (max(x[2] for x in s),min(x[3] for x in s)) if s else None
-    def prescan(name,side,price,frm,cons):
-        if frm>=first: return 'I'
-        if h4[0][0]>frm: return 'U'
-        for x in cons:
-            if frm<=x[0]<first and (pts(x[2],price)>MP if side>0 else pts(x[3],price)<-MP): return 'U'
-        return 'I'
-    for n,(t,o,h,l,c) in enumerate(m5):
-        cons=consumed(t)
-        for ki,(k,prevf,names) in enumerate([(day(t),None,('PDH','PDL')),(wk(t),None,('PWH','PWL')),(mon(t),None,('PMH','PML'))]):
-            if keys[ki]!=k:
-                keys[ki]=k
-                if ki==0:
-                    ds=sorted({day(x[0]) for x in cons if day(x[0])<k and day(x[0]).weekday()!=6})
-                    r=hilo(ds[-1],ds[-1]+dt.timedelta(days=1),cons) if ds else None
-                elif ki==1: r=hilo(k-dt.timedelta(days=7),k,cons)
-                else: r=hilo(prevmon(t),k,cons)
-                for side,nm in ((1,names[0]),(-1,names[1])):
-                    if r is None: lv.pop(nm,None); continue
-                    p=r[0] if side>0 else r[1]
-                    lv[nm]=dict(side=side,p=p,st=prescan(nm,side,p,k,cons),pi=None,frm=k)
-        for nm,L in lv.items():
-            if L['st'] in ('S','B','U'): continue
-            if L['st']=='I':
-                if not (pts(h,L['p'])>MP if L['side']>0 else pts(l,L['p'])<-MP): continue
-                L['st']='P'; L['pi']=n
-            back = pts(c,L['p'])<=0 if L['side']>0 else pts(c,L['p'])>=0
-            if back: L['st']='S'
-            elif n-L['pi']>=N: L['st']='B'
-            else: continue
-            if n>=WARM: ev.append((t,nm,L['st'],L['frm']))
-    return ev, m5[WARM][0]
-'''
+import random
 
-def check(prescan=True, seeds=range(1, 9)):
-    global SEED
-    bad = total = 0
-    for seed in seeds:
-        g = {'SEED': seed}
-        code = CORE if prescan else CORE.replace("st=prescan(nm,side,p,k,cons)", "st='I'")
-        exec(code, g)
-        cont, _ = g['run'](dt.datetime(2026, 7, 1))
-        for start in (dt.datetime(2026, 9, 2, 9, 0), dt.datetime(2026, 9, 9, 2, 0), dt.datetime(2026, 9, 16, 5, 0)):
-            reb, wend = g['run'](start)
-            lim = wend + dt.timedelta(hours=24)
-            total += 1
-            if {e for e in cont if e[0] >= lim} != {e for e in reb if e[0] >= lim}:
-                bad += 1
-    return total, bad
+PT = 0.00001
+N_RECLAIM = 3
+WARM = 100
+PIPS_PTS = 3            # 0.3 pip on a 5-digit symbol
+ATR_FRAC = 0.5
+M5 = dt.timedelta(minutes=5)
+
+
+def make_bars(seed):
+    random.seed(seed)
+    bars, t, px = [], dt.datetime(2026, 6, 1), 1.1000
+    while t < dt.datetime(2026, 9, 30):
+        if t.weekday() < 5:
+            o = px
+            c = o + random.gauss(0, 0.0004)
+            h = max(o, c) + abs(random.gauss(0, 0.0002))
+            l = min(o, c) - abs(random.gauss(0, 0.0002))
+            bars.append((t, o, h, l, c))
+            px = c
+        t += M5
+    return bars
+
+
+def atr_series(bars):
+    """ATR(14) exactly as SeriesComputeATR: 0 for the first 14 bars."""
+    out = [0.0] * len(bars)
+    for i in range(14, len(bars)):
+        s = 0.0
+        for k in range(i - 13, i + 1):
+            pc = bars[k - 1][4]
+            s += max(bars[k][2] - bars[k][3], abs(bars[k][2] - pc), abs(bars[k][3] - pc))
+        out[i] = s / 14.0
+    return out
+
+
+def margin(atr, mode):
+    if mode == 'ATR' and atr > 0:
+        return round(ATR_FRAC * atr / PT)
+    return PIPS_PTS
+
+
+def pts(a, b):
+    return round((a - b) / PT)
+
+
+def h4_of(bars):
+    out = {}
+    for (t, o, h, l, c) in bars:
+        k = t.replace(hour=t.hour // 4 * 4, minute=0)
+        if k not in out:
+            out[k] = [k, o, h, l, c]
+        else:
+            out[k][2] = max(out[k][2], h); out[k][3] = min(out[k][3], l); out[k][4] = c
+    return [tuple(v) for v in sorted(out.values())]
+
+
+def day(t): return t.replace(hour=0, minute=0)
+def week(t): return day(t) - dt.timedelta(days=(day(t).weekday() + 1) % 7)   # Sunday start
+def month(t): return t.replace(day=1, hour=0, minute=0)
+def prev_month(t): return (month(t) - dt.timedelta(days=1)).replace(day=1)
+
+
+def judge(L, b, mp, idx):
+    """S-3 on one bar. Returns 'S' / 'B' when the level resolves."""
+    if L['st'] in ('S', 'B', 'U'):
+        return None
+    t, o, h, l, c = b
+    if L['st'] == 'I':
+        if not (pts(h, L['p']) > mp if L['side'] > 0 else pts(l, L['p']) < -mp):
+            return None
+        L['st'], L['pi'] = 'P', idx
+    back = pts(c, L['p']) <= 0 if L['side'] > 0 else pts(c, L['p']) >= 0
+    if back:
+        L['st'] = 'S'
+    elif idx - L['pi'] >= N_RECLAIM:
+        L['st'] = 'B'
+    else:
+        return None
+    return L['st']
+
+
+def run(allbars, H4, start, variant, mode):
+    m5 = [b for b in allbars if b[0] >= start]
+    if variant == 'v2.46':                      # trimmed to an H4 boundary
+        while m5[0][0].hour % 4 or m5[0][0].minute:
+            m5 = m5[1:]
+    first = m5[0][0]
+    watr = atr_series(m5)
+    pre = [b for b in allbars if b[0] < first]  # what a replay can load
+    patr = atr_series(pre)
+    seam = pre[-14:] + m5[:14]                  # v2.47: window ATR for n < 14
+
+    def win_atr(n):
+        if variant == 'v2.47' and n < 14:
+            s = 0.0
+            for k in range(n - 13 + 14, n + 14 + 1):
+                pc = seam[k - 1][4]
+                s += max(seam[k][2] - seam[k][3], abs(seam[k][2] - pc), abs(seam[k][3] - pc))
+            return s / 14.0
+        return watr[n]
+
+    h4 = [x for x in H4 if x[0] >= start - dt.timedelta(days=83)]
+    keys, lv, ev, hp = [None] * 3, {}, [], 0
+    for n, b in enumerate(m5):
+        t = b[0]
+        while hp < len(h4) and h4[hp][0] + dt.timedelta(hours=4) <= t:
+            hp += 1
+        cons = h4[:hp]
+
+        def hilo(a, z):
+            if not h4 or h4[0][0] > a:
+                return None
+            s = [x for x in cons if a <= x[0] < z]
+            return (max(x[2] for x in s), min(x[3] for x in s)) if s else None
+
+        for ki, k in enumerate((day(t), week(t), month(t))):
+            if keys[ki] == k:
+                continue
+            keys[ki] = k
+            if ki == 0:
+                ds = sorted({day(x[0]) for x in cons if day(x[0]) < k and day(x[0]).weekday() != 6})
+                r = hilo(ds[-1], ds[-1] + dt.timedelta(days=1)) if ds else None
+                names = ('PDH', 'PDL')
+            elif ki == 1:
+                r = hilo(k - dt.timedelta(days=7), k); names = ('PWH', 'PWL')
+            else:
+                r = hilo(prev_month(t), k); names = ('PMH', 'PML')
+            for side, nm in ((1, names[0]), (-1, names[1])):
+                if r is None:
+                    lv.pop(nm, None); continue
+                L = dict(side=side, p=r[0] if side > 0 else r[1], st='I', pi=None, frm=k)
+                if k < first and variant == 'v2.46':
+                    mp0 = margin(watr[0], mode)
+                    for x in cons:
+                        if k <= x[0] < first and (pts(x[2], L['p']) > mp0 if side > 0 else pts(x[3], L['p']) < -mp0):
+                            L['st'] = 'U'; break
+                if k < first and variant == 'v2.47':
+                    for r_i, pb in enumerate(pre):
+                        if pb[0] >= k and judge(L, pb, margin(patr[r_i], mode), r_i - len(pre)):
+                            break
+                lv[nm] = L
+        for nm, L in lv.items():
+            k = judge(L, b, margin(win_atr(n), mode), n)
+            if k and n >= WARM:
+                ev.append((t, nm, k, L['frm']))
+    return ev, m5[WARM][0]
+
+
+def continuous(allbars, H4, mode):
+    """The reference: one run started long before any window checked."""
+    ev, _ = run(allbars, H4, dt.datetime(2026, 7, 1), 'v2.47', mode)
+    return ev
+
 
 if __name__ == '__main__':
-    for flag, name in ((True, 'v2.45 (H4 pre-scan)'), (False, 'v2.42 (no pre-scan)')):
-        t, b = check(flag)
-        print(f"{name:22s} rebuilds {t}  mismatching {b}")
+    starts = (dt.datetime(2026, 9, 2, 9, 5), dt.datetime(2026, 9, 9, 2, 35), dt.datetime(2026, 9, 16, 5, 50))
+    seeds = range(1, 7)
+    data = {s: make_bars(s) for s in seeds}
+    H4s = {s: h4_of(data[s]) for s in seeds}
+    for mode in ('PIPS', 'ATR'):
+        refs = {s: continuous(data[s], H4s[s], mode) for s in seeds}
+        for variant in ('v2.42', 'v2.46', 'v2.47'):
+            bad = total = 0
+            example = None
+            for s in seeds:
+                for st in starts:
+                    ev, wend = run(data[s], H4s[s], st, variant, mode)
+                    lim = wend + dt.timedelta(hours=24)
+                    a = {e for e in refs[s] if e[0] >= lim}
+                    b = {e for e in ev if e[0] >= lim}
+                    total += 1
+                    if a != b:
+                        bad += 1
+                        if example is None:
+                            d = sorted(a ^ b)[0]
+                            example = f"seed {s} start {st:%m.%d %H:%M}: {d[1]} {d[2]} at {d[0]:%m.%d %H:%M} ({'rebuild only' if d in b else 'continuous only'})"
+            print(f"{mode:4s} {variant}  rebuilds {total:2d}  mismatching {bad:2d}" + (f"   e.g. {example}" if example else ""))

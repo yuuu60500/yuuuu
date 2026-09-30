@@ -23,7 +23,7 @@
 #define LQ_PENDING  1
 #define LQ_SWEPT    2
 #define LQ_BROKEN   3
-#define LQ_UNKNOWN  4          // v2.45: resolved before M5 coverage, kind unknown - never fires
+#define LQ_UNKNOWN  4          // history does not reach the level's start: state cannot be known - never fires
 
 #define PL_COUNT    6          // PDH PDL PWH PWL PMH PML, in that order
 
@@ -56,6 +56,9 @@ long        g_liqev_uid = 0;
 // drawing bookkeeping (read and written by HMI_ObjectManager only)
 long        g_pl_drawn[PL_COUNT];    // owner of the line each slot last drew, 0 = none
 long        g_lqe_del_from = 1;      // labels of events below this uid are already gone
+// v2.47 replay bars: the M5 bars BEFORE the window, for this module only
+MqlRates    g_lr[];  int g_lr_n = 0;  double g_lr_atr[];
+int         g_lr_unknown = 0;        // items the loaded history could not reach
 
 string PLName(const int i)
   {
@@ -78,6 +81,7 @@ void LiqLevelsReset()
    g_liqev_uid = 0;
    for(int d = 0; d < PL_COUNT; d++) g_pl_drawn[d] = 0;
    g_lqe_del_from = 1;
+   g_lr_n = 0;  g_lr_unknown = 0;
   }
 
 //--- period boundaries in broker server time (S-2) ------------------
@@ -134,43 +138,11 @@ void PLSet(const int i, const int side, const double px, const datetime from)
    g_pl[i].event_time   = 0;
   }
 
-// v2.45: a level whose period began before the first M5 bar has a stretch
-// no M5 bar can judge. Replay it on the consumed H4 bars of that stretch
-// (all complete: the M5 window starts on an H4 boundary). Any bar beyond the
-// level means it resolved before coverage: UNKNOWN, no event, never again.
-// A period the H4 history does not reach back to is UNKNOWN as well -
-// the one thing a rebuild must not do is assume nothing happened.
-void PLPreScan(const int i)
-  {
-   if(!g_pl[i].valid || g_m5_n <= 0) return;
-   datetime m5first = g_m5[0].time;
-   if(g_pl[i].from >= m5first) return;                  // fully inside M5 coverage
-   if(g_h4_n <= 0 || g_h4[0].time > g_pl[i].from)
-     {
-      g_pl[i].lq_state = LQ_UNKNOWN;                    // history does not reach the period start
-      return;
-     }
-   int mp = MarginM5Pts(0);
-   for(int h = 0; h < g_h4_cursor && h < g_h4_n; h++)
-     {
-      if(g_h4[h].time < g_pl[i].from) continue;
-      if(g_h4[h].time >= m5first) break;
-      bool beyond = (g_pl[i].side > 0) ? BreakUp(g_h4[h].high, g_pl[i].price, mp)
-                                       : BreakDown(g_h4[h].low, g_pl[i].price, mp);
-      if(!beyond) continue;
-      g_pl[i].lq_state   = LQ_UNKNOWN;
-      g_pl[i].event_time = CloseTimeOf(g_h4[h].time, PERIOD_H4);
-      return;
-     }
-  }
-
 void PLPair(const int i, const bool ok, const double hi, const double lo, const datetime from)
   {
    if(!ok) { g_pl[i].valid = false; g_pl[i+1].valid = false; return; }
    PLSet(i,     +1, hi, from);
    PLSet(i + 1, -1, lo, from);
-   PLPreScan(i);
-   PLPreScan(i + 1);
   }
 
 // Previous TRADING day: the newest consumed H4 day before today, skipping a
@@ -224,26 +196,133 @@ void LiqLevelsRoll(const int n)
      }
   }
 
-//--- S-3 judgement on one closed M5 bar. Returns LQ_SWEPT / LQ_BROKEN
-//--- when the level resolves on this bar, LQ_INTACT otherwise. -------
-int LiqJudge(const int side, const double level, int &state, int &pierce, const int n)
+//=== v2.47: one judgement for every M5 bar, replayed or live ==========
+// Bars before the first M5 bar of the window live in g_lr (loaded only for
+// this module); index k < 0 means g_lr[g_lr_n + k], k >= 0 means g_m5[k].
+// The shared g_m5 series is never touched for liquidity's sake.
+
+bool LiqBarAt(const int k, MqlRates &r)
+  {
+   if(k >= 0) { if(!SafeIdx(k, g_m5_n)) return(false); r = g_m5[k]; return(true); }
+   int j = g_lr_n + k;
+   if(j < 0) return(false);
+   r = g_lr[j];
+   return(true);
+  }
+
+// ATR(14) exactly as SeriesComputeATR defines it, at M5 index n. For the
+// first 14 window bars g_m5_atr is 0 (its own warm-up); here the replay bars
+// supply the missing history, so the threshold at the seam is the one a run
+// started earlier would have used - the historical threshold, restored.
+double LiqAtrAt(const int n)
+  {
+   if(n >= 14 || g_lr_n <= 0) return(SafeIdx(n, g_m5_n) ? g_m5_atr[n] : 0.0);
+   double sum = 0.0;
+   for(int k = n - 13; k <= n; k++)
+     {
+      MqlRates cur, prv;
+      if(!LiqBarAt(k, cur) || !LiqBarAt(k - 1, prv)) return(0.0);
+      sum += MathMax(cur.high - cur.low,
+             MathMax(MathAbs(cur.high - prv.close), MathAbs(cur.low - prv.close)));
+     }
+   return(sum / 14.0);
+  }
+
+int LiqMarginAt(const int n) { return(MarginPtsFrom(LiqAtrAt(n))); }
+
+//--- S-3 on one closed M5 bar. Returns LQ_SWEPT / LQ_BROKEN when the level
+//--- resolves on this bar, LQ_INTACT otherwise. idx is the bar's index in
+//--- the combined numbering above, so a pierce during the replay carries
+//--- over into the window with the right bar count. -----------------------
+int LiqJudgeBar(const int side, const double level, const MqlRates &b, const int mp,
+                const int idx, int &state, int &pierce)
   {
    if(state == LQ_SWEPT || state == LQ_BROKEN || state == LQ_UNKNOWN) return(LQ_INTACT);
    if(state == LQ_INTACT)
      {
-      int mp = MarginM5Pts(n);
-      bool beyond = (side > 0) ? BreakUp(g_m5[n].high, level, mp)
-                               : BreakDown(g_m5[n].low, level, mp);
+      bool beyond = (side > 0) ? BreakUp(b.high, level, mp) : BreakDown(b.low, level, mp);
       if(!beyond) return(LQ_INTACT);
       state  = LQ_PENDING;
-      pierce = n;
+      pierce = idx;
      }
-   bool back = (side > 0) ? (Pts(g_m5[n].close, level) <= 0)
-                          : (Pts(g_m5[n].close, level) >= 0);
+   bool back = (side > 0) ? (Pts(b.close, level) <= 0) : (Pts(b.close, level) >= 0);
    if(back) { state = LQ_SWEPT; return(LQ_SWEPT); }
-   if(n - pierce >= MathMax(0, InpLiqSweepReclaimBars)) { state = LQ_BROKEN; return(LQ_BROKEN); }
+   if(idx - pierce >= MathMax(0, InpLiqSweepReclaimBars)) { state = LQ_BROKEN; return(LQ_BROKEN); }
    return(LQ_INTACT);
   }
+
+int LiqJudge(const int side, const double level, int &state, int &pierce, const int n)
+  {
+   return(LiqJudgeBar(side, level, g_m5[n], LiqMarginAt(n), n, state, pierce));
+  }
+
+// Replay one level / pool from its own start over the M5 bars before the
+// window, with each bar's own ATR threshold. No event is emitted - those
+// bars are outside the window - but the STATE is what a run that started
+// earlier would hold now. History that does not reach the start leaves the
+// state unknowable: UNKNOWN, never fires, and counted in the build log.
+void LiqReplayItem(const int side, const double price, const datetime start, const datetime avail,
+                   int &state, int &pierce, datetime &ev_time)
+  {
+   if(start < avail) { state = LQ_UNKNOWN; g_lr_unknown++; return; }
+   for(int r = 0; r < g_lr_n; r++)
+     {
+      if(g_lr[r].time < start) continue;
+      int k = LiqJudgeBar(side, price, g_lr[r], MarginPtsFrom(g_lr_atr[r]), r - g_lr_n, state, pierce);
+      if(k != LQ_INTACT) { ev_time = CloseTimeOf(g_lr[r].time, PERIOD_M5); return; }
+     }
+  }
+
+void LiqReplay()
+  {
+   g_lr_n = 0;  g_lr_unknown = 0;
+   if(g_m5_n <= 0) return;
+   datetime first = g_m5[0].time;
+   datetime need  = first;
+   for(int i = 0; i < PL_COUNT; i++)
+      if(g_pl[i].valid && g_pl[i].from < need) need = g_pl[i].from;
+   for(int j = 0; j < g_liq_n; j++)
+      if(!g_liq[j].swept && g_liq[j].confirm_time < need) need = g_liq[j].confirm_time;
+   if(need >= first) return;                             // everything starts inside the window
+
+   // three extra days so ATR(14) is already valid at `need`, weekend or not
+   MqlRates tmp[];
+   int got = CopyRates(_Symbol, PERIOD_M5, need - 3 * 86400, first - 1, tmp);
+   if(got > 0)
+     {
+      ArrayResize(g_lr, got);
+      for(int i = 0; i < got; i++) g_lr[i] = tmp[i];
+      g_lr_n = got;
+      SeriesComputeATR(g_lr, g_lr_n, g_lr_atr, 0);
+     }
+   datetime avail = first;                               // nothing loaded: nothing is known
+   if(g_lr_n > 0)
+      avail = g_lr[(InpBreakMarginMode == MARGIN_ATR_FRAC ? MathMin(14, g_lr_n - 1) : 0)].time;
+
+   for(int i = 0; i < PL_COUNT; i++)
+     {
+      if(!g_pl[i].valid || g_pl[i].from >= first) continue;
+      int st = g_pl[i].lq_state, pi = g_pl[i].pierce_index;  datetime et = g_pl[i].event_time;
+      LiqReplayItem(g_pl[i].side, g_pl[i].price, g_pl[i].from, avail, st, pi, et);
+      g_pl[i].lq_state = st;  g_pl[i].pierce_index = pi;  g_pl[i].event_time = et;
+     }
+   for(int j = 0; j < g_liq_n; j++)
+     {
+      if(g_liq[j].swept || g_liq[j].confirm_time >= first) continue;
+      int side = (g_liq[j].type == DIR_BULL ? +1 : -1);
+      int st = g_liq[j].lq_state, pi = g_liq[j].pierce_index;  datetime et = g_liq[j].swept_time;
+      LiqReplayItem(side, g_liq[j].price, g_liq[j].confirm_time, avail, st, pi, et);
+      g_liq[j].lq_state = st;  g_liq[j].pierce_index = pi;
+      if(st == LQ_SWEPT || st == LQ_BROKEN || st == LQ_UNKNOWN) { g_liq[j].swept = true; g_liq[j].swept_time = et; }
+     }
+   if(InpLogSignals)
+      PrintFormat("HMI-LIQ-REPLAY,%s,need_from=%s,have_from=%s,bars=%d,unknown=%d",
+                  _Symbol, TimeToString(need, TIME_DATE|TIME_MINUTES),
+                  (g_lr_n > 0 ? TimeToString(avail, TIME_DATE|TIME_MINUTES) : "none"),
+                  g_lr_n, g_lr_unknown);
+  }
+
+datetime LiqPierceTime(const int k) { MqlRates r; if(LiqBarAt(k, r)) return(r.time); return(0); }
 
 // Record + log one resolution. The row uses the MODEL row's column layout
 // (ids in columns 3-4, event time in 7) so the repaint and LIVE-vs-BUILD
@@ -274,7 +353,7 @@ void LiqEmit(const string name, const int side, const double px, const int pierc
                   (kind == LQ_SWEPT ? "SWEEP" : "BROKEN"),
                   TimeToString(CloseTimeOf(g_m5[n].time, PERIOD_M5), TIME_DATE|TIME_SECONDS),
                   DoubleToString(px, _Digits),
-                  TimeToString(SafeIdx(pierce, g_m5_n) ? g_m5[pierce].time : (datetime)0, TIME_DATE|TIME_SECONDS));
+                  TimeToString(LiqPierceTime(pierce), TIME_DATE|TIME_SECONDS));
   }
 
 //--- Phase 1b: runs on every closed M5 bar, warm-up included, so the
@@ -287,6 +366,7 @@ void LiqM5OnBar(const int n)
    datetime tc = CloseTimeOf(g_m5[n].time, PERIOD_M5);
 
    LiqLevelsRoll(n);
+   if(n == 0) LiqReplay();                    // levels and pools that began before the window
    for(int i = 0; i < PL_COUNT; i++)
      {
       if(!g_pl[i].valid) continue;

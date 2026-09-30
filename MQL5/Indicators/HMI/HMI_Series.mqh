@@ -93,27 +93,9 @@ int SeriesAppend(const ENUM_TIMEFRAMES tf, MqlRates &r[], int &cnt, double &atr[
    return(got);
   }
 
-// v2.45: the M5 window starts on an H4 boundary. Every H4 bar before the
-// first M5 bar is then COMPLETE before it, so the liquidity pre-scan
-// (HMI_LiquidityLevels.mqh) can say exactly what happened to a level before
-// M5 coverage began, instead of guessing about half an H4 bar. At most 47
-// leading bars are dropped - all inside the warm-up anyway.
-void SeriesAlignM5ToH4()
-  {
-   int ps = PeriodSeconds(PERIOD_H4);
-   int k = 0;
-   while(k < g_m5_n && (long)g_m5[k].time % ps != 0) k++;
-   if(k <= 0 || k >= g_m5_n) return;
-   for(int i = k; i < g_m5_n; i++) g_m5[i - k] = g_m5[i];
-   g_m5_n -= k;
-   ArrayResize(g_m5, g_m5_n);
-   SeriesComputeATR(g_m5, g_m5_n, g_m5_atr, 0);
-  }
-
 bool SeriesInit()
   {
    bool a = SeriesLoad(PERIOD_M5, g_m5, g_m5_n, g_m5_atr, InpMaxHistoryBarsM5);
-   if(a) SeriesAlignM5ToH4();
    bool b = SeriesLoad(PERIOD_H4, g_h4, g_h4_n, g_h4_atr, InpMaxHistoryBarsH4);
    return(a && b && g_m5_n > 50 && g_h4_n > 10);
   }
