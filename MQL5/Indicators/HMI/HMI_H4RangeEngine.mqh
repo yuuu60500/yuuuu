@@ -125,6 +125,8 @@ void LiqPush(const HSwing &s)
    p.origin_time = s.bar_time;
    p.swept       = false;
    p.swept_time  = 0;
+   p.lq_state    = 0;                 // LQ_INTACT (HMI_LiquidityLevels.mqh)
+   p.pierce_index = -1;
    p.vis         = -1;
    g_liq[g_liq_n] = p;
    g_liq_n++;
@@ -136,16 +138,10 @@ void LiqOnBar(const int h)
    // register pools for swings confirmed by this very bar
    for(int i = g_h4sw_n - 1; i >= 0 && i >= g_h4sw_n - 4; i--)
       if(g_h4sw[i].confirm_time == t) LiqPush(g_h4sw[i]);
-   // sweeps: a wick is enough, but it is committed at the close
-   for(int k = 0; k < g_liq_n; k++)
-     {
-      if(g_liq[k].swept) continue;
-      if(g_liq[k].origin_time >= g_h4[h].time) continue;
-      if(g_liq[k].type == DIR_BULL && g_h4[h].high >= g_liq[k].price)
-        { g_liq[k].swept = true; g_liq[k].swept_time = t; }
-      if(g_liq[k].type == DIR_BEAR && g_h4[h].low  <= g_liq[k].price)
-        { g_liq[k].swept = true; g_liq[k].swept_time = t; }
-     }
+   // v2.42 (BRI-09 S-5): sweeps are no longer judged here. The old test -
+   // any H4 wick through the level - could not tell a sweep from a break.
+   // Both pools and PD/PW/PM levels are now judged on closed M5 bars by
+   // LiqM5OnBar (HMI_LiquidityLevels.mqh) with one definition.
   }
 
 #endif // HMI_H4RANGE_MQH

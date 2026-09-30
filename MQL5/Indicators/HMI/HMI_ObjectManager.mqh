@@ -9,6 +9,7 @@
 #include "HMI_KillZone.mqh"
 #include "HMI_Ranges.mqh"
 #include "HMI_PriceActionEngine.mqh"
+#include "HMI_LiquidityLevels.mqh"
 
 #define TT_MARK  "MK"
 #define TT_CTX   "CX"
@@ -22,6 +23,8 @@
 #define TT_BPR   "BZ"
 #define TT_PRV   "DB"
 #define TT_KZ    "KZ"
+#define TT_PL    "PL"     // BRI-09 PD / PW / PM level lines + labels
+#define TT_LQE   "LE"     // BRI-09 SWEEP / BROKEN labels
 
 string OM_Prefix() { return(HMI_PREFIX + "_" + g_inst + "_"); }
 
@@ -113,6 +116,12 @@ void OM_DeleteOwner(const string tt, const long owner, const int subs)
      }
   }
 
+void OM_DeleteName(const string name)
+  {
+   ObjectDelete(0, name);
+   OM_Unregister(name);
+  }
+
 bool OM_Protected(const string name)
   {
    // the instance marker owns the tag and the panel is rebuilt every bar:
@@ -120,7 +129,8 @@ bool OM_Protected(const string name)
    return(StringFind(name, "_" + TT_MARK + "_") >= 0 ||
           StringFind(name, "_" + TT_CTX  + "_") >= 0 ||
           StringFind(name, "_" + TT_KZ   + "_") >= 0 ||
-          StringFind(name, "_" + TT_LIQ  + "_") >= 0);
+          StringFind(name, "_" + TT_LIQ  + "_") >= 0 ||
+          StringFind(name, "_" + TT_PL   + "_") >= 0);
   }
 
 void OM_Trim()
@@ -406,6 +416,26 @@ void OM_DrawPanel()
   }
 
 //====================== full sync ===================================
+
+//--- BRI-09 display helpers ------------------------------------------
+bool PLShown(const int i)
+  {
+   if(i <= 1) return(InpShowPD);
+   if(i <= 3) return(InpShowPW);
+   return(InpShowPM);
+  }
+
+StyleZone PLZone(const int i) { return(i <= 1 ? ZS_PD : (i <= 3 ? ZS_PW : ZS_PM)); }
+StyleText PLText(const int i) { return(i <= 1 ? TS_PD : (i <= 3 ? TS_PW : TS_PM)); }
+
+bool LiqEventShown(const string name)
+  {
+   if(name == "PDH" || name == "PDL") return(InpShowPD);
+   if(name == "PWH" || name == "PWL") return(InpShowPW);
+   if(name == "PMH" || name == "PML") return(InpShowPM);
+   return(InpShowLiquidity);                 // BSL / SSL
+  }
+
 void OM_SyncAll()
   {
    datetime redge = OM_RightEdge();
@@ -461,6 +491,66 @@ void OM_SyncAll()
         {
          OM_DeleteOwner(TT_LIQ, g_liq[i].id, 1);
          g_liq[i].vis = -2;
+        }
+     }
+
+   //--- BRI-09: PD / PW / PM - one line per level, labels merged -----
+   //--- where levels coincide ("PDH\x00B7PWH"); a resolved level's line
+   //--- stops at the bar that resolved it ---------------------------
+   for(int i = 0; i < PL_COUNT; i++)
+     {
+      long owner = (long)g_pl[i].from;
+      bool show  = g_pl[i].valid && PLShown(i);
+      if(g_pl_drawn[i] != 0 && (!show || g_pl_drawn[i] != owner))
+        {
+         OM_DeleteName(OM_Name(TT_PL, g_pl_drawn[i], i * 2));
+         OM_DeleteName(OM_Name(TT_PL, g_pl_drawn[i], i * 2 + 1));
+         g_pl_drawn[i] = 0;
+        }
+      if(!show) continue;
+      datetime t2 = (g_pl[i].event_time > 0 ? g_pl[i].event_time : redge);
+      OM_Level(OM_Name(TT_PL, owner, i * 2), g_pl[i].from, t2, g_pl[i].price, PLZone(i));
+      g_pl_drawn[i] = owner;
+
+      bool first = true;                       // an earlier shown level at this price owns the label
+      for(int j = 0; j < i; j++)
+         if(g_pl[j].valid && PLShown(j) && Pts(g_pl[j].price, g_pl[i].price) == 0) { first = false; break; }
+      string lnm = OM_Name(TT_PL, owner, i * 2 + 1);
+      if(!first) { OM_DeleteName(lnm); continue; }
+      string txt = PLName(i);
+      for(int j = i + 1; j < PL_COUNT; j++)
+         if(g_pl[j].valid && PLShown(j) && Pts(g_pl[j].price, g_pl[i].price) == 0)
+            txt += "\x00B7" + PLName(j);
+      OM_Text(lnm, t2, g_pl[i].price, txt, PLText(i),
+              g_pl[i].side > 0 ? ANCHOR_LEFT_LOWER : ANCHOR_LEFT_UPPER);
+     }
+
+   //--- BRI-09: SWEEP / BROKEN labels, last InpLiqSweepDays days ------
+   long first_uid = (g_liqev_n > 0 ? g_liqev[0].uid : g_liqev_uid + 1);
+   for(long u = g_lqe_del_from; u < first_uid; u++)    // records rotated out of the ring
+      OM_DeleteName(OM_Name(TT_LQE, u, 0));
+   g_lqe_del_from = first_uid;
+   datetime newest   = (g_m5_n > 0 ? g_m5[g_m5_n - 1].time : 0);
+   datetime keep_from = newest - (datetime)((long)MathMax(0, InpLiqSweepDays) * 86400);
+   for(int e = 0; e < g_liqev_n; e++)
+     {
+      bool want = InpShowLiqEvents && M5LayerOn() && LiqEventShown(g_liqev[e].name) &&
+                  g_liqev[e].bar_time >= keep_from;
+      string nm = OM_Name(TT_LQE, g_liqev[e].uid, 0);
+      if(want && g_liqev[e].vis < 0)
+        {
+         bool sw = (g_liqev[e].kind == LQ_SWEPT);
+         StyleText lts = TS_LQ_BROKEN;
+         if(sw) lts = TS_LQ_SWEEP;
+         OM_Text(nm, g_liqev[e].bar_time, g_liqev[e].price,
+                 g_liqev[e].name + (sw ? " SWEEP" : " BROKEN"), lts,
+                 g_liqev[e].side > 0 ? ANCHOR_LOWER : ANCHOR_UPPER, M5LayerMask());
+         g_liqev[e].vis = 0;
+        }
+      else if(!want && g_liqev[e].vis >= 0)
+        {
+         OM_DeleteName(nm);
+         g_liqev[e].vis = -2;
         }
      }
 

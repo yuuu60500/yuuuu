@@ -652,7 +652,9 @@ margin 沿用逐根计算（动态 ATR），不引入「余量冻结」。日志
 
 ---
 
-## BRI-09 —— 草案：PDH / PDL / PWH / PWL / PMH / PML 与 Liquidity Sweep（待签字，计划 v2.42）
+## BRI-09 —— RESOLVED：PDH / PDL / PWH / PWL / PMH / PML 与 Liquidity Sweep（v2.42）
+
+**用户 2026-09-30 签字：「BRI-09 六项都同意」—— S-1 至 S-6 全部按 ★ 建议值落地。**
 
 来源：用户 2026-09-30「加入 PWL、PDL、PDH、PWH 这些重要的流动性，并且添加识别 liquidity sweep」；
 同日补充「不能只加 PDH/PDL/PWH/PWL，加入月的」→ 增加 PMH / PML（上月高 / 低）。

@@ -6,7 +6,7 @@
 #ifndef HMI_DEFS_MQH
 #define HMI_DEFS_MQH
 
-#define HMI_VERSION      "2.41"
+#define HMI_VERSION      "2.42"
 #define HMI_PREFIX       "HMI"
 
 //--- direction ------------------------------------------------------
@@ -30,6 +30,7 @@
 #define MAX_BPR          32
 #define MAX_TRANGE       64
 #define MAX_LIQ         128
+#define MAX_LIQEV        64   // v2.42 sweep / broken events kept for drawing
 #define MAX_OBJREG     1024
 #define MAX_ALERTQ       32
 
@@ -257,8 +258,10 @@ struct LiqPool
    int               type;           // DIR_BULL = BSL, DIR_BEAR = SSL
    double            price;
    datetime          origin_time;
-   bool              swept;
-   datetime          swept_time;
+   bool              swept;          // RESOLVED (v2.42: SWEEP or BROKEN) - the line goes
+   datetime          swept_time;     // close of the bar that resolved it
+   int               lq_state;       // LQ_INTACT / LQ_PENDING / LQ_SWEPT / LQ_BROKEN
+   int               pierce_index;   // M5 bar that first went beyond, -1 if none
    int               vis;            // last drawn state (-2 = graphics removed)
   };
 

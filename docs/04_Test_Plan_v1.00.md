@@ -762,3 +762,19 @@ Historical vs Live:    NOT VERIFIED
 MetaEditor:            PASS         (v2.40, 0 errors / 0 warnings, 2026-09-24)
 Replay:                NOT VERIFIED
 ```
+
+
+---
+
+### v2.42 验收清单（BRI-09 + A-37 诊断）
+
+```
+1  编译 0 errors（Rule 70）
+2  图上：六条水平线（PD 蓝 / PW 紫 / PM 金，虚线），重合价位只有一个合并标签
+   对照券商 D1 / W1 / MN1 K 线核对数值（数据窗口）
+3  SWEEP / BROKEN 标签只出现在 M5 层，保留最近 5 天
+4  日志：HMI-BUILD,<sym>,LIQ,... 行；`-Source` 重载对比与 `-LiveVsBuild` 一并覆盖
+5  -Chain：A-37 各品种链条停在哪一步
+6  回归：v2.40 的 MODEL 标记在 v2.42 重建中不变（S-1 只标记）——
+   用 v2.40 与 v2.42 各一次重建的 MODEL 行对比
+```

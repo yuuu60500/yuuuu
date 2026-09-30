@@ -54,12 +54,21 @@ input double InpPARejWickToRange      = 0.5;
 input int    InpPABreakRetestMaxBars  = 12;
 input double InpPARetestTolerancePips = 0.5;
 
+input group "=== Liquidity sweep (BRI-09, mark only) ==="
+input int    InpLiqSweepReclaimBars    = 3;      // S-3: M5 bars to close back; 0 = same bar only
+input bool   InpPDSkipSunday           = true;   // S-2: PDH/PDL skip a short Sunday session
+
 input group "=== Display ==="
 input bool   InpShowH4POI             = true;
 input bool   InpShowDeadH4POI         = true;   // false: INVALIDATED / EXPIRED POI 不上图
 input bool   InpShowTradingRange      = true;
 input bool   InpShowLiquidity         = true;
 input int    InpLiqMaxLines            = 10;   // per side; keeps the chart readable
+input bool   InpShowPD                 = true;   // BRI-09: previous day high / low
+input bool   InpShowPW                 = true;   // BRI-09: previous week high / low
+input bool   InpShowPM                 = true;   // BRI-09: previous month high / low
+input bool   InpShowLiqEvents          = true;   // SWEEP / BROKEN labels
+input int    InpLiqSweepDays           = 5;      // days of SWEEP / BROKEN labels kept on chart
 input bool   InpShowM5Blocks          = true;
 input bool   InpShowCounterDirBlocks  = false;  // CONF-06 breaker material
 input bool   InpShowRejectedOB        = false;  // BRI-04 diagnostic

@@ -298,11 +298,33 @@ LiquidityPool {
 
 - `BSL` = 已确认 Swing High（及其 equal highs）
 - `SSL` = 已确认 Swing Low（及其 equal lows）
-- `SWEPT` 判定：H4 **Wick** 越过即可（流动性是被"扫"的，不需要收盘确认），
-  但 `swept_time` 只在该 H4 K 线**收盘后**提交（AX-1：提交时刻 = 收盘时刻）。
+- ~~`SWEPT` 判定：H4 **Wick** 越过即可~~ —— **v2.42 起废止（BRI-09 S-5）**，
+  它分不清「扫了收回」与「直接突破」。现与 PD/PW/PM 共用 §3.5 的同一判定。
 - 相对 Trading Range：`EXTERNAL`（在 TR 之外）/ `INTERNAL`（在 TR 之内）
 
 Liquidity 在 v1.00 **只标记、不过滤**（Rule 69）。
+
+### 3.5 PD / PW / PM 水平位与 Liquidity Sweep（BRI-09，v2.42）
+
+```
+水平位   PDH/PDL 上一个交易日（可跳过周日短时段）· PWH/PWL 上一周 · PMH/PML 上一月
+         边界 = 券商服务器时间的 D1 / W1（周日开）/ MN1
+         取值 = Phase 0 已消费的 H4 K 线在该周期内的最高 / 最低
+                （H4 严格嵌套于日 / 周 / 月，与 D1/W1/MN1 K 线本身相同；
+                 窗口不能完整覆盖该周期时不画、不判定）
+         换期 = 本根 M5 所在的日 / 周 / 月变化时
+
+判定     仅在已收盘 M5 上，所有水平位（含 H4 BSL/SSL）同一规则：
+         越过   影线越过水平位且超过 break margin（D-6，逐根）
+         SWEEP  越过的那根本身、或其后 N 根之内，任一根收盘回到原侧
+                （N = InpLiqSweepReclaimBars，默认 3；N = 0 即只看越过那一根）
+         BROKEN 其后第 N 根收盘仍未收回（提交于该根）
+         每个水平位只判定一次；提交于决定那根的收盘（AX-1）
+
+作用     只标记 + 日志（S-1）。不进入 POI / Session / Block / 模型链。
+日志     HMI-BUILD|HMI-LIVE,<sym>,LIQ,<side>,0,0,<level>,SWEEP|BROKEN,<close>,<px>,<pierce>,0
+         与 MODEL 行同列布局，重绘与 LIVE-vs-BUILD 检查一并覆盖
+```
 
 ---
 
@@ -1396,6 +1418,11 @@ ProcessClosedM5Bar(n):
 
   Phase 1  M5 Structure Update
            bar n 的 M5 Swing 确认（滞后 R 根）、FVG 确认、OB/Breaker Candidate 登记
+
+  Phase 1b Liquidity levels & sweeps（BRI-09，2026-09-30 用户签字，v2.42）
+           PD / PW / PM 水平位换期、PD/PW/PM 与 H4 BSL/SSL 的 SWEEP / BROKEN 判定。
+           只标记（S-1）：Phase 2–7 不读取其任何状态。
+           位于 warm-up 返回之前：水平位状态与构建起点无关，事件在 warm-up 内不输出。
 
   Phase 2  Invalidation Pass (POI / Block)
            用 bar n 的 close 判定 H4 POI（用 H4 close，见 4.5）/ M5 Block 失效

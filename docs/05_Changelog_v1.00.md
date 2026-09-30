@@ -1307,3 +1307,55 @@ Test Impact:
 Compile Status:
   NOT COMPILE VERIFIED（Rule 70）
 ```
+
+---
+
+## v2.42 — BRI-09：PD / PW / PM 水平位与统一的 Liquidity Sweep 判定（含 v2.41 诊断日志）
+
+```
+Version:  v2.42
+Date:     2026-09-30
+签字:     BRI-09 S-1…S-6 全部同意（用户 2026-09-30）；
+          用户要求「用新的版本测试」—— v2.41 未单独发布，其诊断日志随本版一起测试
+
+New Module:
+  HMI_LiquidityLevels.mqh
+    LiqM5OnBar()       Phase 1b。换期 → 判定 → 事件
+    LiqLevelsRoll()    日 / 周 / 月变化时由已消费 H4 求上一周期高低（S-2）
+    PrevTradingDay()   PDH/PDL 可跳过周日短时段（InpPDSkipSunday）
+    LiqJudge()         S-3：越过（+margin）→ N 根内收回 = SWEEP，否则 BROKEN；S-4 只判一次
+    LiqEmit()          事件记录 + HMI-BUILD/LIVE LIQ 行（与 MODEL 行同列布局）
+
+Changed Functions:
+  LiqOnBar()           删除「H4 影线碰到即 swept」（S-5）；只保留登记 BSL/SSL
+  LiqPush()            初始化 lq_state / pierce_index
+  ProcessClosedM5Bar() Phase 1 之后、warm-up 返回之前调用 LiqM5OnBar
+  ResetEngine()        LiqLevelsReset()
+  OM_SyncAll()         六条水平线（重合价位合并标签，已判定的线止于判定那根）；
+                       SWEEP / BROKEN 标签，保留 InpLiqSweepDays 天
+  OM_Protected()       PL 线不参与裁剪；新增 OM_DeleteName()
+
+Changed States:
+  LiqPool  + lq_state, pierce_index；swept 语义改为「已判定（SWEEP 或 BROKEN）」
+
+New Inputs:
+  InpLiqSweepReclaimBars = 3     InpPDSkipSunday = true
+  InpShowPD / InpShowPW / InpShowPM = true
+  InpShowLiqEvents = true        InpLiqSweepDays = 5
+  Style: InpPDColor / InpPWColor / InpPMColor / InpPLStyle / InpPLWidth / InpPLTextSize /
+         InpLiqSweepColor / InpLiqBrokenColor / InpLiqEventTextSize
+
+Trading Logic Changed:
+  NO（S-1）—— POI / Session / Block / Cycle / 模型均不读取本模块任何状态。
+  显示变化：H4 BSL/SSL 线消失的时点由「H4 影线碰到」改为「M5 判定 SWEEP/BROKEN」。
+
+Also in this build (v2.41, 未单独发布):
+  HMI-POI / HMI-SESS / HMI-BLK / HMI-ARM 诊断日志（A-37），仅日志
+
+Tooling:
+  ReloadTest.ps1  -Live / -Quiet / -Chain 的「最新标记」只取 MODEL 行；
+                  -Chain 另列 LIQ 事件；-LiveVsBuild 模型分布含 LIQ <level> <kind>
+
+Compile Status:
+  NOT COMPILE VERIFIED（Rule 70）
+```

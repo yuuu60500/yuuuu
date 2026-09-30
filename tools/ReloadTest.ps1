@@ -44,6 +44,9 @@ param([string]$Source = "", [switch]$LiveVsBuild, [switch]$Rejects, [switch]$Liv
 # Row layout after the tag is stripped:
 #   0 symbol  1 "MODEL"  2 dir  3 cycle_id  4 block_id  5 anchor  6 model
 #   7 confirm_time  8 price  9 ref_time  10 ref_level
+# v2.42 liquidity rows share the layout so every check takes them as marks:
+#   0 symbol  1 "LIQ"  2 side  3 0  4 0  5 level (PDH..PML/BSL/SSL)
+#   6 SWEEP|BROKEN  7 resolve_time  8 level_price  9 pierce_time  10 0
 # Columns 3 and 4 are init-relative sequence numbers - see -LiveVsBuild below.
 function Key([string]$row) {
     $c = $row -split ','
@@ -121,7 +124,8 @@ if ($Live) {
         if (-not $tally.ContainsKey($src)) { $tally[$src] = 0 }
         if ($l -match 'HMI-LIVE,') { $tally[$src]++ }
         # 'yyyy.MM.dd HH:mm:ss' sorts correctly as text - no culture parsing.
-        if ($cols.Count -gt 7 -and ((-not $newest.ContainsKey($src)) -or $cols[7] -gt $newest[$src])) { $newest[$src] = $cols[7] }
+        # newest MODEL mark only: a v2.42 LIQ sweep row is not a link of the mark chain
+        if ($cols.Count -gt 7 -and $cols[1] -eq 'MODEL' -and ((-not $newest.ContainsKey($src)) -or $cols[7] -gt $newest[$src])) { $newest[$src] = $cols[7] }
     }
     if ($tally.Count -eq 0) {
         Write-Host "`nno HMI rows at all. Is InpLogSignals = true ?" -ForegroundColor Red
@@ -168,9 +172,10 @@ if ($Chain) {
         $L = $last[$src].Lines
         $diag = @($L | Where-Object { $_ -match '^HMI-(POI|SESS|BLK|ARM),' })
         Write-Host "`n--- $src   rebuild to=$($last[$src].To)" -ForegroundColor Cyan
-        if ($diag.Count -eq 0) { Write-Host "  no v2.41 diagnostic lines in this rebuild (older version on this chart?)" -ForegroundColor Yellow; continue }
+        if ($diag.Count -eq 0) { Write-Host "  no chain diagnostic lines in this rebuild (chart still on a version before v2.41?)" -ForegroundColor Yellow; continue }
         $any = $true
-        $marks = @($L | Where-Object { $_ -match '^HMI-BUILD,' } | ForEach-Object { ($_ -split ',')[8] })
+        $marks = @($L | Where-Object { $_ -match '^HMI-BUILD,[^,]*,MODEL,' } | ForEach-Object { ($_ -split ',')[8] })
+        $liq   = @($L | Where-Object { $_ -match '^HMI-BUILD,[^,]*,LIQ,' })
         $nm = if ($marks.Count) { @($marks | Sort-Object)[-1].Substring(0, 16) } else { '0000' }
         function Bar([string]$m) { if ($m -match 'bar=([0-9.: ]+)') { $Matches[1].Trim() } else { '' } }
         $steps = [ordered]@{
@@ -188,6 +193,10 @@ if ($Chain) {
             if (-not $stop -and $aft.Count -eq 0) { $stop = $k }
         }
         Write-Host ("  {0,-26} {1,8} {2,14}" -f 'mark', $marks.Count, 0)
+        if ($liq.Count) {
+            $lk = $liq | ForEach-Object { $c = $_ -split ','; "$($c[6]) $($c[7])" } | Group-Object | Sort-Object Name | ForEach-Object { "$($_.Name) x$($_.Count)" }
+            Write-Host "  liquidity (not a chain link): $($lk -join ', ')" -ForegroundColor DarkGray
+        }
         # what ended the POIs and sessions since the last mark
         $out = @($diag | Where-Object { $_ -match '^HMI-POI,[^,]*,(INVALID|EXPIRED|OUT),' -and (Bar $_) -gt $nm } |
                  ForEach-Object { if ($_ -match '^HMI-POI,[^,]*,([A-Z]+),.*was=([A-Z]+)') { "$($Matches[1]) (was $($Matches[2]))" } })
@@ -198,7 +207,7 @@ if ($Chain) {
         if ($stop) { Write-Host "  since the last mark the chain stops at: $stop" -ForegroundColor Yellow }
         else       { Write-Host "  every link fired since the last mark; the model step produced nothing" -ForegroundColor Yellow }
     }
-    if (-not $any) { Write-Host "`nreload the charts on v2.41 first, then run this again." -ForegroundColor Yellow }
+    if (-not $any) { Write-Host "`nreload the charts on v2.41 or later first, then run this again." -ForegroundColor Yellow }
     exit
 }
 
@@ -227,7 +236,7 @@ if ($Quiet) {
             $t = $Matches[1].Trim(); if (-not $lastTo.ContainsKey($src) -or $t -gt $lastTo[$src]) { $lastTo[$src] = $t }
         } elseif ($l -match 'HMI-(LIVE|BUILD),(.*)$') {
             $c = $Matches[2] -split ','
-            if ($c.Count -gt 7 -and ((-not $newest.ContainsKey($src)) -or $c[7] -gt $newest[$src])) { $newest[$src] = $c[7] }
+            if ($c.Count -gt 7 -and $c[1] -eq 'MODEL' -and ((-not $newest.ContainsKey($src)) -or $c[7] -gt $newest[$src])) { $newest[$src] = $c[7] }
         }
     }
     foreach ($src in ($ev.Keys | Sort-Object)) {
@@ -495,7 +504,8 @@ function Show-LiveVsBuild([string]$src) {
     if ($ok.Count -gt 0) {
         # Coverage matters as much as the count: a PASS on one model says
         # nothing about the others' live paths.
-        $bm = $ok | Group-Object { ($_.Row -split ',')[6] } | Sort-Object Name | ForEach-Object { "$($_.Name) $($_.Count)" }
+        $bm = $ok | Group-Object { $c = $_.Row -split ','; if ($c[1] -eq 'LIQ') { "LIQ $($c[5]) $($c[6])" } else { $c[6] } } |
+              Sort-Object Name | ForEach-Object { "$($_.Name) $($_.Count)" }
         Write-Host ("  comparable by model: " + ($bm -join '  |  '))
     }
     if ($ok.Count -eq 0) {

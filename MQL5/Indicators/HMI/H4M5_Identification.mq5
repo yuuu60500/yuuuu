@@ -25,6 +25,7 @@
 #include "HMI_MSSEngine.mqh"           // Phase 4: MSS_Check
 #include "HMI_BPREngine.mqh"           // Phase 4: BPR_Check / BPRLifecycle
 #include "HMI_PriceActionEngine.mqh"   // Phase 4 / 5b: PA_*
+#include "HMI_LiquidityLevels.mqh"     // Phase 1b: LiqM5OnBar (mark only)
 
 //+------------------------------------------------------------------+
 //| Phase 0 helper: consume one CLOSED H4 bar                        |
@@ -110,6 +111,12 @@ void ProcessClosedM5Bar(const int n)
    SwingDetect(g_m5, n, PERIOD_M5, InpM5SwingLeft, InpM5SwingRight,
                g_m5sw, g_m5sw_n, MAX_M5_SWINGS);
    int fi = FvgDetect(g_m5, n, PERIOD_M5, g_m5fvg, g_m5fvg_n, MAX_M5_FVG);
+
+   //--- Phase 1b: liquidity levels & sweeps (BRI-09, mark only) ------
+   // Before the warm-up gate on purpose: level state must not depend on
+   // which bar a build started from. LiqM5OnBar holds back the events
+   // itself during warm-up. Nothing in Phase 2-7 reads its state (S-1).
+   LiqM5OnBar(n);
 
    //--- warmup: build structure, but never mark anything ------------
    if(n < InpWarmupSuppressBars) return;
@@ -204,6 +211,7 @@ void ResetEngine()
    g_sess.end_time = 0;    g_sess.end_reason = SE_NONE;
 
    g_tr_drawn_id = -1;
+   LiqLevelsReset();
    OM_DeleteOwnAll();
    OM_RecreateMarker();
   }

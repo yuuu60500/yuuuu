@@ -63,6 +63,18 @@ input color           InpSSLColor       = clrSlateGray;      // sell-side liquid
 input ENUM_LINE_STYLE InpSSLStyle       = STYLE_DOT;
 input int             InpSSLWidth       = 1;
 
+//================== BRI-09 PD / PW / PM levels & sweeps =============
+input group "=== Style: PD / PW / PM levels & sweeps ==="
+input color           InpPDColor        = clrSteelBlue;      // previous day
+input color           InpPWColor        = clrMediumPurple;   // previous week
+input color           InpPMColor        = clrGoldenrod;      // previous month
+input ENUM_LINE_STYLE InpPLStyle        = STYLE_DASH;
+input int             InpPLWidth        = 1;
+input int             InpPLTextSize     = 7;
+input color           InpLiqSweepColor  = clrOrange;         // SWEEP label
+input color           InpLiqBrokenColor = clrGray;           // BROKEN label
+input int             InpLiqEventTextSize = 7;
+
 //================== M5 blocks ======================================
 input group "=== Style: M5 order block ==="
 input color           InpOBBullColor    = clrDodgerBlue;
@@ -172,12 +184,14 @@ struct StyleText
 
 StyleZone ZS_POI_BULL,  ZS_POI_BEAR,  ZS_POI_TOUCH, ZS_POI_DEAD;
 StyleZone ZS_TRANGE,    ZS_BSL,       ZS_SSL;
+StyleZone ZS_PD,        ZS_PW,        ZS_PM;
 StyleZone ZS_OB_BULL,   ZS_OB_BEAR,   ZS_BRK_BULL,  ZS_BRK_BEAR;
 StyleZone ZS_BLK_TOUCH, ZS_BLK_ARMED, ZS_BLK_DEAD;
 StyleZone ZS_BPR,       ZS_BPR_TOUCH, ZS_BPR_DEAD;
 StyleZone ZS_CISD_LINE, ZS_MSS_LINE;
 
 StyleText TS_POI, TS_ARMED, TS_LEVEL, TS_PANEL, TS_PREVIEW, TS_TRANGE;
+StyleText TS_PD, TS_PW, TS_PM, TS_LQ_SWEEP, TS_LQ_BROKEN;
 
 void SetZ(StyleZone &z, const color c, const ENUM_LINE_STYLE s, const int w, const bool f)
   { z.clr = c; z.style = s; z.width = MathMax(1, w); z.fill = f; }
@@ -195,6 +209,9 @@ void StylesInit()
    SetZ(ZS_TRANGE,    InpTRangeColor,   InpTRangeStyle,   InpTRangeWidth,   false);
    SetZ(ZS_BSL,       InpBSLColor,      InpBSLStyle,      InpBSLWidth,      false);
    SetZ(ZS_SSL,       InpSSLColor,      InpSSLStyle,      InpSSLWidth,      false);
+   SetZ(ZS_PD,        InpPDColor,       InpPLStyle,       InpPLWidth,       false);
+   SetZ(ZS_PW,        InpPWColor,       InpPLStyle,       InpPLWidth,       false);
+   SetZ(ZS_PM,        InpPMColor,       InpPLStyle,       InpPLWidth,       false);
 
    SetZ(ZS_OB_BULL,   InpOBBullColor,   InpOBBullStyle,   InpOBBullWidth,   InpBlkFill);
    SetZ(ZS_OB_BEAR,   InpOBBearColor,   InpOBBearStyle,   InpOBBearWidth,   InpBlkFill);
@@ -217,6 +234,11 @@ void StylesInit()
    SetT(TS_PANEL,   InpPanelColor,     InpPanelFontSize);
    SetT(TS_PREVIEW, InpPreviewColor,   InpPreviewTextSize);
    SetT(TS_TRANGE,  InpTRangeTextColor, InpTRangeTextSize);
+   SetT(TS_PD,        InpPDColor,        InpPLTextSize);
+   SetT(TS_PW,        InpPWColor,        InpPLTextSize);
+   SetT(TS_PM,        InpPMColor,        InpPLTextSize);
+   SetT(TS_LQ_SWEEP,  InpLiqSweepColor,  InpLiqEventTextSize);
+   SetT(TS_LQ_BROKEN, InpLiqBrokenColor, InpLiqEventTextSize);
   }
 
 bool M5LayerOn() { return(InpM5Layer != M5LAYER_OFF); }
