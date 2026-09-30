@@ -161,7 +161,7 @@ if ($Chain) {
     foreach ($l in $all) {
         if ($l -notmatch '\(([A-Za-z0-9._#]+,[A-Za-z0-9]+)\)\s+(HMI.*)$') { continue }
         $src = $Matches[1]; $msg = $Matches[2]
-        if ($msg -match '^HMI-BUILD-BEGIN,.*to=([0-9.: ]+)') { $cur[$src] = [pscustomobject]@{ To = $Matches[1].Trim(); Lines = New-Object System.Collections.ArrayList }; continue }
+        if ($msg -match '^HMI-BUILD-BEGIN,.*from=([0-9.: ]+),to=([0-9.: ]+)') { $cur[$src] = [pscustomobject]@{ From = $Matches[1].Trim(); To = $Matches[2].Trim(); Lines = New-Object System.Collections.ArrayList }; continue }
         if (-not $cur.ContainsKey($src)) { continue }
         if ($msg -match '^HMI-BUILD-END,') { $last[$src] = $cur[$src]; $cur.Remove($src); continue }
         [void]$cur[$src].Lines.Add($msg)
@@ -176,8 +176,17 @@ if ($Chain) {
         $any = $true
         $marks = @($L | Where-Object { $_ -match '^HMI-BUILD,[^,]*,MODEL,' } | ForEach-Object { ($_ -split ',')[8] })
         $liq   = @($L | Where-Object { $_ -match '^HMI-BUILD,[^,]*,LIQ,' })
-        $nm = if ($marks.Count) { @($marks | Sort-Object)[-1].Substring(0, 16) } else { '0000' }
-        $nmLabel = if ($marks.Count) { "since $nm" } else { 'since start' }
+        # The H4 feed reaches ~80 days back, the M5 feed ~26. Everything H4
+        # did before the first M5 bar (plus the M5 warm-up, where Phase 3 does
+        # not run) happened with no M5 bar that could touch anything, so it is
+        # counted separately instead of passing for evidence.
+        $ic2 = [Globalization.CultureInfo]::InvariantCulture
+        $m5Start = [datetime]::ParseExact($last[$src].From, 'yyyy.MM.dd HH:mm', $ic2).AddMinutes(5 * $Warmup)
+        $ws = $m5Start.ToString('yyyy.MM.dd HH:mm', $ic2)
+        $nm = if ($marks.Count) { @($marks | Sort-Object)[-1].Substring(0, 16) } else { $ws }
+        if ($nm -lt $ws) { $nm = $ws }
+        $nmLabel = if ($marks.Count) { "since $nm" } else { 'since M5 start' }
+        Write-Host ("  M5 window after warm-up starts ~{0}; H4-only history before it is excluded" -f $ws) -ForegroundColor DarkGray
         function Bar([string]$m) { if ($m -match 'bar=([0-9.: ]+)') { $Matches[1].Trim() } else { '' } }
         $steps = [ordered]@{
             'POI created'              = '^HMI-POI,[^,]*,NEW,'
@@ -185,10 +194,10 @@ if ($Chain) {
             'M5 block (trend dir)'     = '^HMI-BLK,.*,counter=0,'
             'block ARMED'              = '^HMI-ARM,'
         }
-        Write-Host ("  {0,-26} {1,8} {2,14}" -f 'step', 'window', $nmLabel) -ForegroundColor DarkGray
+        Write-Host ("  {0,-26} {1,8} {2,14}" -f 'step', 'M5 window', $nmLabel) -ForegroundColor DarkGray
         $stop = ''
         foreach ($k in $steps.Keys) {
-            $all1 = @($diag | Where-Object { $_ -match $steps[$k] })
+            $all1 = @($diag | Where-Object { $_ -match $steps[$k] -and (Bar $_) -ge $ws })
             $aft  = @($all1 | Where-Object { (Bar $_) -gt $nm })
             Write-Host ("  {0,-26} {1,8} {2,14}" -f $k, $all1.Count, $aft.Count)
             if (-not $stop -and $aft.Count -eq 0) { $stop = $k }
@@ -224,8 +233,13 @@ if ($Chain) {
             }
         }
         $fate = [ordered]@{ 'touched (session)' = 0; 'untouched, context left first' = 0; 'untouched, INVALID, context agreed' = 0; 'untouched, expired / out' = 0; 'still active' = 0 }
-        $sus = @()
+        $sus = @(); $pre = 0
         foreach ($p in $pois.Values) {
+            # gone before any M5 bar could touch it: not evidence either way.
+            # An INVALID needs its whole breaking H4 bar inside the M5 window.
+            $lim = $ws
+            if ($p.How -eq 'INVALID') { $lim = ([datetime]::ParseExact($ws, 'yyyy.MM.dd HH:mm', $ic2)).AddHours(4).ToString('yyyy.MM.dd HH:mm', $ic2) }
+            if ($p.End -and $p.End -le $lim) { $pre++; continue }
             if ($touched.ContainsKey($p.Id)) { $fate['touched (session)']++; continue }
             if (-not $p.End)                 { $fate['still active']++; continue }
             if ($p.How -ne 'INVALID')        { $fate['untouched, expired / out']++; continue }
@@ -234,10 +248,11 @@ if ($Chain) {
             if ($left -gt 0) { $fate['untouched, context left first']++ }
             else { $fate['untouched, INVALID, context agreed']++; $sus += $p }
         }
-        Write-Host "  POI fate (whole window):" -ForegroundColor DarkGray
+        Write-Host "  POI fate (POIs alive inside the M5 window):" -ForegroundColor DarkGray
         foreach ($k in $fate.Keys) {
             Write-Host ("      {0,-36} {1,4}" -f $k, $fate[$k]) -ForegroundColor $(if ($k -like '*agreed*' -and $fate[$k] -gt 0) { 'Red' } else { 'Gray' })
         }
+        Write-Host ("      {0,-36} {1,4}" -f '(ended in H4-only history, excluded)', $pre) -ForegroundColor DarkGray
         foreach ($p in ($sus | Select-Object -First 5)) {
             Write-Host ("        id={0} dir={1} created {2} -> INVALID {3}" -f $p.Id, $p.Dir, $p.Born, $p.End) -ForegroundColor Red
         }
