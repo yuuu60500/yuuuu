@@ -1103,7 +1103,7 @@ Actual Behavior:         SeriesAppend() 把新 H4 追加进 g_h4 后 g_h4_n 立�
 Impact:                  面板同一行里混合了两个时点的数据
 Business Logic Impact:   NO（仅显示）
 Recommended Fix:         面板一律读 g_h4_cursor - 1，与结构状态同源
-Status:                  **OPEN**
+Status:                  **FIXED —— v2.43**（RangesATRText 读 g_h4_cursor - 1）
 Confidence:              HIGH
 ```
 

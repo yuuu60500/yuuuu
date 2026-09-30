@@ -69,7 +69,13 @@ string RangesPips(const double price_value)
 
 string RangesATRText()
   {
-   double a_h4 = (g_h4_n > 0 ? g_h4_atr[g_h4_n - 1] : 0.0);
+   // A-34: the H4 bar the structure engine has CONSUMED, not the newest one
+   // SeriesAppend has stored. Between the two, Context / strength on the
+   // same panel still describe the older bar; reading g_h4_n - 1 mixed two
+   // points in time on one screen. g_m5 has no such gap: every appended M5
+   // bar is processed in the same call.
+   int    hc   = MathMin(g_h4_cursor, g_h4_n) - 1;
+   double a_h4 = (hc >= 0 ? g_h4_atr[hc] : 0.0);
    double a_m5 = (g_m5_n > 0 ? g_m5_atr[g_m5_n - 1] : 0.0);
    string s = "ATR(14): H4 ";
    s += (a_h4 > 0.0 ? RangesPips(a_h4) + " pip" : "n/a");

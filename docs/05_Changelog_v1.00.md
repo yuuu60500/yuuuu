@@ -1360,3 +1360,29 @@ Tooling:
 Compile Status:
   PASS — 0 errors / 0 warnings（用户实测，2026-09-30，3031 ms，AVX2 + FMA3；v2.42 构建，涵盖 v2.41 诊断日志）
 ```
+
+---
+
+## v2.43 — A-34：面板 H4 ATR 与结构引擎同一时点
+
+```
+Version:  v2.43
+Date:     2026-09-30
+签字:     用户 2026-09-30「1-3 暂且不用修改，只修改 4」
+
+Changed Functions:
+  RangesATRText()   H4 ATR 读 g_h4_atr[g_h4_cursor - 1]（结构引擎已消费的最后一根），
+                    不再读 g_h4_atr[g_h4_n - 1]（已追加但可能尚未消费的一根）
+
+Changed States:
+  (none)
+
+Trading Logic Changed:
+  NO —— 仅面板显示。M5 ATR 不变（M5 追加即处理，无游标差）。
+
+Not in this version（用户决定暂缓）:
+  A-33 BOS 去重 / BRI-08 CISD·MSS 首次有效收盘 / protected_level · leg_anchor
+
+Compile Status:
+  NOT COMPILE VERIFIED（Rule 70）
+```
