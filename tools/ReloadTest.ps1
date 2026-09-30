@@ -21,6 +21,9 @@
 #     .\ReloadTest.ps1 -Rejects              Rule 6 refusals, all charts
 #     .\ReloadTest.ps1 -Ctx                  H4 context events + the strength
 #                                            distribution the panel bands on
+#     .\ReloadTest.ps1 -Quiet                why a chart has had no mark lately:
+#                                            its context timeline since the last
+#                                            mark, and the POIs Rule 6 refused
 #     .\ReloadTest.ps1 -Source "USDJPY,M5"   repaint test on that one chart
 #
 #     add  -Days 5  to merge the 5 most recent log files. MT5 starts a NEW
@@ -33,7 +36,7 @@
 #  hence the grouping below.
 # ============================================================
 param([string]$Source = "", [switch]$LiveVsBuild, [switch]$Rejects, [switch]$Live,
-      [switch]$Ctx, [int]$Days = 1, [string]$LogDir = "", [int]$Warmup = 100)
+      [switch]$Ctx, [switch]$Quiet, [int]$Days = 1, [string]$LogDir = "", [int]$Warmup = 100)
 
 # Row layout after the tag is stripped:
 #   0 symbol  1 "MODEL"  2 dir  3 cycle_id  4 block_id  5 anchor  6 model
@@ -138,6 +141,64 @@ if ($Live) {
         Write-Host "wait a minute for the log to flush," -ForegroundColor Yellow
         Write-Host "then run:  .\ReloadTest.ps1 -LiveVsBuild -Days $Days" -ForegroundColor Yellow
     }
+    exit
+}
+
+# -Quiet: a chart with no recent mark is either quiet by rule or stalled, and
+# the current context alone cannot tell (a trend that began an hour ago says
+# nothing about the ten days before). A mark needs, in order: a trending
+# context, an ACTIVE H4 POI in that direction, price reaching it, an M5
+# block, ARMED, a model. Only the first link and the POI refusals are in the
+# log, so this reports exactly those two, from the last mark to now.
+if ($Quiet) {
+    $ic = [Globalization.CultureInfo]::InvariantCulture
+    function P16([string]$t) { $d = [datetime]::MinValue
+        [void][datetime]::TryParseExact($t.Trim().Substring(0, [Math]::Min(16, $t.Trim().Length)), 'yyyy.MM.dd HH:mm', $ic, [Globalization.DateTimeStyles]::None, [ref]$d); $d }
+    $ev = @{}; $newest = @{}; $lastTo = @{}; $rej = @{}
+    foreach ($l in $all) {
+        if ($l -notmatch '\(([A-Za-z0-9._#]+,[A-Za-z0-9]+)\)') { continue }
+        $src = $Matches[1]
+        if ($l -match 'HMI-CTX,[^,]*,([A-Z_]+),.*ctx=([A-Z_]+),str=(\d+).*,bar=([0-9.: ]+),') {
+            if (-not $ev.ContainsKey($src)) { $ev[$src] = @{} }
+            $k = "$($Matches[4].Trim())|$($Matches[1])|$($Matches[2])"
+            $ev[$src][$k] = [pscustomobject]@{ Bar = $Matches[4].Trim(); Kind = $Matches[1]; Ctx = $Matches[2]; Str = $Matches[3] }
+        } elseif ($l -match 'HMI-REJECT,[^,]*,H4POI,(BULL|BEAR),fvg=([0-9.: ]+),') {
+            if (-not $rej.ContainsKey($src)) { $rej[$src] = @{} }
+            $rej[$src]["$($Matches[1])|$($Matches[2].Trim())"] = $Matches[2].Trim()
+        } elseif ($l -match 'HMI-BUILD-BEGIN,.*,to=([0-9.: ]+)') {
+            $t = $Matches[1].Trim(); if (-not $lastTo.ContainsKey($src) -or $t -gt $lastTo[$src]) { $lastTo[$src] = $t }
+        } elseif ($l -match 'HMI-(LIVE|BUILD),(.*)$') {
+            $c = $Matches[2] -split ','
+            if ($c.Count -gt 7 -and ((-not $newest.ContainsKey($src)) -or $c[7] -gt $newest[$src])) { $newest[$src] = $c[7] }
+        }
+    }
+    foreach ($src in ($ev.Keys | Sort-Object)) {
+        $nm  = if ($newest.ContainsKey($src)) { $newest[$src] } else { '' }
+        Write-Host "`n--- $src   newest mark: $(if ($nm) { $nm } else { 'none' })" -ForegroundColor Cyan
+        if (-not $nm) { continue }
+        $t0  = P16 $nm
+        $now = if ($lastTo.ContainsKey($src)) { (P16 $lastTo[$src]).AddMinutes(5) } else { $t0 }
+        $seq = @($ev[$src].Values | Sort-Object Bar)
+        $before = @($seq | Where-Object { (P16 $_.Bar) -le $t0 })
+        $after  = @($seq | Where-Object { (P16 $_.Bar) -gt $t0 })
+        $state = if ($before.Count) { $before[-1].Ctx } else { '?' }
+        # time in each state from the last mark to the end of the newest build
+        $hrs = @{}; $cur = $state; $from = $t0
+        foreach ($e in $after) { $t = P16 $e.Bar; $hrs[$cur] += ($t - $from).TotalHours; $cur = $e.Ctx; $from = $t }
+        $hrs[$cur] += ($now - $from).TotalHours
+        $tot = 0.0; foreach ($v in $hrs.Values) { $tot += $v }
+        $trend = 0.0; foreach ($k2 in 'BULLISH', 'BEARISH') { if ($hrs.ContainsKey($k2)) { $trend += $hrs[$k2] } }
+        Write-Host ("  context at that mark : {0}" -f $state)
+        Write-Host ("  since then (to {0:yyyy.MM.dd HH:mm}): {1:N0} calendar h (weekends included), trending {2:N0} h ({3:P0})" -f $now, $tot, $trend, $(if ($tot -gt 0) { $trend / $tot } else { 0 }))
+        foreach ($k2 in ($hrs.Keys | Sort-Object)) { Write-Host ("      {0,-11} {1,6:N0} h" -f $k2, $hrs[$k2]) -ForegroundColor DarkGray }
+        $show = @($after | Select-Object -Last 12)
+        if ($after.Count -gt $show.Count) { Write-Host "  ... $($after.Count - $show.Count) earlier event(s) not shown" -ForegroundColor DarkGray }
+        foreach ($e in $show) { Write-Host ("    {0}  {1,-13} -> {2,-10} str={3}" -f $e.Bar, $e.Kind, $e.Ctx, $e.Str) }
+        $nr = 0; if ($rej.ContainsKey($src)) { $nr = @($rej[$src].Values | Where-Object { (P16 $_) -gt $t0 }).Count }
+        Write-Host ("  H4 FVGs whose POI Rule 6 refused since the mark: {0}" -f $nr)
+    }
+    Write-Host "`nwhat this cannot show: whether an ACTIVE POI in the trend's direction existed" -ForegroundColor DarkGray
+    Write-Host "and whether price reached it - touches and sessions are not logged." -ForegroundColor DarkGray
     exit
 }
 
