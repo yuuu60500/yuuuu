@@ -65,12 +65,25 @@ input int             InpSSLWidth       = 1;
 
 //================== BRI-09 PD / PW / PM levels & sweeps =============
 input group "=== Style: PD / PW / PM levels & sweeps ==="
-input color           InpPDColor        = clrSteelBlue;      // previous day
-input color           InpPWColor        = clrMediumPurple;   // previous week
-input color           InpPMColor        = clrGoldenrod;      // previous month
-input ENUM_LINE_STYLE InpPLStyle        = STYLE_DASH;
-input int             InpPLWidth        = 1;
-input int             InpPLTextSize     = 7;
+input color           InpPDHColor       = clrSteelBlue;      // previous day high
+input ENUM_LINE_STYLE InpPDHStyle       = STYLE_DASH;
+input int             InpPDHWidth       = 1;
+input color           InpPDLColor       = clrSteelBlue;      // previous day low
+input ENUM_LINE_STYLE InpPDLStyle       = STYLE_DASH;
+input int             InpPDLWidth       = 1;
+input color           InpPWHColor       = clrMediumPurple;   // previous week high
+input ENUM_LINE_STYLE InpPWHStyle       = STYLE_DASH;
+input int             InpPWHWidth       = 1;
+input color           InpPWLColor       = clrMediumPurple;   // previous week low
+input ENUM_LINE_STYLE InpPWLStyle       = STYLE_DASH;
+input int             InpPWLWidth       = 1;
+input color           InpPMHColor       = clrGoldenrod;      // previous month high
+input ENUM_LINE_STYLE InpPMHStyle       = STYLE_DASH;
+input int             InpPMHWidth       = 1;
+input color           InpPMLColor       = clrGoldenrod;      // previous month low
+input ENUM_LINE_STYLE InpPMLStyle       = STYLE_DASH;
+input int             InpPMLWidth       = 1;
+input int             InpPLTextSize     = 7;                // label size; label colour follows its line
 input color           InpLiqSweepColor  = clrOrange;         // SWEEP label
 input color           InpLiqBrokenColor = clrGray;           // BROKEN label
 input int             InpLiqEventTextSize = 7;
@@ -184,14 +197,14 @@ struct StyleText
 
 StyleZone ZS_POI_BULL,  ZS_POI_BEAR,  ZS_POI_TOUCH, ZS_POI_DEAD;
 StyleZone ZS_TRANGE,    ZS_BSL,       ZS_SSL;
-StyleZone ZS_PD,        ZS_PW,        ZS_PM;
+StyleZone ZS_PL[6];                     // PDH PDL PWH PWL PMH PML
 StyleZone ZS_OB_BULL,   ZS_OB_BEAR,   ZS_BRK_BULL,  ZS_BRK_BEAR;
 StyleZone ZS_BLK_TOUCH, ZS_BLK_ARMED, ZS_BLK_DEAD;
 StyleZone ZS_BPR,       ZS_BPR_TOUCH, ZS_BPR_DEAD;
 StyleZone ZS_CISD_LINE, ZS_MSS_LINE;
 
 StyleText TS_POI, TS_ARMED, TS_LEVEL, TS_PANEL, TS_PREVIEW, TS_TRANGE;
-StyleText TS_PD, TS_PW, TS_PM, TS_LQ_SWEEP, TS_LQ_BROKEN;
+StyleText TS_PL[6], TS_LQ_SWEEP, TS_LQ_BROKEN;
 
 void SetZ(StyleZone &z, const color c, const ENUM_LINE_STYLE s, const int w, const bool f)
   { z.clr = c; z.style = s; z.width = MathMax(1, w); z.fill = f; }
@@ -209,9 +222,12 @@ void StylesInit()
    SetZ(ZS_TRANGE,    InpTRangeColor,   InpTRangeStyle,   InpTRangeWidth,   false);
    SetZ(ZS_BSL,       InpBSLColor,      InpBSLStyle,      InpBSLWidth,      false);
    SetZ(ZS_SSL,       InpSSLColor,      InpSSLStyle,      InpSSLWidth,      false);
-   SetZ(ZS_PD,        InpPDColor,       InpPLStyle,       InpPLWidth,       false);
-   SetZ(ZS_PW,        InpPWColor,       InpPLStyle,       InpPLWidth,       false);
-   SetZ(ZS_PM,        InpPMColor,       InpPLStyle,       InpPLWidth,       false);
+   SetZ(ZS_PL[0], InpPDHColor, InpPDHStyle, InpPDHWidth, false);
+   SetZ(ZS_PL[1], InpPDLColor, InpPDLStyle, InpPDLWidth, false);
+   SetZ(ZS_PL[2], InpPWHColor, InpPWHStyle, InpPWHWidth, false);
+   SetZ(ZS_PL[3], InpPWLColor, InpPWLStyle, InpPWLWidth, false);
+   SetZ(ZS_PL[4], InpPMHColor, InpPMHStyle, InpPMHWidth, false);
+   SetZ(ZS_PL[5], InpPMLColor, InpPMLStyle, InpPMLWidth, false);
 
    SetZ(ZS_OB_BULL,   InpOBBullColor,   InpOBBullStyle,   InpOBBullWidth,   InpBlkFill);
    SetZ(ZS_OB_BEAR,   InpOBBearColor,   InpOBBearStyle,   InpOBBearWidth,   InpBlkFill);
@@ -234,9 +250,12 @@ void StylesInit()
    SetT(TS_PANEL,   InpPanelColor,     InpPanelFontSize);
    SetT(TS_PREVIEW, InpPreviewColor,   InpPreviewTextSize);
    SetT(TS_TRANGE,  InpTRangeTextColor, InpTRangeTextSize);
-   SetT(TS_PD,        InpPDColor,        InpPLTextSize);
-   SetT(TS_PW,        InpPWColor,        InpPLTextSize);
-   SetT(TS_PM,        InpPMColor,        InpPLTextSize);
+   SetT(TS_PL[0], InpPDHColor, InpPLTextSize);
+   SetT(TS_PL[1], InpPDLColor, InpPLTextSize);
+   SetT(TS_PL[2], InpPWHColor, InpPLTextSize);
+   SetT(TS_PL[3], InpPWLColor, InpPLTextSize);
+   SetT(TS_PL[4], InpPMHColor, InpPLTextSize);
+   SetT(TS_PL[5], InpPMLColor, InpPLTextSize);
    SetT(TS_LQ_SWEEP,  InpLiqSweepColor,  InpLiqEventTextSize);
    SetT(TS_LQ_BROKEN, InpLiqBrokenColor, InpLiqEventTextSize);
   }

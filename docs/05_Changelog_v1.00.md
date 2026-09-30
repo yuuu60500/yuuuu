@@ -1342,8 +1342,9 @@ New Inputs:
   InpLiqSweepReclaimBars = 3     InpPDSkipSunday = true
   InpShowPD / InpShowPW / InpShowPM = true
   InpShowLiqEvents = true        InpLiqSweepDays = 5
-  Style: InpPDColor / InpPWColor / InpPMColor / InpPLStyle / InpPLWidth / InpPLTextSize /
-         InpLiqSweepColor / InpLiqBrokenColor / InpLiqEventTextSize
+  Style: 六条线各自独立 —— Inp{PDH,PDL,PWH,PWL,PMH,PML}{Color,Style,Width}
+         （用户 2026-09-30 要求可逐条调颜色 / 线型 / 粗细；标签颜色跟随各自的线）
+         InpPLTextSize / InpLiqSweepColor / InpLiqBrokenColor / InpLiqEventTextSize
 
 Trading Logic Changed:
   NO（S-1）—— POI / Session / Block / Cycle / 模型均不读取本模块任何状态。

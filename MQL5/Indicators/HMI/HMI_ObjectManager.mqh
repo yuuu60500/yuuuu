@@ -425,8 +425,8 @@ bool PLShown(const int i)
    return(InpShowPM);
   }
 
-StyleZone PLZone(const int i) { return(i <= 1 ? ZS_PD : (i <= 3 ? ZS_PW : ZS_PM)); }
-StyleText PLText(const int i) { return(i <= 1 ? TS_PD : (i <= 3 ? TS_PW : TS_PM)); }
+StyleZone PLZone(const int i) { return(ZS_PL[MathMax(0, MathMin(5, i))]); }
+StyleText PLText(const int i) { return(TS_PL[MathMax(0, MathMin(5, i))]); }
 
 bool LiqEventShown(const string name)
   {
