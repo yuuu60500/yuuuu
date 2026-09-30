@@ -1305,7 +1305,7 @@ Test Impact:
   v2.40 的结论（USDJPY 10/10 存活）保留在 docs/04，不受影响。
 
 Compile Status:
-  NOT COMPILE VERIFIED（Rule 70）
+  未单独编译 —— 随 v2.42 一起编译通过（2026-09-30）
 ```
 
 ---
@@ -1358,5 +1358,5 @@ Tooling:
                   -Chain 另列 LIQ 事件；-LiveVsBuild 模型分布含 LIQ <level> <kind>
 
 Compile Status:
-  NOT COMPILE VERIFIED（Rule 70）
+  PASS — 0 errors / 0 warnings（用户实测，2026-09-30，3031 ms，AVX2 + FMA3；v2.42 构建，涵盖 v2.41 诊断日志）
 ```
