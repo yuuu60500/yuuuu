@@ -128,9 +128,9 @@ int CycCreate(const int blk_idx, const int A)
    g_blk[blk_idx].armed_time = cy.armed_time;
    g_blk[blk_idx].vis        = -1;
    if(InpLogSignals)                     // A-37 diagnostic, log only
-      PrintFormat("HMI-ARM,%s,block=%I64d,sess=%I64d,dir=%d,bar=%s",
+      PrintFormat("HMI-ARM,%s,block=%I64d,sess=%I64d,dir=%d,bar=%s,inst=%s",
                   _Symbol, g_blk[blk_idx].id, g_blk[blk_idx].session_id,
-                  g_blk[blk_idx].dir, DiagT(cy.armed_time));
+                  g_blk[blk_idx].dir, DiagT(cy.armed_time), g_inst);
 
    return(CycPush(cy));
   }
@@ -187,10 +187,10 @@ int M5TouchArbitrate(const int n)
         {
          armable = false;
          if(InpLogSignals)
-            PrintFormat("HMI-GUARD,%s,ARMED_BLOCKED,block=%I64d,blk_sess=%I64d,sess=%I64d,sess_dir=%d,ctx_dir=%d,bar=%s",
+            PrintFormat("HMI-GUARD,%s,ARMED_BLOCKED,block=%I64d,blk_sess=%I64d,sess=%I64d,sess_dir=%d,ctx_dir=%d,bar=%s,inst=%s",
                         _Symbol, g_blk[i].id, g_blk[i].session_id, g_sess.id,
                         g_sess.dir, CtxDirection(),
-                        TimeToString(CloseTimeOf(g_m5[n].time, PERIOD_M5), TIME_DATE|TIME_MINUTES));
+                        TimeToString(CloseTimeOf(g_m5[n].time, PERIOD_M5), TIME_DATE|TIME_MINUTES), g_inst);
         }
 
       if(!armable)

@@ -39,11 +39,11 @@ void CtxLog(const string kind, const string dir, const int h, const int broken)
       sw_t = TimeToString(g_h4sw[broken].bar_time, TIME_DATE|TIME_MINUTES);
       sw_p = DoubleToString(g_h4sw[broken].price, _Digits);
      }
-   PrintFormat("HMI-CTX,%s,%s,dir=%s,live=%d,ctx=%s,str=%d,messy=%d,bar=%s,swing=%s,swing_px=%s,close=%s",
+   PrintFormat("HMI-CTX,%s,%s,dir=%s,live=%d,ctx=%s,str=%d,messy=%d,bar=%s,swing=%s,swing_px=%s,close=%s,inst=%s",
                _Symbol, kind, dir, (g_live ? 1 : 0),
                CtxName(g_ctx), g_ctx_strength, (g_ctx_messy ? 1 : 0),
                TimeToString(CloseTimeOf(g_h4[h].time, PERIOD_H4), TIME_DATE|TIME_MINUTES),
-               sw_t, sw_p, DoubleToString(g_h4[h].close, _Digits));
+               sw_t, sw_p, DoubleToString(g_h4[h].close, _Digits), g_inst);
   }
 
 // Classify the raw break for bar h and drive the state machine.

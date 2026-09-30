@@ -1300,7 +1300,23 @@ Severity:                P1（重建会出连续运行不会出的事件 → 重
 Location:                HMI_LiquidityLevels.mqh PLSet / LiqM5OnBar；HMI_H4RangeEngine.mqh LiqPush
 Actual Behavior:         M5 窗口之前的周期段与流动性池生命周期从 INTACT 起算
 Evidence:                tools/liq_reload_sim.py：v2.42 规则 24 次重建中 6 次与连续运行不一致
-Fix:                     v2.45（M5 起点对齐 H4 + H4 回放 → LQ_UNKNOWN）；同模拟 0 / 24
-Status:                  **FIXED —— v2.45，待编译实测**
+Fix:                     ~~v2.45（M5 起点对齐 H4 + H4 回放 → LQ_UNKNOWN）~~ 复核退回：
+                         裁剪了共用 M5；回放阈值不是历史 ATR 阈值（ATR 模式定向模拟 2/48 不一致）。
+                         v2.47：独立加载窗口前 M5 逐根回放，每根自身 ATR；接缝借用回放 K 线；
+                         同模拟 PIPS / ATR / ATR 定向均 0 不一致
+Status:                  **FIXED —— v2.47，待编译实测**
 Confidence:              HIGH（规则层）；MQL 实现待实测
+```
+
+
+### A-40 —— **多实例日志无法关联**（复核 v2.46，成立）
+
+```
+Severity:                P2（同品种同周期挂多个实例时，测试结论不可信）
+Location:                所有 HMI 日志行；tools/ReloadTest.ps1 按 (品种,周期) 分组
+Actual Behavior:         MT5 行首只有 (品种,周期)；两个实例的 BEGIN/END、事件行、实时行交错，
+                         被当作同一来源配对
+Fix:                     v2.48 每行带 inst=；脚本按实例拆分来源
+Status:                  **FIXED —— v2.48，待编译实测**
+Confidence:              HIGH
 ```

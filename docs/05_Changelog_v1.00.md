@@ -1482,3 +1482,65 @@ Trading Logic Changed:  NO（仅显示）
 Compile Status:
   NOT COMPILE VERIFIED（Rule 70）
 ```
+
+---
+
+## v2.47 — 流动性回放改用 M5，恢复历史 ATR 阈值；撤销共用 M5 裁剪
+
+```
+Version:  v2.47
+Date:     2026-09-30
+来源:     工程师复核 v2.46（2026-09-30）：共用 M5 裁剪 / 历史 ATR 阈值还原
+
+Reverted (v2.45):
+  SeriesAlignM5ToH4()   删除 —— 为流动性裁剪了所有引擎共用的 g_m5，影响面过大
+  PLPreScan() / LiqOnBar 中的 H4 回放   删除 —— 用窗口第 0 根的 margin
+                        （ATR 预热期为 0 → 回退 pips）代替历史阈值
+
+New:
+  g_lr[] / g_lr_atr[]   仅本模块使用的「窗口之前」M5 K 线（CopyRates，按需加载，
+                        起点 = 最早一个需要回放的价位 / 池的开始时间 - 3 天）
+  LiqReplay()           窗口第 0 根：周期价位（起点早于窗口）与流动性池（确认早于窗口）
+                        从各自起点在 g_lr 上逐根执行与实时完全相同的 S-3 判定，
+                        每根使用自身 ATR(14) 的 margin；不输出事件，只恢复状态
+  LiqAtrAt()            窗口第 0–13 根借用 g_lr 末尾计算 ATR —— 接缝处的阈值
+                        与更早开始的连续运行一致
+  LiqJudgeBar()         实时与回放共用的单根判定；回放中已越过、尚在 N 根等待期内的
+                        状态以负索引带入窗口，计数不断
+  HMI-LIQ-REPLAY 日志   need_from / have_from / bars / unknown
+
+LQ_UNKNOWN 的含义收窄为: 已加载的 M5 历史够不到该价位 / 池的起点。
+
+Verification（tools/liq_reload_sim.py，规则层模型）:
+  PIPS  v2.42 4/18 不一致 · v2.46 0/18 · v2.47 0/18
+  ATR   v2.42 4/18 · v2.46 0/18 · v2.47 0/18
+  ATR（系数 2.0，定向场景）v2.46 2/48 不一致（例：PMH BROKEN 仅连续运行有）· v2.47 0/48
+
+Trading Logic Changed:  标记链 NO；共用 M5 恢复为 v2.44 行为
+Compile Status:         随 v2.48 一起编译
+```
+
+---
+
+## v2.48 — 多实例日志关联
+
+```
+Version:  v2.48
+Date:     2026-09-30
+来源:     工程师复核 v2.46：多实例日志关联
+
+Changed:
+  所有 HMI 日志行末尾追加 ,inst=<实例>（BEGIN 行原已有）:
+    MODEL / LIQ 事件行、BUILD-END、CTX、REJECT、GUARD、POI、SESS、BLK、ARM、LIQ-REPLAY
+  MT5 只给日志行标 (品种,周期)；同一品种同一周期挂两个实例时，
+  两者的构建与实时行过去会被当成同一来源互相配对。
+
+Tooling:
+  ReloadTest.ps1 读入后先取出并去掉行尾 ,inst=，其余解析规则不变；
+  同一 (品种,周期) 出现多个实例时拆成「品种#实例,周期」，各自比对。
+  已用两个交错实例的模拟日志验证：实例 0002 丢失的事件被单独判为 MISMATCH，
+  实例 0001 不受影响。
+
+Trading Logic Changed:  NO（仅日志）
+Compile Status:         NOT COMPILE VERIFIED（Rule 70）
+```

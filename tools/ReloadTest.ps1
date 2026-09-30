@@ -106,6 +106,38 @@ Write-Host "log file(s): $(($logs | ForEach-Object Name) -join ', ')" -Foregroun
 # Oldest first, so LIVE rows keep their real order relative to the rebuild.
 $all = @()
 foreach ($f in $logs) { $all += Get-Content $f.FullName }
+
+# v2.48: every HMI line ends in ",inst=XXXX" (the indicator instance), the
+# build header carries it too. MT5 only tags a line with (SYMBOL,TF), so two
+# instances on the same symbol and timeframe used to share one source and
+# their builds and live rows got paired with each other. Strip the trailing
+# tag so every parser below sees the payload it always did, and where one
+# source really has several instances, split it into "SYMBOL#XXXX,TF" - the
+# symbol pattern everywhere already allows '#'. Older lines without a tag
+# stay under the plain source.
+$instOf = New-Object 'System.Collections.Generic.List[string]'
+$srcInst = @{}
+for ($i = 0; $i -lt $all.Count; $i++) {
+    $l = $all[$i]; $in = ''
+    if ($l -match '(?:,inst=|instance=)([0-9A-Fa-f]{4})') { $in = $Matches[1].ToUpper() }
+    if ($l -match ',inst=[0-9A-Fa-f]{4}\s*$') { $l = $l -replace ',inst=[0-9A-Fa-f]{4}\s*$', ''; $all[$i] = $l }
+    $instOf.Add($in)
+    if ($in -and $l -match '\(([A-Za-z0-9._#]+,[A-Za-z0-9]+)\)') {
+        if (-not $srcInst.ContainsKey($Matches[1])) { $srcInst[$Matches[1]] = @{} }
+        $srcInst[$Matches[1]][$in] = $true
+    }
+}
+$multi = @($srcInst.Keys | Where-Object { $srcInst[$_].Count -gt 1 })
+if ($multi.Count -gt 0) {
+    for ($i = 0; $i -lt $all.Count; $i++) {
+        $in = $instOf[$i]
+        if (-not $in) { continue }
+        if ($all[$i] -match '\(([A-Za-z0-9._#]+),([A-Za-z0-9]+)\)' -and $multi -contains "$($Matches[1]),$($Matches[2])") {
+            $all[$i] = $all[$i].Replace("($($Matches[1]),$($Matches[2]))", "($($Matches[1])#$in,$($Matches[2]))")
+        }
+    }
+    Write-Host ("several instances on one chart source - split as SYMBOL#INSTANCE: " + ($multi -join ', ')) -ForegroundColor Yellow
+}
 # -Live is the check you run while waiting for samples: it needs no build
 # block and no -Source, and it discovers the charts from the log itself, so
 # adding symbols does not mean editing a list.

@@ -316,10 +316,10 @@ void LiqReplay()
       if(st == LQ_SWEPT || st == LQ_BROKEN || st == LQ_UNKNOWN) { g_liq[j].swept = true; g_liq[j].swept_time = et; }
      }
    if(InpLogSignals)
-      PrintFormat("HMI-LIQ-REPLAY,%s,need_from=%s,have_from=%s,bars=%d,unknown=%d",
+      PrintFormat("HMI-LIQ-REPLAY,%s,need_from=%s,have_from=%s,bars=%d,unknown=%d,inst=%s",
                   _Symbol, TimeToString(need, TIME_DATE|TIME_MINUTES),
                   (g_lr_n > 0 ? TimeToString(avail, TIME_DATE|TIME_MINUTES) : "none"),
-                  g_lr_n, g_lr_unknown);
+                  g_lr_n, g_lr_unknown, g_inst);
   }
 
 datetime LiqPierceTime(const int k) { MqlRates r; if(LiqBarAt(k, r)) return(r.time); return(0); }
@@ -348,12 +348,12 @@ void LiqEmit(const string name, const int side, const double px, const int pierc
    g_liqev_n++;
 
    if(InpLogSignals)
-      PrintFormat("%s,%s,LIQ,%d,0,0,%s,%s,%s,%s,%s,0",
+      PrintFormat("%s,%s,LIQ,%d,0,0,%s,%s,%s,%s,%s,0,inst=%s",
                   (g_live ? "HMI-LIVE" : "HMI-BUILD"), _Symbol, side, name,
                   (kind == LQ_SWEPT ? "SWEEP" : "BROKEN"),
                   TimeToString(CloseTimeOf(g_m5[n].time, PERIOD_M5), TIME_DATE|TIME_SECONDS),
                   DoubleToString(px, _Digits),
-                  TimeToString(LiqPierceTime(pierce), TIME_DATE|TIME_SECONDS));
+                  TimeToString(LiqPierceTime(pierce), TIME_DATE|TIME_SECONDS), g_inst);
   }
 
 //--- Phase 1b: runs on every closed M5 bar, warm-up included, so the
