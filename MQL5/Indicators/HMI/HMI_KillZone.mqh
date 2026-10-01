@@ -17,7 +17,7 @@
 #include "HMI_Series.mqh"
 
 #define KZ_COUNT      4
-#define MAX_KZ_INST  40      // KZ_COUNT x (InpKZDays + 1)
+#define MAX_KZ_INST  64      // >= KZ_COUNT x (InpKZDays + 2); KZInit warns past that
 
 input group "=== Kill zone: general ==="
 input bool   InpShowKillZones   = true;
@@ -113,6 +113,13 @@ void KZInit()
    SetZ(g_kz_style[3], InpKZ4Color, InpKZ4Style, InpKZ4Width, false);
 
    SetT(TS_KZ, InpKZTextColor, InpKZTextSize);
+
+   // KZCollect keeps the newest MAX_KZ_INST windows and says nothing about
+   // the rest: a day count past the capacity silently lost the oldest days.
+   int need = KZ_COUNT * (MathMax(0, InpKZDays) + 2);
+   if(InpShowKillZones && need > MAX_KZ_INST)
+      PrintFormat("HMI: InpKZDays=%d can need %d kill zone windows, capacity is %d - "
+                  "the oldest days will not be drawn", InpKZDays, need, MAX_KZ_INST);
   }
 
 datetime KZDayAnchor(const datetime t)

@@ -47,8 +47,92 @@ void OM_Register(const string name)
   }
 
 //--- multi-instance safety (Rule 55) --------------------------------
+// The instance marker carries the id of the terminal PROCESS that made it.
+// Chart objects are saved with the chart, so after a kill, a crash or a
+// restart the previous run's marker is still there: the old code saw it,
+// took the next tag, and left every object of the dead run on the chart for
+// good (OM_DeleteOwnAll only ever touches its own prefix). The run id lives
+// in a TEMPORARY terminal global - created on the first HMI init of a
+// terminal session, never written to disk, gone when the terminal exits -
+// so a marker whose run id is not ours was made by a terminal that no
+// longer runs, and its whole family is safe to delete. Within one run a
+// marker is either live or already removed by its owner's OnDeinit. This
+// reads ownership from the chart, not state (Rule 53): no engine sees it.
+#define HMI_RUN_GV  "HMI_RUN_ID"
+long g_run_id = 0;
+
+long OM_RunId()
+  {
+   if(g_run_id > 0) return(g_run_id);
+   if(!GlobalVariableCheck(HMI_RUN_GV))
+     {
+      GlobalVariableTemp(HMI_RUN_GV);                                  // 0, not persisted
+      GlobalVariableSetOnCondition(HMI_RUN_GV, (double)(long)TimeLocal(), 0.0);
+     }
+   g_run_id = (long)GlobalVariableGet(HMI_RUN_GV);
+   if(g_run_id <= 0)                                                   // pathological: still be unique
+     {
+      g_run_id = (long)TimeLocal();
+      GlobalVariableSet(HMI_RUN_GV, (double)g_run_id);
+     }
+   return(g_run_id);
+  }
+
+string OM_MarkerName(const string tag) { return(HMI_PREFIX + "_" + tag + "_" + TT_MARK + "_0_0"); }
+
+bool OM_MarkerCreate(const string mk)
+  {
+   if(!ObjectCreate(0, mk, OBJ_LABEL, 0, 0, 0)) return(false);
+   ObjectSetInteger(0, mk, OBJPROP_TIMEFRAMES, OBJ_NO_PERIODS);
+   ObjectSetInteger(0, mk, OBJPROP_HIDDEN, true);
+   ObjectSetInteger(0, mk, OBJPROP_SELECTABLE, false);
+   ObjectSetString (0, mk, OBJPROP_TEXT, "run=" + IntegerToString(OM_RunId()));
+   return(true);
+  }
+
+void OM_DeleteByPrefix(const string pfx)
+  {
+   for(int i = ObjectsTotal(0, -1, -1) - 1; i >= 0; i--)
+     {
+      string nm = ObjectName(0, i, -1, -1);
+      if(StringFind(nm, pfx) == 0) ObjectDelete(0, nm);
+     }
+  }
+
+// Collect first, delete second: deleting while walking the object list by
+// index would shift the entries still to be visited.
+void OM_SweepStaleInstances()
+  {
+   string head = HMI_PREFIX + "_";
+   string tail = "_" + TT_MARK + "_0_0";
+   int    hl   = StringLen(head);
+   long   run  = OM_RunId();
+   string stale[];
+   int    ns = 0;
+
+   for(int i = ObjectsTotal(0, -1, -1) - 1; i >= 0; i--)
+     {
+      string nm = ObjectName(0, i, -1, -1);
+      if(StringLen(nm) != hl + 4 + StringLen(tail)) continue;
+      if(StringFind(nm, head) != 0 || StringFind(nm, tail) != hl + 4) continue;
+      string txt = ObjectGetString(0, nm, OBJPROP_TEXT);
+      if(StringFind(txt, "run=") != 0) continue;              // pre-v2.49 marker: owner unknown, leave it
+      if(StringToInteger(StringSubstr(txt, 4)) == run) continue;   // alive in this terminal run
+      ArrayResize(stale, ns + 1);
+      stale[ns] = StringSubstr(nm, hl, 4);
+      ns++;
+     }
+   for(int s2 = 0; s2 < ns; s2++)
+     {
+      OM_DeleteByPrefix(head + stale[s2] + "_");
+      PrintFormat("HMI: removed the objects of instance %s left by a previous terminal run", stale[s2]);
+     }
+  }
+
 bool OM_ClaimInstance()
   {
+   OM_SweepStaleInstances();
+
    long h = ChartID();
    for(int i = 0; i < StringLen(_Symbol); i++)
       h = h * 31 + StringGetCharacter(_Symbol, i);
@@ -57,12 +141,9 @@ bool OM_ClaimInstance()
      {
       int  v   = (int)((h + (long)k * 40503) & 0xFFFF);
       string tag = StringFormat("%04X", v);
-      string mk  = HMI_PREFIX + "_" + tag + "_" + TT_MARK + "_0_0";
-      if(ObjectFind(0, mk) >= 0) continue;                 // taken by another instance
-      if(!ObjectCreate(0, mk, OBJ_LABEL, 0, 0, 0)) continue;
-      ObjectSetInteger(0, mk, OBJPROP_TIMEFRAMES, OBJ_NO_PERIODS);
-      ObjectSetInteger(0, mk, OBJPROP_HIDDEN, true);
-      ObjectSetInteger(0, mk, OBJPROP_SELECTABLE, false);
+      string mk  = OM_MarkerName(tag);
+      if(ObjectFind(0, mk) >= 0) continue;                 // taken by another live instance
+      if(!OM_MarkerCreate(mk)) continue;
       g_inst = tag;
       OM_Register(mk);
       return(true);
@@ -72,24 +153,14 @@ bool OM_ClaimInstance()
 
 void OM_DeleteOwnAll()
   {
-   string pfx = OM_Prefix();
-   for(int i = ObjectsTotal(0, -1, -1) - 1; i >= 0; i--)
-     {
-      string nm = ObjectName(0, i, -1, -1);
-      if(StringFind(nm, pfx) == 0) ObjectDelete(0, nm);     // own instance only
-     }
+   OM_DeleteByPrefix(OM_Prefix());                          // own instance only (Rule 55)
    g_obj_n = 0;
   }
 
 void OM_RecreateMarker()
   {
-   string mk = HMI_PREFIX + "_" + g_inst + "_" + TT_MARK + "_0_0";
-   if(ObjectCreate(0, mk, OBJ_LABEL, 0, 0, 0))
-     {
-      ObjectSetInteger(0, mk, OBJPROP_TIMEFRAMES, OBJ_NO_PERIODS);
-      ObjectSetInteger(0, mk, OBJPROP_HIDDEN, true);
-      ObjectSetInteger(0, mk, OBJPROP_SELECTABLE, false);
-     }
+   string mk = OM_MarkerName(g_inst);
+   OM_MarkerCreate(mk);
    OM_Register(mk);
   }
 
@@ -227,7 +298,7 @@ void OM_PanelRow(const int row, const string text, const int ypix, const color c
 #define MAX_PANEL_ROWS 12
 
 //================== kill zone bookkeeping ==========================
-#define MAX_KZ_DRAWN 64
+#define MAX_KZ_DRAWN MAX_KZ_INST     // one bookkeeping slot per window KZCollect can return
 int      g_kzd_zone[MAX_KZ_DRAWN];
 datetime g_kzd_anchor[MAX_KZ_DRAWN];
 int      g_kzd_n = 0;

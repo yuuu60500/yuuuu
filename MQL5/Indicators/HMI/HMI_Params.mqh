@@ -48,6 +48,9 @@ input bool   InpBPRRequireBothLegsAfterArmed = false; // CONF-04
 input bool   InpBPREarlyLegFromSessionStart  = true;  // D-2
 input bool   InpPAAllowArmedBarConfirm       = true;  // D-4 (PA ENGULFING / REJECTION only)
 input bool   InpStopIdentificationOnBlockInvalidation = false; // D-5
+input bool   InpArmRequiresFreshTouch = true;  // D-11 (BRI-10): a TOUCHED block re-arms only on a
+                                               // NEW touch (previous closed bar outside the zone);
+                                               // false = v2.48 behaviour
 input double InpPAEngulfMinBodyRatio  = 1.0;
 input double InpPARejWickToBody       = 2.0;
 input double InpPARejWickToRange      = 0.5;

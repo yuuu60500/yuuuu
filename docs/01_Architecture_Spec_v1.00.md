@@ -636,6 +636,10 @@ BLOCK_EXPIRED       // Session 结束、超龄、超出数量上限
 | CONFIRMED/ACTIVE | INVALIDATED | 被突破并转为 Breaker 原料（6.3） | 突破 K 线收盘 |
 | 任意 | EXPIRED | Session 结束 / 超出 `InpM5MaxBlocks` | 检查时 |
 
+> **v2.49 / D-11（BRI-10）：**「再次触碰」= 新的触碰事件 —— 上一根已收盘 M5 K 线不与该 Block
+> 相交、本根相交。停在区间内不算再次触碰，仲裁落选的 TOUCHED Block 不能在下一根反手 ARMED。
+> 与 8.3 第 1 条（ACTIVE）一致。`InpArmRequiresFreshTouch = false` 恢复字面读法。
+
 ### 7.3 ARMED Block 被 INVALIDATED 时的行为
 
 ```
@@ -681,7 +685,7 @@ bar 0 期间可显示 `PENDING TOUCH` 预览样式（虚线 / 半透明），
 
 ### 8.3 ARMED 前置条件（全部必须满足）
 
-1. Block 状态为 `ACTIVE`
+1. Block 状态为 `ACTIVE`，或 `TOUCHED` 且本根是新的触碰（7.2 / D-11）
 2. `block.direction == session.direction == context.direction`
 3. 所属 RefinementSession 仍然 Active
 4. `time[n] >= block.confirm_time`

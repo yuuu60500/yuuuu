@@ -9,7 +9,7 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "2.48"          // keep equal to HMI_VERSION (HMI_Defs.mqh)
+#property version   "2.49"          // keep equal to HMI_VERSION (HMI_Defs.mqh)
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window
@@ -226,7 +226,7 @@ int g_build_seq = 0;
 
 string ParamsDigest()
   {
-   string s = StringFormat("%d|%d|%d|%d|%.8f|%d|%.8f|%d|%.8f|%d|%.8f|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%.8f|%.8f|%.8f|%d|%.8f|%d|%d",
+   string s = StringFormat("%d|%d|%d|%d|%.8f|%d|%.8f|%d|%.8f|%d|%.8f|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%.8f|%.8f|%.8f|%d|%.8f|%d|%d|%d",
       InpMaxHistoryBarsM5, InpMaxHistoryBarsH4, InpWarmupSuppressBars,
       (int)InpBreakMarginMode, InpBreakMarginPips, InpBreakMarginPoints, InpBreakMarginATRFrac,
       InpH4OBtoFVGMaxBars, InpH4ConnectTolerancePips, InpM5OBtoFVGMaxBars, InpM5ConnectTolerancePips,
@@ -238,7 +238,7 @@ string ParamsDigest()
       (int)InpStopIdentificationOnBlockInvalidation, InpMaxCyclesKept,
       InpPAEngulfMinBodyRatio, InpPARejWickToBody, InpPARejWickToRange,
       InpPABreakRetestMaxBars, InpPARetestTolerancePips,
-      InpLiqSweepReclaimBars, (int)InpPDSkipSunday);
+      InpLiqSweepReclaimBars, (int)InpPDSkipSunday, (int)InpArmRequiresFreshTouch);
    uint h = (uint)0x811C9DC5;               // FNV-1a, 32 bit (offset basis)
    for(int i = 0; i < StringLen(s); i++)
      {

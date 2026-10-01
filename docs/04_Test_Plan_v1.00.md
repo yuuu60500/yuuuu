@@ -849,3 +849,19 @@ PIPS  v2.42 4/18 · v2.46 0/18 · v2.47 0/18
 ATR   v2.42 4/18 · v2.46 0/18 · v2.47 0/18
 ATR 系数 2.0 定向：v2.46 2/48（PMH BROKEN 仅连续运行有）· v2.47 0/48
 ```
+
+### v2.49 验收清单（在 v2.48 清单之上，只验收本轮修复）
+
+```
+0  编译 0 errors / 0 warnings（截图）
+1  版本：`starting on` 与 BEGIN 行 ver= 均为 2.49；params= 与 v2.48 不同（摘要多一项）
+2  D-11：`-Chain` 里同一 Session 内相邻两根 K 线连续 ARMED 的情况应消失；
+          对照：InpArmRequiresFreshTouch=false 重建一次，HMI-ARM 行数应 >= true 时
+3  重启残留：挂指标 → 任务管理器强杀 terminal64.exe → 重启 → 日志应出现
+          `HMI: removed the objects of instance XXXX left by a previous terminal run`，
+          图上无旧矩形；同一张图挂两个实例时互不删除
+4  同版本重载：同一张图重载两次 → `-Source "<图>,M5"` IDENTICAL inside the comparable region
+5  实时 vs 重建：`-LiveVsBuild` 双向 0 MISMATCH
+6  回归：`HMI-GUARD` 0 行；v2.48 → v2.49 跨版本 MODEL 行差异只允许出现在
+          「v2.48 下一根反手 ARMED」的 Cycle 上（upgrade regression 列出的差异逐条核对）
+```

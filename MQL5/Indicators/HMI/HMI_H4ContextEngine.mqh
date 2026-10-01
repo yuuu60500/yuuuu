@@ -55,16 +55,21 @@ CtxEventType H4ContextOnBar(const int h)
    datetime t = CloseTimeOf(g_h4[h].time, PERIOD_H4);
 
    //--- timeout: a transition that never resolves becomes a range ---
+   // The bar's own close is still judged below. This used to return at once,
+   // so a break landing on the timeout bar was never seen: the swing stayed
+   // unswept and only a second close beyond it, next bar, could count. The
+   // RANGE row of 2.3 applies to this bar like any other: a break is a BOS.
+   bool timed_out = false;
    if(g_ctx == CTX_TRANSITION && g_ctx_bars > InpH4TransitionMaxBars)
      {
       CtxEnter(CTX_RANGE, DIR_NONE, t);
       CtxLog("TIMEOUT", "-", h, -1);
-      return(EV_TIMEOUT);
+      timed_out = true;
      }
 
    int broken = -1;
    int brk = H4DetectBreak(h, broken);
-   if(brk == DIR_NONE) return(EV_NONE);
+   if(brk == DIR_NONE) return(timed_out ? EV_TIMEOUT : EV_NONE);
 
    datetime brk_confirm = (SafeIdx(broken, g_h4sw_n) ? g_h4sw[broken].confirm_time : 0);
    H4ConsumeSwing(broken, t);

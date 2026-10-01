@@ -1320,3 +1320,79 @@ Fix:                     v2.48 每行带 inst=；脚本按实例拆分来源
 Status:                  **FIXED —— v2.48，待编译实测**
 Confidence:              HIGH
 ```
+
+
+## Audit Round 10 —— 代码审查（2026-10-01，v2.48 全部源文件静态通读，未编译）
+
+### A-41 —— **仲裁落选的 Block 下一根反手 ARMED，关闭一根前的 Cycle**（成立）
+
+```
+Severity:                P1（标记链：Cycle 被提前关闭，六个模型 PASS；重叠 Block 越多越频繁）
+Location:                HMI_CycleManager.mqh M5TouchArbitrate（TOUCHED 可参与仲裁，仍相交即算触碰）
+Actual Behavior:         见 docs/02 BRI-10
+Evidence:                代码推演；重建与实时一致，重绘测试不可见
+Fix:                     v2.49 D-11：TOUCHED 只在「上一根不相交」的新触碰上参与仲裁
+Status:                  **FIXED —— v2.49，待编译实测**；默认值待用户确认
+Confidence:              HIGH（行为确定）；MEDIUM（规格意图：§7.2 与 §8.3 矛盾）
+```
+
+### A-42 —— **Block 轮转可丢掉当前 Cycle 的 ARMED 锚块**（Potential Risk）
+
+```
+Severity:                P3（D-5 / ANCHOR INVALIDATED 静默失效；锚块矩形停止延伸）
+Location:                HMI_M5BlockEngine.mqh BlkPush
+Actual Behavior:         容量满时无条件丢 index 0；Cycle 无时限，锚块迟早成为最老记录
+Fix:                     v2.49 跳过当前 ACTIVE Cycle 的锚块（同 POIPush 保护 Session POI）
+Status:                  **FIXED —— v2.49**
+Confidence:              HIGH
+```
+
+### A-43 —— **终端非正常退出后旧实例对象永久残留**（成立）
+
+```
+Severity:                P2（图上残留整套失效矩形 / 标签，每次重启再累积一套）
+Location:                HMI_ObjectManager.mqh OM_ClaimInstance
+Actual Behavior:         对象随图表保存；重启后旧标记仍在，认领逻辑见到即换下一个 tag，
+                         旧前缀的对象无人删除（OM_DeleteOwnAll 只删自己的前缀）
+Fix:                     v2.49 标记写 run=<终端进程 id>（临时终端全局变量 HMI_RUN_ID）；
+                         OnInit 先清掉 run id 不同的实例全部对象。无 run= 的旧版标记不动
+Status:                  **FIXED —— v2.49，待实测**（强杀 terminal64 → 重启 → 日志应有 removed the objects of instance）
+Confidence:              HIGH
+```
+
+### A-44 —— **TRANSITION 超时那根 H4 的突破被跳过**（成立，影响小）
+
+```
+Severity:                P3（仅当超时与突破落在同一根；最多延迟一根 H4）
+Location:                HMI_H4ContextEngine.mqh H4ContextOnBar
+Fix:                     v2.49 超时后继续判定本根收盘；突破 = RANGE 行 BOS
+Status:                  **FIXED —— v2.49**
+Confidence:              HIGH
+```
+
+### A-45 —— **SE_NEW_SESSION 的结束时间用开盘时间，其他原因用收盘时间**（日志）
+
+```
+Severity:                P3（日志 / end_time 不一致）
+Location:                HMI_M5BlockEngine.mqh SessionStart
+Fix:                     v2.49 统一为收盘时间
+Status:                  **FIXED —— v2.49**
+```
+
+### A-46 —— **Kill Zone 窗口容量不足时静默丢弃最早几天**（显示）
+
+```
+Severity:                P3（显示；InpKZDays > 8 时触发）
+Location:                HMI_KillZone.mqh KZCollect / MAX_KZ_INST
+Fix:                     v2.49 容量 40 → 64，超出时 OnInit 打印提示
+Status:                  **FIXED —— v2.49**
+```
+
+### 本轮审查确认无需修改的项
+
+- Cycle 无时限：§9.3 / Rule 15 字面；D-1、D-5 已裁决维持。BPR 晚腿上界为 now（§12）。
+- A-32 精确比较引起的重建频率：先观察日志 BEGIN 行 build= 计数，暂不改。
+- OnTimer：MT5 的 K 线只在下一个 tick 到来时才成为 shift 1，定时器无法更早看到已收盘
+  K 线；读 shift 0 违反「只用 shift ≥ 1」，与重建不一致。不加。
+- LiqReplay 首次挂载时 M5 历史不足 → UNKNOWN 且不重试：只影响流动性线，HMI-LIQ-REPLAY 可见，暂不改。
+- 通读确认：无未来函数路径；所有 PrintFormat 占位符与参数一致；所有结构体字段显式初始化。

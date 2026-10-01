@@ -18,7 +18,17 @@ int BlkPush(const M5Block &b)
    int cap = MathMin(MAX_BLOCKS, MathMax(4, InpM5MaxBlocks));
    if(g_blk_n >= cap)
      {
-      for(int i = 1; i < g_blk_n; i++) g_blk[i-1] = g_blk[i];
+      // Rotation took index 0 whatever it held. A cycle has no time limit
+      // (Rule 15), so after enough later blocks the live cycle's ARMED anchor
+      // is the oldest record: dropping it left Phase 2's BlockFindById with
+      // nothing to find, and D-5 / ANCHOR INVALIDATED went blind without a
+      // word. Skip that one record, the way POIPush keeps the session's POI.
+      int kill = 0;
+      if(g_blk_n > 1 && SafeIdx(g_active_cyc, g_cyc_n) &&
+         g_cyc[g_active_cyc].state == CY_ACTIVE &&
+         g_blk[0].id == g_cyc[g_active_cyc].block_id)
+         kill = 1;
+      for(int i = kill + 1; i < g_blk_n; i++) g_blk[i-1] = g_blk[i];
       g_blk_n--;
      }
    g_blk[g_blk_n] = b;
@@ -65,7 +75,9 @@ void SessionEndNow(const SessionEnd reason, const datetime t)
 void SessionStart(const int poi_idx, const int n)
   {
    if(!SafeIdx(poi_idx, g_poi_n)) return;
-   if(g_sess.active) SessionEndNow(SE_NEW_SESSION, g_m5[n].time);
+   // ends at this bar's CLOSE like every other end reason (the log row and
+   // end_time carried the open time for this one reason only)
+   if(g_sess.active) SessionEndNow(SE_NEW_SESSION, CloseTimeOf(g_m5[n].time, PERIOD_M5));
    g_sess.id          = g_next_id++;
    g_sess.poi_id      = g_poi[poi_idx].id;
    g_sess.dir         = g_poi[poi_idx].dir;

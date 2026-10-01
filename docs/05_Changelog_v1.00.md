@@ -1544,3 +1544,43 @@ Tooling:
 Trading Logic Changed:  NO（仅日志）
 Compile Status:         NOT COMPILE VERIFIED（Rule 70）
 ```
+
+---
+
+## v2.49 — 代码审查修复：仲裁落选 Block 的反手 ARMED、锚块轮转、重启残留对象
+
+```
+Version:  v2.49
+Date:     2026-10-01
+来源:     代码审查（2026-10-01，v2.48 全部源文件静态通读；未编译）
+
+Trading logic (D-11, BRI-10 —— docs/02):
+  M5TouchArbitrate   TOUCHED 的 Block 只在「新的触碰」上参与仲裁：上一根已收盘 M5
+                     K 线不与该 Block 相交。规格 §7.2 允许 TOUCHED → ARMED（后续 K 线
+                     再次触碰），§8.3 又要求 ARMED 前置状态为 ACTIVE；v2.48 把「仍在
+                     区间内」当作再次触碰，同一根上落选的 Block 下一根反手 ARMED，
+                     一根前刚建立的 Cycle 被关闭并全部 PASS。
+                     InpArmRequiresFreshTouch = true（默认）；false 恢复 v2.48 行为。进入参数摘要。
+  H4ContextOnBar     TRANSITION 超时那根 H4 的收盘仍做突破判定：此前超时即返回，
+                     落在同一根上的突破被跳过。超时后同根突破 = RANGE 行的 BOS（§2.3）。
+
+Fixed:
+  BlkPush            轮转不再丢掉当前 ACTIVE Cycle 的 ARMED 锚块（Cycle 无时限，锚块
+                     迟早成为最老记录；丢掉后 Phase 2 的 BlockFindById 找不到，
+                     D-5 / ANCHOR INVALIDATED 静默失效）。与 POIPush 保护 Session POI 同理。
+  OM_ClaimInstance   实例标记写入 run=<终端进程 id>（临时终端全局变量 HMI_RUN_ID，不落盘，
+                     终端退出即消失）。OnInit 先清掉 run id 不同的实例标记及其全部对象：
+                     终端被杀 / 崩溃 / 重启后随图表保存下来的旧对象此前永远留在图上
+                     （旧代码见到旧标记只是换下一个 tag）。无 run= 的旧版标记不动。
+                     日志：HMI: removed the objects of instance XXXX left by a previous terminal run
+  SessionStart       SE_NEW_SESSION 的 end_time / 日志改为该根收盘时间，与其他结束原因一致。
+  KillZone           MAX_KZ_INST 40 → 64；InpKZDays 超出容量时 OnInit 打印提示，此前静默丢弃最早几天。
+
+Not changed (按规格 / 待观察):
+  Cycle 无时限 —— §9.3 / Rule 15 字面，D-1 / D-5 已裁决；BPR 晚腿上界为 now（§12）
+  A-32 精确比较的重建频率 —— 先看日志 BEGIN 行 build= 计数
+  OnTimer —— MT5 的 K 线只在下一个 tick 到来时才成为 shift 1，定时器看不到更早的已收盘 K 线
+
+Trading Logic Changed:  YES（D-11 默认开；TRANSITION 超时根）—— 与 v2.48 不可做重绘比对
+Compile Status:         NOT COMPILE VERIFIED（Rule 70）
+```
