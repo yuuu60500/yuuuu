@@ -474,8 +474,10 @@ void OM_DrawPanel()
       if(g_lh_state == LH_WAITING)
         {
          C[n] = base;
-         L[n++] = "LIQ HISTORY: WAITING for M5 bars before the window (attempt " +
-                  IntegerToString(g_lh_attempts) + ") - liquidity lines provisional";
+         L[n++] = "LIQ HISTORY: WAITING - " + IntegerToString(g_lh_pend_n) +
+                  " level(s) from " + TimeToString(g_lh_need, TIME_DATE|TIME_MINUTES) +
+                  " (attempt " + IntegerToString(g_lh_attempts) +
+                  (g_lh_attempts >= HMI_LH_FAST_TRIES ? ", slow retry" : "") + ") - liquidity lines provisional";
         }
       C[n] = base;
       L[n++] = "CYCLE " + OM_PanelCycleLine();

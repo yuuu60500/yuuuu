@@ -10,3 +10,10 @@ HMI_v*.zip
 reload_diff.txt
 live_vs_build_diff.txt
 poi_rejects.txt
+
+# ReloadTest.ps1 writes these next to the log it read (per source since v2.24),
+# including into the synthetic case folders under tools/logtests
+reload_diff_*.txt
+live_vs_build_diff_*.txt
+poi_rejects_*.txt
+ctx_events.csv

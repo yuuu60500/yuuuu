@@ -1344,7 +1344,9 @@ Severity:                P3（D-5 / ANCHOR INVALIDATED 静默失效；锚块矩�
 Location:                HMI_M5BlockEngine.mqh BlkPush
 Actual Behavior:         容量满时无条件丢 index 0；Cycle 无时限，锚块迟早成为最老记录
 Fix:                     v2.49 跳过当前 ACTIVE Cycle 的锚块（同 POIPush 保护 Session POI）
-Status:                  **FIXED —— v2.49**
+Status:                  **WITHDRAWN —— v2.51 撤回到 anchor_rotation.patch**（验收方 2026-10-02 第 4 项：
+                         改变被淘汰的块 → 可改变标记：D-5 开启时，或默认配置下 index 1 恰为本 Session
+                         仍可 ARMED 的块时。与「P1/P2 不得改变 MODEL」的范围冲突，单独出版本）
 Confidence:              HIGH
 ```
 
@@ -1454,3 +1456,73 @@ Confidence:              HIGH
 
 附带修正：`$sources.Count` 在只有一个来源时显示的是该组的块数（Group-Object 单组返回 GroupInfo），
 已改为数组包裹。
+
+
+## Audit Round 12 —— 验收方 v2.50 复核（2026-10-02）
+
+五项均在源码中核实成立。第 4 项范围比报告所述略宽：默认配置下也有一条路径（见 A-42）。
+
+### A-49 —— **流动性历史只按最老起点判定等待，可恢复的较晚价位被一并放弃**（成立，模型复现）
+
+```
+Severity:                流动性线 / SWEEP / BROKEN（Rule 69：标记链不读，MODEL 不受影响）
+Location:                HMI_LiquidityLevels.mqh LiqReplay / LiqHistoryMayArrive（v2.50）
+Actual Behavior:         need = 所有条目最早起点；服务器首日晚于它 → 整组 READY，较晚但服务器有的条目
+                         也成为 UNKNOWN 且永不恢复；探测目标固定在不可能到达的最老起点
+Fix (v2.51):             逐条判定。够不到的条目经 LiqStartLost 分为
+                           lost     起点早于历史下限（服务器首根 / Max bars 截断，取较晚者）；或已加载 K 线
+                                    已从下限开始（ATR 前 14 根）；或终端已持有起点前 3 天的历史，缺口是真实休市
+                           pending  其余 —— 只是可能还没下载
+                         任何 pending → WAITING；探测目标 = 最早的仍可恢复 pending 起点（每次探测按最新下限重算）
+Evidence:                tools/liq_wait_sim.py（逐函数镜像 MQL）：v2.51 9/9；--v250 对照 2/9，
+                         S1（报告原例：A 早于服务器首日、B 可下载）在 v2.50 下 B 被判永久 UNKNOWN
+Status:                  **FIXED —— v2.51，待编译实测**
+```
+
+### A-50 —— **探测满 60 次即宣告 READY**（成立，模型复现）
+
+```
+Severity:                面板 WAITING 消失、状态语义错误；5 分钟后才到的历史不再恢复
+Location:                H4M5_Identification.mq5 OnTimer（v2.50）
+Fix (v2.51):             定时器只能通过一次重建结束等待；重建的 BUILD-END 说 READY 才算 READY。
+                         60 次快速探测（5 秒）后改为每 60 秒探测，日志 HMI-LIQ-HIST,SLOW，状态仍 WAITING，
+                         面板显示 slow retry。结束原因：ARRIVED / BEFORE_FLOOR（全部 pending 起点早于下限）/
+                         SETTLED（K 线已齐，缺口确为最终）—— 三者都经 TryBuild 重建
+Evidence:                liq_wait_sim.py S2（第 61 次才到）与 S7（永不到）：v2.51 PASS；v2.50 均 FAIL
+Status:                  **FIXED —— v2.51**
+```
+
+### A-51 —— **缺字段绕过身份校验；诊断行与实时行不校验**（成立，合成日志复现）
+
+```
+Severity:                测试工具给出错误的 IDENTICAL
+Location:                tools/ReloadTest.ps1（v2.50）：身份条件「两边都有且不等才报错」；liqev 有才核；
+                         诊断行直接进入 Lines；实时行异身份只「set aside」
+Fix (v2.51):             严格模式 = BEGIN 声明 ver >= 2.50 或带 run/init。严格模式下：
+                         BEGIN / END / 块内每条带标签的行（事件与 HMI-POI/SESS/BLK/ARM/CTX/REJECT/GUARD/LIQ-REPLAY
+                         诊断）缺身份与身份不符同样 INCOMPLETE；END 必须有有效的 build / marks / liqev / liq /
+                         unknown，2.51 起还要 liqwait 且与 liq 一致；块内出现 HMI-LIVE → INCOMPLETE。
+                         实时行缺身份或不属于构建 A 的生命周期 → 该对 PENDING，不再静默剔除后继续给 PASS。
+                         旧格式（< 2.50 且无 run/init）仍走宽松路径
+Evidence:                tools/logtests（25 组，PowerShell 运行器）：v2.51 25/25；v2.50 脚本 7/25
+Status:                  **FIXED —— v2.51**
+```
+
+### A-52 —— **跨版本「0 difference」可来自空集合**（成立，合成日志复现）
+
+```
+Severity:                测试工具给出无效的回归通过
+Location:                tools/ReloadTest.ps1 Show-Reload 的 DIFFERENT VERSIONS 分支（v2.50）
+Fix (v2.51):             所有比较先查参数；再求共同区间（两边预热之后，窗口移动加 -SettleHours），
+                         无交集 → NOT COMPARABLE；跨版本两边 MODEL 均为 0 → INSUFFICIENT SAMPLE；
+                         输出实际比较的行数；窗口移动的 0 difference → PENDING REVIEW 并提示用固定窗口。
+                         新增 -Versus：两个实例并排（例如 v2.48 与 v2.51 同时挂在同一品种两张图上，
+                         同一根 M5 内构建 → 同一窗口），比较两者最新 COMPLETE 构建
+Status:                  **FIXED —— v2.51**
+```
+
+### 未改的边界（需实测确认）
+
+- `SERIES_SERVER_FIRSTDATE` 与 `Bars()` / `TERMINAL_MAXBARS` 截断按 MQL5 文档建模，未在终端观测。
+  若截断识别失败，后果是该条目一直 WAITING（慢速重试、面板提示），不会被误判为 READY。
+- 「终端已持有起点前 3 天历史」用 `SERIES_TERMINAL_FIRSTDATE`（不分周期的本地首日）判断。

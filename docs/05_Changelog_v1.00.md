@@ -1626,3 +1626,45 @@ Kept from v2.49:    BlkPush 锚块保护、重启残留实例清理、SE_NEW_SES
 Trading Logic Changed:  NO（相对 v2.48；v2.49 的两项变化已撤回）
 Compile Status:         NOT COMPILE VERIFIED（Rule 70）
 ```
+
+---
+
+## v2.51 — 验收方 v2.50 复核：流动性逐条等待、等待不靠计数结束、日志缺字段即不完整、跨版本比较需有效区间；锚点轮转撤出
+
+```
+Version:  v2.51
+Date:     2026-10-02
+来源:     验收方「HMI v2.50 验收复核报告」（2026-10-02）
+
+P1 (A-49) 流动性历史逐条判定:
+  LiqStartLost      够不到的条目：起点早于历史下限 / 已加载 K 线从下限开始 / 终端已持有起点前 3 天
+                    → 永久 UNKNOWN；否则 pending。任何 pending → WAITING
+  LiqHistoryFloor   服务器首根与 Max bars 截断后最老一根，取较晚者；均未知 = 0（不等于「没有」）
+  LiqHistoryProbe   目标 = 最早的仍可恢复 pending 起点（每次按最新下限重算）；
+                    ARRIVED / BEFORE_FLOOR / SETTLED → 重建一次
+  日志              HMI-LIQ-REPLAY 加 waiting= wait_from= floor=；BUILD-END 加 liqwait=
+P1 (A-50) 等待只由重建结束:
+  OnTimer           60 次快速探测（5 s）后改 60 s 慢速，HMI-LIQ-HIST,SLOW，状态仍 WAITING，
+                    面板 slow retry；不再有「次数到了就 READY」
+P2 (A-51) 日志严格校验:
+  ReloadTest.ps1    ver >= 2.50 或带 run/init 的构建：缺身份 = 身份不符；块内全部带标签行（含诊断）校验；
+                    END 必填 build/marks/liqev/liq/unknown（2.51 起 liqwait，且与 liq 一致）；
+                    实时行同规则，不符 → 该对 PENDING
+P2 (A-52) 跨版本可比性:
+  ReloadTest.ps1    先查参数；无共同区间 → NOT COMPARABLE；无 MODEL 行 → INSUFFICIENT SAMPLE；
+                    输出比较行数；窗口移动 → PENDING REVIEW；新增 -Source <a> -Versus <b> 做固定窗口版本回归
+Withdrawn:
+  BlkPush           A-42 锚点轮转保护撤回到 anchor_rotation.patch（可改变 MODEL，单独出版本）
+
+Tools:
+  tools/liq_wait_sim.py      P1 状态机模型（镜像 MQL 函数）9 个场景；--v250 对照
+  tools/logtests/            25 组合成日志 + cases.json + Run-LogTests.ps1（仅需 PowerShell）
+Patches (package / Patches_withdrawn): D-11_fresh_touch / timeout_bar_bos / anchor_rotation，
+                           单独或一起均可干净套用于 v2.51
+
+Kept from v2.49 (do not touch the mark chain):
+  重启残留实例清理（绘图）、SE_NEW_SESSION 收盘时间（日志 / end_time 无读取方）、KillZone 容量（显示）
+
+Trading Logic Changed:  NO（相对 v2.48，任何参数下；参数摘要与 v2.48 相同）
+Compile Status:         NOT COMPILE VERIFIED（Rule 70）
+```

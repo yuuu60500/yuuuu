@@ -9,7 +9,7 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "2.50"          // keep equal to HMI_VERSION (HMI_Defs.mqh)
+#property version   "2.51"          // keep equal to HMI_VERSION (HMI_Defs.mqh)
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window
@@ -224,8 +224,7 @@ void ResetEngine()
 // "different", while a margin change does.
 int g_build_seq = 0;
 
-#define HMI_LH_RETRY_SEC   5      // A-47: probe cadence while liquidity history is WAITING
-#define HMI_LH_MAX_TRIES   60     // ... after which the pre-window items stay UNKNOWN for good
+// HMI_LH_FAST_SEC / _FAST_TRIES / _SLOW_SEC: HMI_LiquidityLevels.mqh (A-47 / A-50)
 
 string ParamsDigest()
   {
@@ -277,9 +276,9 @@ void BuildHistory()
    g_live = true;
 
    if(InpLogSignals)
-      PrintFormat("HMI-BUILD-END,%s,marks=%d,cycles=%d,pois=%d,blocks=%d,build=%d,liq=%s,liqev=%d,unknown=%d,inst=%s,run=%I64d,init=%d",
+      PrintFormat("HMI-BUILD-END,%s,marks=%d,cycles=%d,pois=%d,blocks=%d,build=%d,liq=%s,liqev=%d,unknown=%d,liqwait=%d,inst=%s,run=%I64d,init=%d",
                   _Symbol, g_log_count, g_cyc_n, g_poi_n, g_blk_n, g_build_seq,
-                  (g_lh_state == LH_WAITING ? "WAITING" : "READY"), g_log_liq_count, g_lr_unknown,
+                  (g_lh_state == LH_WAITING ? "WAITING" : "READY"), g_log_liq_count, g_lr_unknown, g_lh_pend_n,
                   g_inst, g_run_id, g_init_seq);
    g_alertq_n = 0;                     // historical build never alerts
    OM_SyncAll();
@@ -287,9 +286,12 @@ void BuildHistory()
    ChartRedraw();
 
    // A-47: liquidity history still on its way -> poll on a timer. OnTimer
-   // rebuilds through TryBuild once the bars are in, then the timer stops.
-   if(g_lh_state == LH_WAITING) EventSetTimer(HMI_LH_RETRY_SEC);
-   else                         EventKillTimer();
+   // rebuilds through TryBuild once the pending items settle, then the timer
+   // stops. A rebuild for another reason keeps the slow cadence if reached.
+   if(g_lh_state == LH_WAITING)
+      EventSetTimer(g_lh_attempts >= HMI_LH_FAST_TRIES ? HMI_LH_SLOW_SEC : HMI_LH_FAST_SEC);
+   else
+      EventKillTimer();
   }
 
 //--- the ONE rebuild path (Rule 51): first run, history refresh (A-32) and
@@ -428,30 +430,32 @@ void OnTimer()
    if(!g_ready) return;                          // a rebuild is already due on the next tick
 
    g_lh_attempts++;
-   if(LiqHistoryProbe())
+   string why = LiqHistoryProbe();
+   if(why != "")
      {
       if(InpLogSignals)
-         PrintFormat("HMI-LIQ-HIST,%s,ARRIVED,attempt=%d,need_from=%s,inst=%s,run=%I64d,init=%d",
-                     _Symbol, g_lh_attempts, TimeToString(g_lh_need, TIME_DATE|TIME_MINUTES),
-                     g_inst, g_run_id, g_init_seq);
+         PrintFormat("HMI-LIQ-HIST,%s,%s,attempt=%d,wait_from=%s,waiting=%d,inst=%s,run=%I64d,init=%d",
+                     _Symbol, why, g_lh_attempts, TimeToString(g_lh_need, TIME_DATE|TIME_MINUTES),
+                     g_lh_pend_n, g_inst, g_run_id, g_init_seq);
       EventKillTimer();
       g_ready = false;
-      TryBuild();                                // the one path: LiqReplay now sees the bars
+      TryBuild();                                // the one path; its BUILD-END says READY
       return;
      }
-   bool server_lacks = !LiqHistoryMayArrive(g_lh_need);
-   if(server_lacks || g_lh_attempts >= HMI_LH_MAX_TRIES)
+   // A-50: giving up the fast cadence is not a verdict. The state stays
+   // WAITING, the panel keeps saying so, the BUILD-END already logged
+   // liq=WAITING - and the bars are still picked up whenever they come.
+   if(g_lh_attempts == HMI_LH_FAST_TRIES)
      {
-      g_lh_state = LH_READY;                     // UNKNOWN for good: a fact now, not a wait
-      if(InpLogSignals)
-         PrintFormat("HMI-LIQ-HIST,%s,%s,attempt=%d,need_from=%s,unknown=%d,inst=%s,run=%I64d,init=%d",
-                     _Symbol, (server_lacks ? "SERVER_LACKS" : "GAVE_UP"), g_lh_attempts,
-                     TimeToString(g_lh_need, TIME_DATE|TIME_MINUTES), g_lr_unknown,
-                     g_inst, g_run_id, g_init_seq);
       EventKillTimer();
-      OM_SyncAll();                              // the panel's WAITING line goes
-      ChartRedraw();
+      EventSetTimer(HMI_LH_SLOW_SEC);
+      if(InpLogSignals)
+         PrintFormat("HMI-LIQ-HIST,%s,SLOW,attempt=%d,wait_from=%s,waiting=%d,every=%ds,inst=%s,run=%I64d,init=%d",
+                     _Symbol, g_lh_attempts, TimeToString(g_lh_need, TIME_DATE|TIME_MINUTES),
+                     g_lh_pend_n, HMI_LH_SLOW_SEC, g_inst, g_run_id, g_init_seq);
      }
+   OM_DrawPanel();                               // attempt count on the panel
+   ChartRedraw();
   }
 
 //+------------------------------------------------------------------+

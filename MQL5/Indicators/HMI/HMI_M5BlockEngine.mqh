@@ -18,17 +18,9 @@ int BlkPush(const M5Block &b)
    int cap = MathMin(MAX_BLOCKS, MathMax(4, InpM5MaxBlocks));
    if(g_blk_n >= cap)
      {
-      // Rotation took index 0 whatever it held. A cycle has no time limit
-      // (Rule 15), so after enough later blocks the live cycle's ARMED anchor
-      // is the oldest record: dropping it left Phase 2's BlockFindById with
-      // nothing to find, and D-5 / ANCHOR INVALIDATED went blind without a
-      // word. Skip that one record, the way POIPush keeps the session's POI.
-      int kill = 0;
-      if(g_blk_n > 1 && SafeIdx(g_active_cyc, g_cyc_n) &&
-         g_cyc[g_active_cyc].state == CY_ACTIVE &&
-         g_blk[0].id == g_cyc[g_active_cyc].block_id)
-         kill = 1;
-      for(int i = kill + 1; i < g_blk_n; i++) g_blk[i-1] = g_blk[i];
+      // A-42 (anchor kept out of rotation) is NOT in this version: it changes
+      // which block is dropped, so it can change marks - its own version.
+      for(int i = 1; i < g_blk_n; i++) g_blk[i-1] = g_blk[i];
       g_blk_n--;
      }
    g_blk[g_blk_n] = b;

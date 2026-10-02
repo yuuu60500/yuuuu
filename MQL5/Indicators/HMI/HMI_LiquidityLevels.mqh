@@ -59,17 +59,26 @@ long        g_lqe_del_from = 1;      // labels of events below this uid are alre
 // v2.47 replay bars: the M5 bars BEFORE the window, for this module only
 MqlRates    g_lr[];  int g_lr_n = 0;  double g_lr_atr[];
 int         g_lr_unknown = 0;        // items the loaded history could not reach
-// A-47: coverage of the replay history. WAITING = the terminal has not
-// delivered the bars before the window yet (or its server metadata is not
-// in yet): every pre-window item is provisionally UNKNOWN and the main
-// program probes on a timer, rebuilding once through the one build path
-// when they arrive. READY = replayed, or the server itself does not reach
-// that far back - those items stay UNKNOWN for good (a fact, not a wait).
+// A-47 / A-49: coverage of the replay history, judged PER ITEM. A level or
+// pool the loaded bars cannot reach is either
+//   lost     its history can never be had (LiqStartLost): UNKNOWN for good,
+//            counted in g_lr_unknown - a fact, not a failure
+//   pending  the bars may merely not be downloaded yet: provisionally
+//            UNKNOWN, its start kept in g_lh_pend[]
+// WAITING while any item is pending - even when an older one is lost (the
+// v2.50 test looked at the oldest start only, so one unrecoverable item hid
+// every recoverable one). The main program probes on a timer and rebuilds
+// once through the one build path when the pending items settle. READY
+// only when nothing is pending; the timer never declares it.
 #define LH_READY    0
 #define LH_WAITING  1
+#define HMI_LH_FAST_SEC    5      // A-47: probe cadence while WAITING
+#define HMI_LH_FAST_TRIES  60     // A-50: after these, keep probing but slowly - still WAITING,
+#define HMI_LH_SLOW_SEC    60     //       never READY until a probe settles the pending items
 int         g_lh_state     = LH_READY;
 int         g_lh_attempts  = 0;        // probes made while WAITING (reset at OnInit only)
-datetime    g_lh_need      = 0;        // earliest start the replay must reach; 0 = nothing to replay
+datetime    g_lh_need      = 0;        // earliest PENDING start (the probe target); 0 = none
+datetime    g_lh_pend[];  int g_lh_pend_n = 0;   // starts of the pending items
 int         g_log_liq_count = 0;       // LIQ rows this build wrote (BUILD-END liqev=, A-48)
 
 string PLName(const int i)
@@ -94,7 +103,7 @@ void LiqLevelsReset()
    for(int d = 0; d < PL_COUNT; d++) g_pl_drawn[d] = 0;
    g_lqe_del_from = 1;
    g_lr_n = 0;  g_lr_unknown = 0;
-   g_lh_state = LH_READY;  g_lh_need = 0;
+   g_lh_state = LH_READY;  g_lh_need = 0;  g_lh_pend_n = 0;
   }
 
 //--- period boundaries in broker server time (S-2) ------------------
@@ -269,23 +278,6 @@ int LiqJudge(const int side, const double level, int &state, int &pierce, const 
    return(LiqJudgeBar(side, level, g_m5[n], LiqMarginAt(n), n, state, pierce));
   }
 
-// Replay one level / pool from its own start over the M5 bars before the
-// window, with each bar's own ATR threshold. No event is emitted - those
-// bars are outside the window - but the STATE is what a run that started
-// earlier would hold now. History that does not reach the start leaves the
-// state unknowable: UNKNOWN, never fires, and counted in the build log.
-void LiqReplayItem(const int side, const double price, const datetime start, const datetime avail,
-                   int &state, int &pierce, datetime &ev_time)
-  {
-   if(start < avail) { state = LQ_UNKNOWN; g_lr_unknown++; return; }
-   for(int r = 0; r < g_lr_n; r++)
-     {
-      if(g_lr[r].time < start) continue;
-      int k = LiqJudgeBar(side, price, g_lr[r], MarginPtsFrom(g_lr_atr[r]), r - g_lr_n, state, pierce);
-      if(k != LQ_INTACT) { ev_time = CloseTimeOf(g_lr[r].time, PERIOD_M5); return; }
-     }
-  }
-
 // How far back a replay over `bars` is valid: PIPS from the first bar;
 // ATR_FRAC only from the 15th, the first with an ATR(14) of its own.
 // Boundary review (A-47): with 14 or fewer bars the old code took the last
@@ -299,32 +291,111 @@ datetime LiqReplayAvail(const MqlRates &bars[], const int n)
    return(bars[0].time);
   }
 
-// Could more history still arrive? The server's first date says how far its
-// history goes. 0 = metadata not in yet, which is NOT "the server has none":
-// a fresh terminal reports 0 for a while, so 0 means wait.
-bool LiqHistoryMayArrive(const datetime need)
+// The earliest M5 bar a program can ever be given: the server's first bar,
+// or - when "Max bars in chart" already caps the series - the oldest bar of
+// that capped series, whichever is later. 0 = neither is known yet, which is
+// NOT "the server has nothing": a fresh terminal reports 0 for a while.
+datetime LiqHistoryFloor()
   {
-   datetime srv_first = (datetime)SeriesInfoInteger(_Symbol, PERIOD_M5, SERIES_SERVER_FIRSTDATE);
-   if(srv_first <= 0) return(true);
-   return(srv_first <= need);
+   datetime srv  = (datetime)SeriesInfoInteger(_Symbol, PERIOD_M5, SERIES_SERVER_FIRSTDATE);
+   long     maxb = TerminalInfoInteger(TERMINAL_MAXBARS);
+   int      tot  = Bars(_Symbol, PERIOD_M5);
+   datetime cap  = 0;
+   if(maxb > 0 && tot > 0 && tot >= maxb) cap = iTime(_Symbol, PERIOD_M5, tot - 1);
+   return(srv > cap ? srv : cap);
   }
 
-// Timer probe while WAITING: does the terminal now hold bars back to
-// g_lh_need? Reads into a local array and touches no state. CopyRates on a
-// range the terminal lacks returns at once and queues the download, which
-// is what makes the retry non-blocking.
-bool LiqHistoryProbe()
+datetime LiqTerminalFirst()
   {
-   if(g_lh_state != LH_WAITING || g_lh_need == 0 || g_m5_n <= 0) return(false);
+   return((datetime)SeriesInfoInteger(_Symbol, PERIOD_M5, SERIES_TERMINAL_FIRSTDATE));
+  }
+
+// An item whose start the loaded `bars` cannot reach: is that final?
+//   before floor  it starts before the earliest bar a program can ever get
+//   at floor      the loaded bars already begin at that earliest bar (ATR
+//                 mode: the first 14 bars of all history have no ATR)
+//   lead-in held  the terminal already holds history from 3 days before the
+//                 start, so the loaded bars are all there are and the
+//                 shortfall is a real gap (ATR mode: < 15 bars in 3 days)
+// Otherwise the bars may only be late: pending, never lost.
+// The last two need loaded bars: an unbuilt series (CopyRates -1) proves nothing.
+bool LiqStartLost(const datetime start, const MqlRates &bars[], const int n,
+                  const datetime hfloor, const datetime term_first)
+  {
+   if(hfloor > 0 && start < hfloor)                                return(true);
+   if(n > 0 && hfloor > 0 && bars[0].time <= hfloor)               return(true);
+   if(n > 0 && term_first > 0 && term_first <= start - 3 * 86400) return(true);
+   return(false);
+  }
+
+void LiqPendPush(const datetime start)
+  {
+   ArrayResize(g_lh_pend, g_lh_pend_n + 1);
+   g_lh_pend[g_lh_pend_n] = start;
+   g_lh_pend_n++;
+   if(g_lh_need == 0 || start < g_lh_need) g_lh_need = start;
+  }
+
+// Replay one level / pool from its own start over the M5 bars before the
+// window, with each bar's own ATR threshold. No event is emitted - those
+// bars are outside the window - but the STATE is what a run that started
+// earlier would hold now. History that does not reach the start leaves the
+// state unknowable: UNKNOWN, never fires - for good when LiqStartLost says
+// so (counted in g_lr_unknown), otherwise pending (g_lh_pend[]).
+void LiqReplayItem(const int side, const double price, const datetime start, const datetime avail,
+                   const datetime hfloor, const datetime term_first,
+                   int &state, int &pierce, datetime &ev_time)
+  {
+   if(start < avail)
+     {
+      state = LQ_UNKNOWN;
+      if(LiqStartLost(start, g_lr, g_lr_n, hfloor, term_first)) g_lr_unknown++;
+      else                                                     LiqPendPush(start);
+      return;
+     }
+   for(int r = 0; r < g_lr_n; r++)
+     {
+      if(g_lr[r].time < start) continue;
+      int k = LiqJudgeBar(side, price, g_lr[r], MarginPtsFrom(g_lr_atr[r]), r - g_lr_n, state, pierce);
+      if(k != LQ_INTACT) { ev_time = CloseTimeOf(g_lr[r].time, PERIOD_M5); return; }
+     }
+  }
+
+// Timer probe while WAITING. Reads into a local array and touches no engine
+// state; CopyRates on a range the terminal lacks returns at once and queues
+// the download, which is what keeps the retry non-blocking.
+// Returns "" while still waiting, else why a rebuild now settles every
+// pending item (the rebuild applies the same LiqStartLost to a request that
+// contains this one, so it cannot come back WAITING on the same facts):
+//   ARRIVED       the bars reach the earliest recoverable pending start
+//   BEFORE_FLOOR  every pending start now lies before the history floor
+//   SETTLED       the bars are all in and the earliest one is still short
+string LiqHistoryProbe()
+  {
+   if(g_lh_state != LH_WAITING || g_lh_pend_n <= 0 || g_m5_n <= 0) return("");
+   datetime first = g_m5[0].time;
+   datetime hfloor = LiqHistoryFloor();
+   datetime tfst  = LiqTerminalFirst();
+   MqlRates none[];
+   datetime target = 0;
+   for(int i = 0; i < g_lh_pend_n; i++)
+      if(!LiqStartLost(g_lh_pend[i], none, 0, hfloor, tfst) && (target == 0 || g_lh_pend[i] < target))
+         target = g_lh_pend[i];
+   if(target == 0) return("BEFORE_FLOOR");
+   g_lh_need = target;                                 // log / panel only
+
    MqlRates tmp[];
-   int got = CopyRates(_Symbol, PERIOD_M5, g_lh_need - 3 * 86400, g_m5[0].time - 1, tmp);
+   int got = CopyRates(_Symbol, PERIOD_M5, target - 3 * 86400, first - 1, tmp);
+   if(got <= 0) return("");                            // not built yet: no evidence either way
    datetime avail = LiqReplayAvail(tmp, got);
-   return(avail > 0 && avail <= g_lh_need);
+   if(avail > 0 && avail <= target)                    return("ARRIVED");
+   if(LiqStartLost(target, tmp, got, hfloor, tfst))     return("SETTLED");
+   return("");
   }
 
 void LiqReplay()
   {
-   g_lr_n = 0;  g_lr_unknown = 0;  g_lh_need = 0;  g_lh_state = LH_READY;
+   g_lr_n = 0;  g_lr_unknown = 0;  g_lh_need = 0;  g_lh_pend_n = 0;  g_lh_state = LH_READY;
    if(g_m5_n <= 0) return;
    datetime first = g_m5[0].time;
    datetime need  = first;
@@ -333,7 +404,6 @@ void LiqReplay()
    for(int j = 0; j < g_liq_n; j++)
       if(!g_liq[j].swept && g_liq[j].confirm_time < need) need = g_liq[j].confirm_time;
    if(need >= first) return;                             // everything starts inside the window
-   g_lh_need = need;
 
    // three extra days so ATR(14) is already valid at `need`, weekend or not
    MqlRates tmp[];
@@ -346,19 +416,15 @@ void LiqReplay()
       SeriesComputeATR(g_lr, g_lr_n, g_lr_atr, 0);
      }
    datetime avail = LiqReplayAvail(g_lr, g_lr_n);
-   if(avail == 0) avail = first;                         // nothing usable: nothing is known
-
-   // A-47: short of `need`, the items it cannot reach become UNKNOWN below.
-   // Whether that is final depends on the server: if its history goes back
-   // far enough, or it has not said yet, the bars are merely late - WAITING,
-   // and the main program's timer rebuilds once they are in.
-   if(avail > need && LiqHistoryMayArrive(need)) g_lh_state = LH_WAITING;
+   if(avail == 0) avail = first;                         // nothing usable: nothing reached
+   datetime hfloor = LiqHistoryFloor();
+   datetime tfst  = LiqTerminalFirst();
 
    for(int i = 0; i < PL_COUNT; i++)
      {
       if(!g_pl[i].valid || g_pl[i].from >= first) continue;
       int st = g_pl[i].lq_state, pi = g_pl[i].pierce_index;  datetime et = g_pl[i].event_time;
-      LiqReplayItem(g_pl[i].side, g_pl[i].price, g_pl[i].from, avail, st, pi, et);
+      LiqReplayItem(g_pl[i].side, g_pl[i].price, g_pl[i].from, avail, hfloor, tfst, st, pi, et);
       g_pl[i].lq_state = st;  g_pl[i].pierce_index = pi;  g_pl[i].event_time = et;
      }
    for(int j = 0; j < g_liq_n; j++)
@@ -366,15 +432,20 @@ void LiqReplay()
       if(g_liq[j].swept || g_liq[j].confirm_time >= first) continue;
       int side = (g_liq[j].type == DIR_BULL ? +1 : -1);
       int st = g_liq[j].lq_state, pi = g_liq[j].pierce_index;  datetime et = g_liq[j].swept_time;
-      LiqReplayItem(side, g_liq[j].price, g_liq[j].confirm_time, avail, st, pi, et);
+      LiqReplayItem(side, g_liq[j].price, g_liq[j].confirm_time, avail, hfloor, tfst, st, pi, et);
       g_liq[j].lq_state = st;  g_liq[j].pierce_index = pi;
       if(st == LQ_SWEPT || st == LQ_BROKEN || st == LQ_UNKNOWN) { g_liq[j].swept = true; g_liq[j].swept_time = et; }
      }
+   g_lh_state = (g_lh_pend_n > 0 ? LH_WAITING : LH_READY);
+
    if(InpLogSignals)
-      PrintFormat("HMI-LIQ-REPLAY,%s,need_from=%s,have_from=%s,bars=%d,unknown=%d,state=%s,attempt=%d,inst=%s,run=%I64d,init=%d",
+      PrintFormat("HMI-LIQ-REPLAY,%s,need_from=%s,have_from=%s,bars=%d,unknown=%d,waiting=%d,wait_from=%s,floor=%s,state=%s,attempt=%d,inst=%s,run=%I64d,init=%d",
                   _Symbol, TimeToString(need, TIME_DATE|TIME_MINUTES),
                   (avail < first ? TimeToString(avail, TIME_DATE|TIME_MINUTES) : "none"),
-                  g_lr_n, g_lr_unknown, (g_lh_state == LH_WAITING ? "WAITING" : "READY"), g_lh_attempts,
+                  g_lr_n, g_lr_unknown, g_lh_pend_n,
+                  (g_lh_need > 0 ? TimeToString(g_lh_need, TIME_DATE|TIME_MINUTES) : "none"),
+                  (hfloor > 0 ? TimeToString(hfloor, TIME_DATE|TIME_MINUTES) : "unknown"),
+                  (g_lh_state == LH_WAITING ? "WAITING" : "READY"), g_lh_attempts,
                   g_inst, g_run_id, g_init_seq);
   }
 

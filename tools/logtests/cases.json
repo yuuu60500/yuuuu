@@ -1,0 +1,319 @@
+{
+ "n01_ok": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "IDENTICAL inside the comparable region (3 MODEL + 2 LIQ)"
+  ],
+  "forbid": []
+ },
+ "n02_wrong_end": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "INCOMPLETE build(s) - no verdict",
+   "END build=99, BEGIN build=1"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "MODEL IDENTICAL"
+  ]
+ },
+ "n03_marks": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "END marks=5 but 3 MODEL row(s)"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "MODEL IDENTICAL"
+  ]
+ },
+ "n04_end_no_id": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "END without run/init"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "MODEL IDENTICAL"
+  ]
+ },
+ "n05_model_no_id": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "row(s) without run/init (HMI-BUILD)"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "MODEL IDENTICAL"
+  ]
+ },
+ "n06_block_no_id": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "BEGIN without run/init (v2.51 log must carry it)"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "MODEL IDENTICAL"
+  ]
+ },
+ "n07_no_liqev": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "END without a valid liqev="
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "MODEL IDENTICAL"
+  ]
+ },
+ "n08_diag_other_id": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "carry another run/init than the BEGIN (HMI-ARM/HMI-BLK/HMI-POI/HMI-SESS)"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "MODEL IDENTICAL"
+  ]
+ },
+ "n08c_chain": {
+  "args": [
+   "-Chain"
+  ],
+  "expect": [
+   "1 INCOMPLETE build(s) skipped",
+   "block ARMED                       1"
+  ],
+  "forbid": []
+ },
+ "n09_model_other_id": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "carry another run/init than the BEGIN (HMI-BUILD)"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "MODEL IDENTICAL"
+  ]
+ },
+ "n10_waiting": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "LIQ rows PENDING, MODEL rows compared",
+   "MODEL IDENTICAL inside the comparable region (3 rows)",
+   "pending (liquidity WAITING)"
+  ],
+  "forbid": [
+   "(3 MODEL + 2 LIQ) - no repaint"
+  ]
+ },
+ "n11_dup_begin": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "no END before the next BEGIN (build 1)",
+   "IDENTICAL inside the comparable region"
+  ],
+  "forbid": []
+ },
+ "n12_missing_end": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "no END (the log ends inside build 2)"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "MODEL IDENTICAL"
+  ]
+ },
+ "n13_legacy": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "IDENTICAL inside the comparable region",
+   "liquidity state not logged"
+  ],
+  "forbid": []
+ },
+ "n14_xver_disjoint": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "NOT COMPARABLE - no common region"
+  ],
+  "forbid": [
+   "0 difference(s)"
+  ]
+ },
+ "n15_xver_moved": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "DIFFERENT VERSIONS (2.48 / 2.51)",
+   "PENDING REVIEW, not a pass",
+   "use a fixed window"
+  ],
+  "forbid": [
+   "same window and parameters"
+  ]
+ },
+ "n16_xver_params": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "NOT COMPARABLE - different parameters"
+  ],
+  "forbid": [
+   "0 difference(s)"
+  ]
+ },
+ "n17_xver_empty": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "INSUFFICIENT SAMPLE"
+  ],
+  "forbid": [
+   "0 difference(s)"
+  ]
+ },
+ "n18_versus_same": {
+  "args": [
+   "-Source",
+   "USDJPY#0A48,M5",
+   "-Versus",
+   "USDJPY#0B51,M5"
+  ],
+  "expect": [
+   "split as SYMBOL#INSTANCE",
+   "upgrade regression: 0 difference(s) over 3 / 3 MODEL row(s), same window and parameters."
+  ],
+  "forbid": []
+ },
+ "n19_versus_diff": {
+  "args": [
+   "-Source",
+   "USDJPY#0A48,M5",
+   "-Versus",
+   "USDJPY#0B51,M5"
+  ],
+  "expect": [
+   "upgrade regression: 2 difference(s) over 3 / 3 MODEL row(s)"
+  ],
+  "forbid": []
+ },
+ "n20_wait_inconsistent": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "END liq=WAITING but liqwait=0"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "MODEL IDENTICAL"
+  ]
+ },
+ "n21_v250_no_liqwait": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "IDENTICAL inside the comparable region"
+  ],
+  "forbid": []
+ },
+ "n22_live_ok": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "AGREE BOTH WAYS on every covered bar (MODEL + LIQ)"
+  ],
+  "forbid": []
+ },
+ "n23_live_noid": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "live rows without run/init 1",
+   "nothing comparable yet - no PASS can be given."
+  ],
+  "forbid": [
+   "AGREE BOTH WAYS"
+  ]
+ },
+ "n24_live_inside": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "HMI-LIVE row inside a historical build"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "MODEL IDENTICAL"
+  ]
+ }
+}
