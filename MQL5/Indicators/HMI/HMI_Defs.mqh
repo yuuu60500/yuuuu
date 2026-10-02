@@ -6,7 +6,7 @@
 #ifndef HMI_DEFS_MQH
 #define HMI_DEFS_MQH
 
-#define HMI_VERSION      "2.49"
+#define HMI_VERSION      "2.50"
 #define HMI_PREFIX       "HMI"
 
 //--- direction ------------------------------------------------------
@@ -268,6 +268,8 @@ struct LiqPool
 
 //====================== GLOBAL STATE ================================
 string   g_inst          = "0000";     // instance tag (Rule 55)
+long     g_run_id        = 0;          // terminal process id (temporary global; HMI_ObjectManager sets it)
+int      g_init_seq      = 0;          // this initialisation's number within the run (A-48)
 long     g_next_id       = 1;
 bool     g_live          = false;      // false during historical build (no alerts)
 bool     g_ready         = false;

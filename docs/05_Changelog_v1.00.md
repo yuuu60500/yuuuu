@@ -1584,3 +1584,45 @@ Not changed (按规格 / 待观察):
 Trading Logic Changed:  YES（D-11 默认开；TRANSITION 超时根）—— 与 v2.48 不可做重绘比对
 Compile Status:         NOT COMPILE VERIFIED（Rule 70）
 ```
+
+---
+
+## v2.50 — 规则基线恢复；流动性历史等待与恢复（P1）；构建日志严格校验（P2）
+
+```
+Version:  v2.50
+Date:     2026-10-02
+来源:     验收方「HMI v2.49 阶段验收报告」（2026-10-01）+ 用户范围决定（2026-10-02）
+
+Reverted (v2.49 → v2.48 行为; 两项各自独立出版本):
+  M5TouchArbitrate   撤回 D-11「离开后重新触碰才能 ARMED」；InpArmRequiresFreshTouch 删除，参数摘要恢复 37 项
+  H4ContextOnBar     撤回「TRANSITION 超时当根继续判定 BOS」，超时进入 RANGE 后立即返回
+  两项变化保留于提交 30a288b 与随包交付的补丁 D-11_fresh_touch.patch / timeout_bar_bos.patch
+  （均可干净套用于 v2.50），BRI-10 保持 OPEN
+
+P1 (A-47) 流动性历史等待与恢复:
+  LiqReplay          三态 READY / WAITING / UNKNOWN；WAITING = 回放够不到起点且服务器元数据未到或服务器有该段；
+                     永久 UNKNOWN 仅当 SERIES_SERVER_FIRSTDATE 晚于起点
+  OnTimer            WAITING 时每 5 秒非阻塞探测（CopyRates 到本地数组）；到位 → TryBuild() 重建一次（唯一路径）；
+                     60 次仍未到 / 服务器确认没有 → UNKNOWN 定格，定时器停
+  TryBuild           OnCalculate 首次 / 历史刷新 / 定时重试共用的唯一重建入口
+  LiqReplayAvail     边界复核：ATR 模式不足 15 根回放 K 线 → 无可回放起点（原取最后一根 ATR=0 按 pips 回退）
+  日志               HMI-LIQ-REPLAY 加 state= attempt=；HMI-LIQ-HIST ARRIVED / GAVE_UP / SERVER_LACKS；
+                     BUILD-END 加 liq= liqev= unknown=；面板 WAITING 提示（COMPACT 后缀 / FULL 单行）
+
+P2 (A-48) 构建日志严格校验:
+  指标               每行 ,inst=,run=<终端进程 id>,init=<初始化序号>（临时终端全局变量，CAS 自增）；
+                     BEGIN / END / 事件 / 诊断 / starting on 一致携带
+  ReloadTest.ps1     单一构建块解析器供所有模式使用；COMPLETE = END build 与 BEGIN 相同 + run/init 相同 +
+                     块内每行 run/init 相同 + marks= 等于 MODEL 行数 + liqev= 等于 LIQ 行数；
+                     缺 END / 重复 BEGIN / 错号 END / 数量不符 / 身份不符 → INCOMPLETE 不比对不 PASS；
+                     -Chain 只读最新 COMPLETE 块；LIVE vs BUILD 排除异身份实时行；
+                     任一构建 liq=WAITING → LIQ 行 PENDING、MODEL 照常；MODEL / LIQ 数量分开显示；
+                     修正单来源时 sources found 显示块数的旧问题
+                     合成日志 9 组验证通过（PowerShell 7.4.6）
+
+Kept from v2.49:    BlkPush 锚块保护、重启残留实例清理、SE_NEW_SESSION 收盘时间、KillZone 容量（均不触碰标记链）
+
+Trading Logic Changed:  NO（相对 v2.48；v2.49 的两项变化已撤回）
+Compile Status:         NOT COMPILE VERIFIED（Rule 70）
+```

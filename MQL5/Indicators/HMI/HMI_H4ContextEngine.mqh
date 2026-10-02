@@ -39,11 +39,11 @@ void CtxLog(const string kind, const string dir, const int h, const int broken)
       sw_t = TimeToString(g_h4sw[broken].bar_time, TIME_DATE|TIME_MINUTES);
       sw_p = DoubleToString(g_h4sw[broken].price, _Digits);
      }
-   PrintFormat("HMI-CTX,%s,%s,dir=%s,live=%d,ctx=%s,str=%d,messy=%d,bar=%s,swing=%s,swing_px=%s,close=%s,inst=%s",
+   PrintFormat("HMI-CTX,%s,%s,dir=%s,live=%d,ctx=%s,str=%d,messy=%d,bar=%s,swing=%s,swing_px=%s,close=%s,inst=%s,run=%I64d,init=%d",
                _Symbol, kind, dir, (g_live ? 1 : 0),
                CtxName(g_ctx), g_ctx_strength, (g_ctx_messy ? 1 : 0),
                TimeToString(CloseTimeOf(g_h4[h].time, PERIOD_H4), TIME_DATE|TIME_MINUTES),
-               sw_t, sw_p, DoubleToString(g_h4[h].close, _Digits), g_inst);
+               sw_t, sw_p, DoubleToString(g_h4[h].close, _Digits), g_inst, g_run_id, g_init_seq);
   }
 
 // Classify the raw break for bar h and drive the state machine.
@@ -55,21 +55,18 @@ CtxEventType H4ContextOnBar(const int h)
    datetime t = CloseTimeOf(g_h4[h].time, PERIOD_H4);
 
    //--- timeout: a transition that never resolves becomes a range ---
-   // The bar's own close is still judged below. This used to return at once,
-   // so a break landing on the timeout bar was never seen: the swing stayed
-   // unswept and only a second close beyond it, next bar, could count. The
-   // RANGE row of 2.3 applies to this bar like any other: a break is a BOS.
-   bool timed_out = false;
+   // (BRI-10 companion note: a break on the timeout bar itself is not judged
+   // here; v2.49 tried that and v2.50 withdrew it pending its own version)
    if(g_ctx == CTX_TRANSITION && g_ctx_bars > InpH4TransitionMaxBars)
      {
       CtxEnter(CTX_RANGE, DIR_NONE, t);
       CtxLog("TIMEOUT", "-", h, -1);
-      timed_out = true;
+      return(EV_TIMEOUT);
      }
 
    int broken = -1;
    int brk = H4DetectBreak(h, broken);
-   if(brk == DIR_NONE) return(timed_out ? EV_TIMEOUT : EV_NONE);
+   if(brk == DIR_NONE) return(EV_NONE);
 
    datetime brk_confirm = (SafeIdx(broken, g_h4sw_n) ? g_h4sw[broken].confirm_time : 0);
    H4ConsumeSwing(broken, t);

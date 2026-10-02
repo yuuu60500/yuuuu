@@ -1332,7 +1332,8 @@ Location:                HMI_CycleManager.mqh M5TouchArbitrate（TOUCHED 可参�
 Actual Behavior:         见 docs/02 BRI-10
 Evidence:                代码推演；重建与实时一致，重绘测试不可见
 Fix:                     v2.49 D-11：TOUCHED 只在「上一根不相交」的新触碰上参与仲裁
-Status:                  **FIXED —— v2.49，待编译实测**；默认值待用户确认
+Status:                  **WITHDRAWN —— v2.49 的修复在 v2.50 撤回**（用户 2026-10-02：规则变化独立出版本）；
+                         基线行为恢复，BRI-10 保持 OPEN，变更保留于 30a288b / 补丁文件
 Confidence:              HIGH（行为确定）；MEDIUM（规格意图：§7.2 与 §8.3 矛盾）
 ```
 
@@ -1366,7 +1367,8 @@ Confidence:              HIGH
 Severity:                P3（仅当超时与突破落在同一根；最多延迟一根 H4）
 Location:                HMI_H4ContextEngine.mqh H4ContextOnBar
 Fix:                     v2.49 超时后继续判定本根收盘；突破 = RANGE 行 BOS
-Status:                  **FIXED —— v2.49**
+Status:                  **WITHDRAWN —— v2.50 撤回**（用户 2026-10-02：改变 H4 方向 / POI / Session 的语义变更，
+                         独立出版本并回放超时无突破 / 同根向上 / 同根向下 / 重载一致性）；变更保留于 30a288b / 补丁文件
 Confidence:              HIGH
 ```
 
@@ -1396,3 +1398,59 @@ Status:                  **FIXED —— v2.49**
   K 线；读 shift 0 违反「只用 shift ≥ 1」，与重建不一致。不加。
 - LiqReplay 首次挂载时 M5 历史不足 → UNKNOWN 且不重试：只影响流动性线，HMI-LIQ-REPLAY 可见，暂不改。
 - 通读确认：无未来函数路径；所有 PrintFormat 占位符与参数一致；所有结构体字段显式初始化。
+
+
+## Audit Round 11 —— 验收方阶段报告（2026-10-01）与用户范围决定（2026-10-02）
+
+### A-47 —— **流动性历史未就绪时状态长期停留在 UNKNOWN，且不重试**（验收方 P1，成立）
+
+```
+Severity:                验收方定为阻塞（本仓库此前记为显示层信息提示；标记链不读流动性状态，Rule 69）
+Location:                HMI_LiquidityLevels.mqh LiqReplay（仅 n==0 调用一次）；H4M5_Identification.mq5 BuildHistory
+Actual Behavior:         CopyRates 取不到窗口前 M5 历史 → 所有早于窗口的池 / 周期价位记 UNKNOWN，
+                         构建照常提交 ready，之后没有任何路径重试
+Fix (v2.50):             三态：READY / WAITING / UNKNOWN。
+                         WAITING = 回放够不到最早起点，且服务器 SERIES_SERVER_FIRSTDATE 为 0（元数据未到）
+                         或早于该起点（服务器有、终端未下载）；UNKNOWN（永久）= 服务器首日期晚于起点。
+                         WAITING 时 EventSetTimer(5s) 非阻塞探测（CopyRates 到本地数组，不碰状态）；
+                         探测到数据够到起点 → 走唯一重建路径 TryBuild() 重建一次 → READY，定时器停。
+                         60 次（5 分钟）仍未到或服务器确认没有 → 定为 UNKNOWN，日志 GAVE_UP / SERVER_LACKS。
+                         日志：HMI-LIQ-REPLAY 加 state= / attempt=；HMI-LIQ-HIST 记 ARRIVED / GAVE_UP / SERVER_LACKS；
+                         BUILD-END 加 liq=READY|WAITING、liqev=、unknown=。面板 WAITING 时提示。
+                         ReloadTest：任一构建 liq=WAITING → LIQ 行 PENDING，MODEL 行照常比对；
+                         unknown>0 且 READY 为信息提示，不要求为零。
+Boundary review:         ATR 模式回放前置样本：原代码 g_lr_n <= 14 时取最后一根（ATR=0）作为可回放起点，
+                         落在其上的条目会按 pips 回退阈值回放，不是历史阈值。v2.50 LiqReplayAvail：
+                         不足 15 根 → 无可回放起点 → 该条目 WAITING / UNKNOWN，不再误判为还原成功。
+                         窗口第 0–13 根借用不足 15 根的回放 K 线算 ATR 的路径（LiqAtrAt）本就按
+                         「够几根算几根、不够回退」处理，与连续运行一致，不改。
+Equivalence argument:    延迟到位后的重建与一开始就绪的构建走同一函数、同一输入（Rule 51），结果同构；
+                         MODEL 标记不读任何流动性状态（Rule 69），重建前后应完全一致 —— 列入 v2.50 验收实测。
+Status:                  **FIXED —— v2.50，待编译实测**
+Confidence:              HIGH（结构）；终端行为（SERVER_FIRSTDATE 时序、下载延迟）待实测
+```
+
+### A-48 —— **构建日志解析器接受错号 END**（验收方 P2，成立，合成日志复现）
+
+```
+Severity:                P1（测试工具可给出错误的 PASS）；正常运行不会产生错号 END（BuildHistory 同步写 BEGIN/END）
+Location:                tools/ReloadTest.ps1 主解析器与 -Chain 分支：任何 END 关闭当前打开的构建
+Evidence:                合成日志（两轮 BEGIN build=1/2，END 均 build=99）→ v2.49 脚本输出 IDENTICAL
+Fix (v2.50):             指标：每行 ,inst=,run=<终端进程 id>,init=<本次初始化序号>（临时终端全局变量 CAS 自增）；
+                         BEGIN / END / 事件 / 诊断行一致携带；END 加 liq= / liqev= / unknown=。
+                         脚本：所有模式共用一个构建块解析器；COMPLETE 条件 = END build 等于 BEGIN、
+                         END run/init 等于 BEGIN（有则校验）、块内每行 run/init 等于 BEGIN、
+                         END marks= 等于块内 MODEL 行数、END liqev= 等于块内 LIQ 行数（有则校验）。
+                         缺 END、下一 BEGIN 前无 END、错号 END、数量不符、身份不符 → INCOMPLETE：
+                         列出原因，不比对，不给 PASS；-Chain 只读最新的 COMPLETE 块。
+                         LIVE vs BUILD：实时行 run/init 与构建 A 不同 → 排除并注明。
+                         旧格式（v2.48 及更早）日志：无 run/init 的校验跳过，build / marks 校验仍做。
+Verification:            PowerShell 7.4.6 合成日志 9 组：错号 END、marks 不符、重复 BEGIN、缺 END、
+                         END 身份不符 → INCOMPLETE / 无结论；正常 v2.50 与 v2.48 格式 → IDENTICAL；
+                         liq=WAITING → MODEL IDENTICAL + LIQ PENDING；LIVE vs BUILD 异身份实时行排除。
+Status:                  **FIXED —— v2.50**（脚本已验证；指标侧日志格式待编译实测）
+Confidence:              HIGH
+```
+
+附带修正：`$sources.Count` 在只有一个来源时显示的是该组的块数（Group-Object 单组返回 GroupInfo），
+已改为数组包裹。

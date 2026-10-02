@@ -128,9 +128,9 @@ int CycCreate(const int blk_idx, const int A)
    g_blk[blk_idx].armed_time = cy.armed_time;
    g_blk[blk_idx].vis        = -1;
    if(InpLogSignals)                     // A-37 diagnostic, log only
-      PrintFormat("HMI-ARM,%s,block=%I64d,sess=%I64d,dir=%d,bar=%s,inst=%s",
+      PrintFormat("HMI-ARM,%s,block=%I64d,sess=%I64d,dir=%d,bar=%s,inst=%s,run=%I64d,init=%d",
                   _Symbol, g_blk[blk_idx].id, g_blk[blk_idx].session_id,
-                  g_blk[blk_idx].dir, DiagT(cy.armed_time), g_inst);
+                  g_blk[blk_idx].dir, DiagT(cy.armed_time), g_inst, g_run_id, g_init_seq);
 
    return(CycPush(cy));
   }
@@ -176,18 +176,6 @@ int M5TouchArbitrate(const int n)
 
       bool armable = (g_sess.active && g_blk[i].dir == g_sess.dir && st != BLOCK_CONFIRMED);
 
-      // D-11 (BRI-10): Spec 7.2 lets a TOUCHED block reach ARMED on a LATER
-      // touch; 8.3 lists ACTIVE as the precondition. Read together, "touched
-      // again" means a NEW touch: a closed bar left the zone and a later one
-      // came back. A bar that merely stays inside the zone it was already
-      // inside continues the same touch - and without this test the loser of
-      // bar n's arbitration armed on bar n+1 and closed, one bar old, the very
-      // cycle it had just lost to. A TOUCHED block was touched by some bar
-      // <= n-1, so it was visible at n-1 and the n-1 range is a fair test.
-      if(armable && st == BLOCK_TOUCHED && InpArmRequiresFreshTouch && n > 0 &&
-         RangesIntersect(g_m5[n-1].low, g_m5[n-1].high, g_blk[i].lo, g_blk[i].hi))
-         armable = false;
-
       // Phase 5 re-check (signed boundary 1, 2026-09-24): the block must
       // belong to THIS session and the session must still agree with the
       // CURRENT H4 direction. Phase 0b should already have ended any session
@@ -199,10 +187,10 @@ int M5TouchArbitrate(const int n)
         {
          armable = false;
          if(InpLogSignals)
-            PrintFormat("HMI-GUARD,%s,ARMED_BLOCKED,block=%I64d,blk_sess=%I64d,sess=%I64d,sess_dir=%d,ctx_dir=%d,bar=%s,inst=%s",
+            PrintFormat("HMI-GUARD,%s,ARMED_BLOCKED,block=%I64d,blk_sess=%I64d,sess=%I64d,sess_dir=%d,ctx_dir=%d,bar=%s,inst=%s,run=%I64d,init=%d",
                         _Symbol, g_blk[i].id, g_blk[i].session_id, g_sess.id,
                         g_sess.dir, CtxDirection(),
-                        TimeToString(CloseTimeOf(g_m5[n].time, PERIOD_M5), TIME_DATE|TIME_MINUTES), g_inst);
+                        TimeToString(CloseTimeOf(g_m5[n].time, PERIOD_M5), TIME_DATE|TIME_MINUTES), g_inst, g_run_id, g_init_seq);
         }
 
       if(!armable)

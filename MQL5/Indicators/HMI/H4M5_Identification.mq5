@@ -9,7 +9,7 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "2.49"          // keep equal to HMI_VERSION (HMI_Defs.mqh)
+#property version   "2.50"          // keep equal to HMI_VERSION (HMI_Defs.mqh)
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window
@@ -73,14 +73,14 @@ void LogPhase7()
                       : (m == MDL_MSS ? g_cyc[ci].mss_level : 0.0));
          datetime rt = (m == MDL_CISD ? g_cyc[ci].cisd_ref_time
                        : (m == MDL_MSS ? g_cyc[ci].mss_ref_time : 0));
-         PrintFormat("%s,%s,MODEL,%d,%I64d,%I64d,%s,%s,%s,%s,%s,%s,inst=%s",
+         PrintFormat("%s,%s,MODEL,%d,%I64d,%I64d,%s,%s,%s,%s,%s,%s,inst=%s,run=%I64d,init=%d",
                      tag, _Symbol, g_cyc[ci].dir, g_cyc[ci].cycle_id, g_cyc[ci].block_id,
                      (g_cyc[ci].anchor_type == BT_M5_OB ? "OB" : "BREAKER"),
                      ModelName(m),
                      TimeToString(CloseTimeOf(g_cyc[ci].cfm_time[m], PERIOD_M5), TIME_DATE|TIME_SECONDS),
                      DoubleToString(g_cyc[ci].cfm_price[m], _Digits),
                      TimeToString(rt, TIME_DATE|TIME_SECONDS),
-                     DoubleToString(lvl, _Digits), g_inst);
+                     DoubleToString(lvl, _Digits), g_inst, g_run_id, g_init_seq);
         }
      }
   }
@@ -224,9 +224,12 @@ void ResetEngine()
 // "different", while a margin change does.
 int g_build_seq = 0;
 
+#define HMI_LH_RETRY_SEC   5      // A-47: probe cadence while liquidity history is WAITING
+#define HMI_LH_MAX_TRIES   60     // ... after which the pre-window items stay UNKNOWN for good
+
 string ParamsDigest()
   {
-   string s = StringFormat("%d|%d|%d|%d|%.8f|%d|%.8f|%d|%.8f|%d|%.8f|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%.8f|%.8f|%.8f|%d|%.8f|%d|%d|%d",
+   string s = StringFormat("%d|%d|%d|%d|%.8f|%d|%.8f|%d|%.8f|%d|%.8f|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%d|%.8f|%.8f|%.8f|%d|%.8f|%d|%d",
       InpMaxHistoryBarsM5, InpMaxHistoryBarsH4, InpWarmupSuppressBars,
       (int)InpBreakMarginMode, InpBreakMarginPips, InpBreakMarginPoints, InpBreakMarginATRFrac,
       InpH4OBtoFVGMaxBars, InpH4ConnectTolerancePips, InpM5OBtoFVGMaxBars, InpM5ConnectTolerancePips,
@@ -238,7 +241,7 @@ string ParamsDigest()
       (int)InpStopIdentificationOnBlockInvalidation, InpMaxCyclesKept,
       InpPAEngulfMinBodyRatio, InpPARejWickToBody, InpPARejWickToRange,
       InpPABreakRetestMaxBars, InpPARetestTolerancePips,
-      InpLiqSweepReclaimBars, (int)InpPDSkipSunday, (int)InpArmRequiresFreshTouch);
+      InpLiqSweepReclaimBars, (int)InpPDSkipSunday);
    uint h = (uint)0x811C9DC5;               // FNV-1a, 32 bit (offset basis)
    for(int i = 0; i < StringLen(s); i++)
      {
@@ -251,7 +254,7 @@ string ParamsDigest()
 void BuildHistory()
   {
    g_live = false;
-   g_log_count = 0;
+   g_log_count = 0;  g_log_liq_count = 0;
    g_build_seq++;
 
    // Bracketing the build makes the reload comparison self-verifying: the
@@ -263,23 +266,41 @@ void BuildHistory()
    // any gap in the M5 feed would make wrong.
    int wi = MathMin(MathMax(0, InpWarmupSuppressBars), g_m5_n - 1);
    if(InpLogSignals)
-      PrintFormat("HMI-BUILD-BEGIN,%s,m5_bars=%d,h4_bars=%d,from=%s,to=%s,ver=%s,params=%s,inst=%s,build=%d,warmup_end=%s",
+      PrintFormat("HMI-BUILD-BEGIN,%s,m5_bars=%d,h4_bars=%d,from=%s,to=%s,ver=%s,params=%s,inst=%s,build=%d,warmup_end=%s,run=%I64d,init=%d",
                   _Symbol, g_m5_n, g_h4_n,
                   TimeToString(g_m5[0].time, TIME_DATE|TIME_MINUTES),
                   TimeToString(g_m5[g_m5_n-1].time, TIME_DATE|TIME_MINUTES),
                   HMI_VERSION, ParamsDigest(), g_inst, g_build_seq,
-                  TimeToString(g_m5[wi].time, TIME_DATE|TIME_MINUTES));
+                  TimeToString(g_m5[wi].time, TIME_DATE|TIME_MINUTES), g_run_id, g_init_seq);
 
    for(int n = 0; n < g_m5_n; n++) ProcessClosedM5Bar(n);
    g_live = true;
 
    if(InpLogSignals)
-      PrintFormat("HMI-BUILD-END,%s,marks=%d,cycles=%d,pois=%d,blocks=%d,build=%d,inst=%s",
-                  _Symbol, g_log_count, g_cyc_n, g_poi_n, g_blk_n, g_build_seq, g_inst);
+      PrintFormat("HMI-BUILD-END,%s,marks=%d,cycles=%d,pois=%d,blocks=%d,build=%d,liq=%s,liqev=%d,unknown=%d,inst=%s,run=%I64d,init=%d",
+                  _Symbol, g_log_count, g_cyc_n, g_poi_n, g_blk_n, g_build_seq,
+                  (g_lh_state == LH_WAITING ? "WAITING" : "READY"), g_log_liq_count, g_lr_unknown,
+                  g_inst, g_run_id, g_init_seq);
    g_alertq_n = 0;                     // historical build never alerts
    OM_SyncAll();
    OM_Trim();
    ChartRedraw();
+
+   // A-47: liquidity history still on its way -> poll on a timer. OnTimer
+   // rebuilds through TryBuild once the bars are in, then the timer stops.
+   if(g_lh_state == LH_WAITING) EventSetTimer(HMI_LH_RETRY_SEC);
+   else                         EventKillTimer();
+  }
+
+//--- the ONE rebuild path (Rule 51): first run, history refresh (A-32) and
+//--- the liquidity-history retry (A-47) all come through here ------------
+bool TryBuild()
+  {
+   if(!SeriesInit()) return(false);
+   ResetEngine();
+   BuildHistory();
+   g_ready = true;
+   return(true);
   }
 
 //+------------------------------------------------------------------+
@@ -307,9 +328,11 @@ int OnInit()
       Print("HMI: could not claim an instance tag - too many instances on this chart");
       return(INIT_FAILED);
      }
+   g_init_seq    = OM_NextInitSeq();              // (run, init) names this lifetime in the log (A-48)
+   g_lh_attempts = 0;
    IndicatorSetString(INDICATOR_SHORTNAME, "HMI v" + HMI_VERSION + " [" + g_inst + "]");
-   PrintFormat("HMI v%s starting on %s %s  instance=%s",
-               HMI_VERSION, _Symbol, EnumToString((ENUM_TIMEFRAMES)Period()), g_inst);
+   PrintFormat("HMI v%s starting on %s %s  instance=%s run=%I64d init=%d",
+               HMI_VERSION, _Symbol, EnumToString((ENUM_TIMEFRAMES)Period()), g_inst, g_run_id, g_init_seq);
 
    double m = 0.0;
    switch(InpBreakMarginMode)
@@ -355,10 +378,7 @@ int OnCalculate(const int rates_total,
 
    if(!g_ready)
      {
-      if(!SeriesInit()) return(rates_total);      // data not ready: retry next tick
-      ResetEngine();
-      BuildHistory();
-      g_ready = true;
+      TryBuild();                                 // data not ready: retry next tick
       return(rates_total);
      }
 
@@ -400,8 +420,44 @@ int OnCalculate(const int rates_total,
   }
 
 //+------------------------------------------------------------------+
+//| A-47: runs only while the liquidity replay is WAITING for history |
+//+------------------------------------------------------------------+
+void OnTimer()
+  {
+   if(g_lh_state != LH_WAITING) { EventKillTimer(); return; }
+   if(!g_ready) return;                          // a rebuild is already due on the next tick
+
+   g_lh_attempts++;
+   if(LiqHistoryProbe())
+     {
+      if(InpLogSignals)
+         PrintFormat("HMI-LIQ-HIST,%s,ARRIVED,attempt=%d,need_from=%s,inst=%s,run=%I64d,init=%d",
+                     _Symbol, g_lh_attempts, TimeToString(g_lh_need, TIME_DATE|TIME_MINUTES),
+                     g_inst, g_run_id, g_init_seq);
+      EventKillTimer();
+      g_ready = false;
+      TryBuild();                                // the one path: LiqReplay now sees the bars
+      return;
+     }
+   bool server_lacks = !LiqHistoryMayArrive(g_lh_need);
+   if(server_lacks || g_lh_attempts >= HMI_LH_MAX_TRIES)
+     {
+      g_lh_state = LH_READY;                     // UNKNOWN for good: a fact now, not a wait
+      if(InpLogSignals)
+         PrintFormat("HMI-LIQ-HIST,%s,%s,attempt=%d,need_from=%s,unknown=%d,inst=%s,run=%I64d,init=%d",
+                     _Symbol, (server_lacks ? "SERVER_LACKS" : "GAVE_UP"), g_lh_attempts,
+                     TimeToString(g_lh_need, TIME_DATE|TIME_MINUTES), g_lr_unknown,
+                     g_inst, g_run_id, g_init_seq);
+      EventKillTimer();
+      OM_SyncAll();                              // the panel's WAITING line goes
+      ChartRedraw();
+     }
+  }
+
+//+------------------------------------------------------------------+
 void OnDeinit(const int reason)
   {
+   EventKillTimer();
    OM_DeleteOwnAll();          // own instance only (Rule 55)
    ChartRedraw();
   }

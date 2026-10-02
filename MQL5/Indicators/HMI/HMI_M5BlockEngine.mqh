@@ -34,10 +34,10 @@ int BlkPush(const M5Block &b)
    g_blk[g_blk_n] = b;
    g_blk_n++;
    if(InpLogSignals)                     // A-37 diagnostic, log only
-      PrintFormat("HMI-BLK,%s,NEW,id=%I64d,sess=%I64d,dir=%d,type=%s,counter=%d,bar=%s,inst=%s",
+      PrintFormat("HMI-BLK,%s,NEW,id=%I64d,sess=%I64d,dir=%d,type=%s,counter=%d,bar=%s,inst=%s,run=%I64d,init=%d",
                   _Symbol, b.id, b.session_id, b.dir,
                   (b.block_type == BT_M5_OB ? "OB" : "BREAKER"),
-                  (b.counter_dir ? 1 : 0), DiagT(b.confirm_time), g_inst);
+                  (b.counter_dir ? 1 : 0), DiagT(b.confirm_time), g_inst, g_run_id, g_init_seq);
    return(g_blk_n - 1);
   }
 
@@ -58,8 +58,8 @@ void SessionEndNow(const SessionEnd reason, const datetime t)
    g_sess.end_time   = t;
    g_sess.end_reason = reason;
    if(InpLogSignals)                     // A-37 diagnostic, log only
-      PrintFormat("HMI-SESS,%s,END,id=%I64d,poi=%I64d,dir=%d,reason=%s,bar=%s,inst=%s",
-                  _Symbol, g_sess.id, g_sess.poi_id, g_sess.dir, SessEndName(reason), DiagT(t), g_inst);
+      PrintFormat("HMI-SESS,%s,END,id=%I64d,poi=%I64d,dir=%d,reason=%s,bar=%s,inst=%s,run=%I64d,init=%d",
+                  _Symbol, g_sess.id, g_sess.poi_id, g_sess.dir, SessEndName(reason), DiagT(t), g_inst, g_run_id, g_init_seq);
    SessionExpireOpenBlocks();     // ARMED blocks / cycles are NOT touched (Rule 15)
 
    // A-06 (opt-in, default off): only a TIMEOUT may hand the POI back.
@@ -88,9 +88,9 @@ void SessionStart(const int poi_idx, const int n)
    g_sess.active      = true;
    g_poi[poi_idx].session_count++;
    if(InpLogSignals)                     // A-37 diagnostic, log only
-      PrintFormat("HMI-SESS,%s,START,id=%I64d,poi=%I64d,dir=%d,bar=%s,inst=%s",
+      PrintFormat("HMI-SESS,%s,START,id=%I64d,poi=%I64d,dir=%d,bar=%s,inst=%s,run=%I64d,init=%d",
                   _Symbol, g_sess.id, g_sess.poi_id, g_sess.dir,
-                  DiagT(CloseTimeOf(g_m5[n].time, PERIOD_M5)), g_inst);
+                  DiagT(CloseTimeOf(g_m5[n].time, PERIOD_M5)), g_inst, g_run_id, g_init_seq);
   }
 
 // Phase 0b (signed 2026-09-24): runs right after H4 sync, BEFORE Phase 1

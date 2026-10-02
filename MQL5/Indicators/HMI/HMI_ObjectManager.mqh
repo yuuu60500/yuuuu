@@ -59,7 +59,6 @@ void OM_Register(const string name)
 // marker is either live or already removed by its owner's OnDeinit. This
 // reads ownership from the chart, not state (Rule 53): no engine sees it.
 #define HMI_RUN_GV  "HMI_RUN_ID"
-long g_run_id = 0;
 
 long OM_RunId()
   {
@@ -76,6 +75,23 @@ long OM_RunId()
       GlobalVariableSet(HMI_RUN_GV, (double)g_run_id);
      }
    return(g_run_id);
+  }
+
+// Every OnInit of every HMI instance in this terminal run takes the next
+// number, so (run, init) names one indicator lifetime: the log can tell a
+// build of this initialisation from one of the previous initialisation on
+// the same chart, where inst and build= start over (A-48). CAS loop: two
+// charts initialising at once must not share a number.
+#define HMI_INIT_GV "HMI_INIT_SEQ"
+int OM_NextInitSeq()
+  {
+   if(!GlobalVariableCheck(HMI_INIT_GV)) GlobalVariableTemp(HMI_INIT_GV);
+   for(int tries = 0; tries < 32; tries++)
+     {
+      double cur = GlobalVariableGet(HMI_INIT_GV);
+      if(GlobalVariableSetOnCondition(HMI_INIT_GV, cur + 1.0, cur)) return((int)(cur + 1.0));
+     }
+   return((int)(GetTickCount64() % 1000000));         // contended beyond reason: still unique enough
   }
 
 string OM_MarkerName(const string tag) { return(HMI_PREFIX + "_" + tag + "_" + TT_MARK + "_0_0"); }
@@ -455,6 +471,12 @@ void OM_DrawPanel()
       C[n] = base;
       L[n++] = "SESSION: " + (g_sess.active ? "ACTIVE since " +
                TimeToString(g_sess.start_time, TIME_DATE|TIME_MINUTES) : "none");
+      if(g_lh_state == LH_WAITING)
+        {
+         C[n] = base;
+         L[n++] = "LIQ HISTORY: WAITING for M5 bars before the window (attempt " +
+                  IntegerToString(g_lh_attempts) + ") - liquidity lines provisional";
+        }
       C[n] = base;
       L[n++] = "CYCLE " + OM_PanelCycleLine();
      }
@@ -466,7 +488,8 @@ void OM_DrawPanel()
                (g_ctx_messy ? " MESSY" : " CLEAN") +
                "   |   POI " + IntegerToString(poi_active) +
                "   |   " + (g_sess.active ? "SESSION " +
-               TimeToString(g_sess.start_time, TIME_MINUTES) : "no session");
+               TimeToString(g_sess.start_time, TIME_MINUTES) : "no session") +
+               (g_lh_state == LH_WAITING ? "   |   LIQ WAITING" : "");
       C[n] = base;
       L[n++] = OM_PanelCycleLine();
      }

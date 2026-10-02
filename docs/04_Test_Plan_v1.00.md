@@ -850,18 +850,29 @@ ATR   v2.42 4/18 · v2.46 0/18 · v2.47 0/18
 ATR 系数 2.0 定向：v2.46 2/48（PMH BROKEN 仅连续运行有）· v2.47 0/48
 ```
 
-### v2.49 验收清单（在 v2.48 清单之上，只验收本轮修复）
+### v2.50 验收清单（基础修复阶段；以 v2.48 的交易规则为基线，P1/P2 不得改变 MODEL 标记）
 
 ```
 0  编译 0 errors / 0 warnings（截图）
-1  版本：`starting on` 与 BEGIN 行 ver= 均为 2.49；params= 与 v2.48 不同（摘要多一项）
-2  D-11：`-Chain` 里同一 Session 内相邻两根 K 线连续 ARMED 的情况应消失；
-          对照：InpArmRequiresFreshTouch=false 重建一次，HMI-ARM 行数应 >= true 时
-3  重启残留：挂指标 → 任务管理器强杀 terminal64.exe → 重启 → 日志应出现
-          `HMI: removed the objects of instance XXXX left by a previous terminal run`，
-          图上无旧矩形；同一张图挂两个实例时互不删除
-4  同版本重载：同一张图重载两次 → `-Source "<图>,M5"` IDENTICAL inside the comparable region
-5  实时 vs 重建：`-LiveVsBuild` 双向 0 MISMATCH
-6  回归：`HMI-GUARD` 0 行；v2.48 → v2.49 跨版本 MODEL 行差异只允许出现在
-          「v2.48 下一根反手 ARMED」的 Cycle 上（upgrade regression 列出的差异逐条核对）
+1  版本：`starting on` 行为 v2.50 且带 run= init=；BEGIN 行 ver=2.50，params= 与 v2.48 相同
+          （摘要项目恢复 37 项；D-11 开关已撤）；每条 HMI 行末尾 ,inst=,run=,init=
+2  规则基线：v2.48 → v2.50 跨版本 `-Source` 显示 DIFFERENT VERSIONS，MODEL upgrade regression 0 difference
+          （两条规则变化已撤回；P1/P2 不触碰标记链）
+3  P1 延迟加载：在终端从未下载过该品种深历史的情况下挂指标（或先清空 bases 再挂）
+          日志应依次出现：HMI-LIQ-REPLAY ... state=WAITING → HMI-LIQ-HIST ... ARRIVED → 第二个
+          BEGIN/END（同 init，build+1）且 END liq=READY；面板 WAITING 提示消失
+          把该品种在已有历史的终端上另挂一次（一开始就 READY），两次 READY 构建的 LIQ 行
+          `-Source` 比对 IDENTICAL (MODEL + LIQ)；MODEL 行与 WAITING 构建相同
+4  P1 永久缺失：服务器历史不够远的品种 → state=READY,unknown>0，无 WAITING，无重试；
+          unknown>0 是信息提示，不是失败
+5  P1 分开报告：WAITING 构建与 READY 构建 `-Source` → MODEL IDENTICAL，LIQ PENDING（不是 PASS，也不是 MISMATCH）
+6  P2 严格校验：`-Source` 列表每块显示 id=run/init liq=；人工截断日志（删掉最后一个 END）→ INCOMPLETE 无结论；
+          `-Chain` 跳过 INCOMPLETE 块并提示
+7  同版本重载：同一张图重载两次 → IDENTICAL inside the comparable region (MODEL + LIQ)
+8  实时 vs 重建：`-LiveVsBuild` 双向 0 MISMATCH；参数改动后的实时行（init 变化）被标为 set aside
+9  重启残留（v2.49 带入）：强杀 terminal64.exe → 重启 → 日志 `removed the objects of instance`
 ```
+
+脚本侧合成日志验证（PowerShell 7.4.6，2026-10-02，不替代以上实测）：错号 END / marks 不符 /
+重复 BEGIN / 缺 END / END 身份不符 → INCOMPLETE 无结论；v2.50 与 v2.48 格式正常日志 → IDENTICAL；
+liq=WAITING → MODEL IDENTICAL + LIQ PENDING；LIVE vs BUILD 异身份实时行 set aside。

@@ -31,9 +31,9 @@ void POIPush(const H4POI &p)
          // A-37 diagnostic: the state it LEAVES in says whether a POI was
          // pushed out before price ever reached it (ACTIVE) - log only.
          if(InpLogSignals && !g_poi[drop].out_of_window)
-            PrintFormat("HMI-POI,%s,OUT,id=%I64d,dir=%d,was=%s,bar=%s,inst=%s",
+            PrintFormat("HMI-POI,%s,OUT,id=%I64d,dir=%d,was=%s,bar=%s,inst=%s,run=%I64d,init=%d",
                         _Symbol, g_poi[drop].id, g_poi[drop].dir,
-                        PoiStateName(g_poi[drop].state), DiagT(p.confirm_time), g_inst);
+                        PoiStateName(g_poi[drop].state), DiagT(p.confirm_time), g_inst, g_run_id, g_init_seq);
          if(g_poi[drop].state != POI_INVALID) g_poi[drop].state = POI_EXPIRED;
          g_poi[drop].out_of_window = true;      // drawing layer will drop its graphics
         }
@@ -56,9 +56,9 @@ void POIPush(const H4POI &p)
    g_poi[g_poi_n] = p;
    g_poi_n++;
    if(InpLogSignals)
-      PrintFormat("HMI-POI,%s,NEW,id=%I64d,dir=%d,lo=%s,hi=%s,origin=%s,bar=%s,inst=%s",
+      PrintFormat("HMI-POI,%s,NEW,id=%I64d,dir=%d,lo=%s,hi=%s,origin=%s,bar=%s,inst=%s,run=%I64d,init=%d",
                   _Symbol, p.id, p.dir, DoubleToString(p.lo, _Digits),
-                  DoubleToString(p.hi, _Digits), DiagT(p.origin_time), DiagT(p.confirm_time), g_inst);
+                  DoubleToString(p.hi, _Digits), DiagT(p.origin_time), DiagT(p.confirm_time), g_inst, g_run_id, g_init_seq);
   }
 
 // A-06 (opt-in): a session that ended on TIMEOUT may re-arm its POI, but
@@ -137,11 +137,11 @@ void POIOnBar(const int h, const int fvg_idx)
    // candidate with its measured gap makes the refusal side of Rule 6
    // checkable against the data window, instead of just a counter.
    if(InpLogSignals && rejected != "")
-      PrintFormat("HMI-REJECT,%s,H4POI,%s,fvg=%s,fvg_lo=%s,fvg_hi=%s%s,inst=%s",
+      PrintFormat("HMI-REJECT,%s,H4POI,%s,fvg=%s,fvg_lo=%s,fvg_hi=%s%s,inst=%s,run=%I64d,init=%d",
                   _Symbol, (dir == DIR_BULL ? "BULL" : "BEAR"),
                   TimeToString(g_h4fvg[fvg_idx].bar_time, TIME_DATE|TIME_MINUTES),
                   DoubleToString(g_h4fvg[fvg_idx].lo, _Digits),
-                  DoubleToString(g_h4fvg[fvg_idx].hi, _Digits), rejected, g_inst);
+                  DoubleToString(g_h4fvg[fvg_idx].hi, _Digits), rejected, g_inst, g_run_id, g_init_seq);
   }
 
 //--- invalidation on a closed H4 candle -----------------------------
@@ -159,8 +159,8 @@ void POIInvalidateOnBar(const int h)
       if(dead)
         {
          if(InpLogSignals)
-            PrintFormat("HMI-POI,%s,INVALID,id=%I64d,dir=%d,was=%s,bar=%s,inst=%s",
-                        _Symbol, g_poi[i].id, g_poi[i].dir, PoiStateName(g_poi[i].state), DiagT(t), g_inst);
+            PrintFormat("HMI-POI,%s,INVALID,id=%I64d,dir=%d,was=%s,bar=%s,inst=%s,run=%I64d,init=%d",
+                        _Symbol, g_poi[i].id, g_poi[i].dir, PoiStateName(g_poi[i].state), DiagT(t), g_inst, g_run_id, g_init_seq);
          g_poi[i].state        = POI_INVALID;
          g_poi[i].invalid_time = t;
         }
@@ -172,8 +172,8 @@ void POIInvalidateOnBar(const int h)
       if((long)(t - g_poi[i].confirm_time) > (long)InpH4POIMaxAgeBars * PeriodSeconds(PERIOD_H4))
         {
          if(InpLogSignals)
-            PrintFormat("HMI-POI,%s,EXPIRED,id=%I64d,dir=%d,was=ACTIVE,bar=%s,inst=%s",
-                        _Symbol, g_poi[i].id, g_poi[i].dir, DiagT(t), g_inst);
+            PrintFormat("HMI-POI,%s,EXPIRED,id=%I64d,dir=%d,was=ACTIVE,bar=%s,inst=%s,run=%I64d,init=%d",
+                        _Symbol, g_poi[i].id, g_poi[i].dir, DiagT(t), g_inst, g_run_id, g_init_seq);
          g_poi[i].state = POI_EXPIRED;
         }
      }
