@@ -315,5 +315,139 @@
    "AGREE BOTH WAYS",
    "MODEL IDENTICAL"
   ]
+ },
+ "b01_build_both_missing": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "BEGIN without a valid build=",
+   "END without a valid build="
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "MODEL IDENTICAL"
+  ]
+ },
+ "b02_build_begin_missing": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "BEGIN without a valid build="
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "MODEL IDENTICAL"
+  ]
+ },
+ "b03_build_end_missing": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "END without a valid build="
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "MODEL IDENTICAL"
+  ]
+ },
+ "b04_build_bogus": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "BEGIN without a valid build= (bogus)"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "MODEL IDENTICAL"
+  ]
+ },
+ "b05_build_zero": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "BEGIN without a valid build= (0)"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "MODEL IDENTICAL"
+  ]
+ },
+ "b06_build_legacy_243": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "IDENTICAL inside the comparable region"
+  ],
+  "forbid": [
+   "INCOMPLETE"
+  ]
+ },
+ "w01_waiting_no_model": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "MODEL  INSUFFICIENT SAMPLE",
+   "LIQ    PENDING"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "MODEL IDENTICAL"
+  ]
+ },
+ "w02_ready_no_model": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "MODEL  INSUFFICIENT SAMPLE",
+   "LIQ    IDENTICAL over 2 / 2 row(s)"
+  ],
+  "forbid": [
+   "MODEL IDENTICAL"
+  ]
+ },
+ "w03_ready_no_liq": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "MODEL  IDENTICAL over 3 / 3 row(s)",
+   "LIQ    no event on either side",
+   "IDENTICAL inside the comparable region (3 MODEL + 0 LIQ)"
+  ],
+  "forbid": []
+ },
+ "w04_live_only_liq_waiting": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "no judged event (LIQ pending",
+   "nothing comparable yet - no PASS can be given."
+  ],
+  "forbid": [
+   "AGREE BOTH WAYS"
+  ]
  }
 }

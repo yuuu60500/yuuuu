@@ -61,7 +61,7 @@ MqlRates    g_lr[];  int g_lr_n = 0;  double g_lr_atr[];
 int         g_lr_unknown = 0;        // items the loaded history could not reach
 // A-47 / A-49: coverage of the replay history, judged PER ITEM. A level or
 // pool the loaded bars cannot reach is either
-//   lost     its history can never be had (LiqStartLost): UNKNOWN for good,
+//   lost     its history can never be had (LiqLossKind): UNKNOWN for good,
 //            counted in g_lr_unknown - a fact, not a failure
 //   pending  the bars may merely not be downloaded yet: provisionally
 //            UNKNOWN, its start kept in g_lh_pend[]
@@ -79,6 +79,10 @@ int         g_lh_state     = LH_READY;
 int         g_lh_attempts  = 0;        // probes made while WAITING (reset at OnInit only)
 datetime    g_lh_need      = 0;        // earliest PENDING start (the probe target); 0 = none
 datetime    g_lh_pend[];  int g_lh_pend_n = 0;   // starts of the pending items
+int         g_lr_short     = 0;        // of g_lr_unknown: lost SHORT - every bar from the request
+                                       // start is in and the start still has no (ATR) bars (A-53)
+int         g_lh_err       = 0;        // last failed CopyRates: GetLastError() ...
+string      g_lh_fail      = "";       // ... and why: CAP / NOT_BUILT / LOAD (diagnostic only)
 int         g_log_liq_count = 0;       // LIQ rows this build wrote (BUILD-END liqev=, A-48)
 
 string PLName(const int i)
@@ -104,6 +108,7 @@ void LiqLevelsReset()
    g_lqe_del_from = 1;
    g_lr_n = 0;  g_lr_unknown = 0;
    g_lh_state = LH_READY;  g_lh_need = 0;  g_lh_pend_n = 0;
+   g_lr_short = 0;  g_lh_err = 0;  g_lh_fail = "";
   }
 
 //--- period boundaries in broker server time (S-2) ------------------
@@ -291,41 +296,66 @@ datetime LiqReplayAvail(const MqlRates &bars[], const int n)
    return(bars[0].time);
   }
 
+// The built M5 series' own first bar - per PERIOD, unlike the two symbol-wide
+// dates SERIES_SERVER_FIRSTDATE / SERIES_TERMINAL_FIRSTDATE, which do not say
+// what M5 range is actually built (A-53). 0 = not built.
+datetime LiqM5First()
+  {
+   return((datetime)SeriesInfoInteger(_Symbol, PERIOD_M5, SERIES_FIRSTDATE));
+  }
+
+bool LiqSeriesCapped()
+  {
+   long maxb = TerminalInfoInteger(TERMINAL_MAXBARS);
+   int  tot  = Bars(_Symbol, PERIOD_M5);
+   return(maxb > 0 && tot > 0 && tot >= maxb);
+  }
+
 // The earliest M5 bar a program can ever be given: the server's first bar,
-// or - when "Max bars in chart" already caps the series - the oldest bar of
-// that capped series, whichever is later. 0 = neither is known yet, which is
-// NOT "the server has nothing": a fresh terminal reports 0 for a while.
+// or - when "Max bars in chart" already caps the series - the capped series'
+// first bar, whichever is later. 0 = neither is known yet, which is NOT "the
+// server has nothing": a fresh terminal reports 0 for a while.
 datetime LiqHistoryFloor()
   {
-   datetime srv  = (datetime)SeriesInfoInteger(_Symbol, PERIOD_M5, SERIES_SERVER_FIRSTDATE);
-   long     maxb = TerminalInfoInteger(TERMINAL_MAXBARS);
-   int      tot  = Bars(_Symbol, PERIOD_M5);
-   datetime cap  = 0;
-   if(maxb > 0 && tot > 0 && tot >= maxb) cap = iTime(_Symbol, PERIOD_M5, tot - 1);
+   datetime srv = (datetime)SeriesInfoInteger(_Symbol, PERIOD_M5, SERIES_SERVER_FIRSTDATE);
+   datetime cap = (LiqSeriesCapped() ? LiqM5First() : 0);
    return(srv > cap ? srv : cap);
   }
 
-datetime LiqTerminalFirst()
+// Where a replay or a probe for `start` may ask from: its 3-day ATR lead-in,
+// but never before the floor. CopyRates returns -1 for a range reaching past
+// TERMINAL_MAXBARS (it does not clip), and nothing exists before the
+// server's first bar - so a request that crossed the floor could fail for
+// good while the bars it needed were there all along (A-53).
+datetime LiqRequestFrom(const datetime start, const datetime hfloor)
   {
-   return((datetime)SeriesInfoInteger(_Symbol, PERIOD_M5, SERIES_TERMINAL_FIRSTDATE));
+   datetime r = start - 3 * 86400;
+   return(hfloor > 0 && r < hfloor ? hfloor : r);
   }
 
-// An item whose start the loaded `bars` cannot reach: is that final?
-//   before floor  it starts before the earliest bar a program can ever get
-//   at floor      the loaded bars already begin at that earliest bar (ATR
-//                 mode: the first 14 bars of all history have no ATR)
-//   lead-in held  the terminal already holds history from 3 days before the
-//                 start, so the loaded bars are all there are and the
-//                 shortfall is a real gap (ATR mode: < 15 bars in 3 days)
-// Otherwise the bars may only be late: pending, never lost.
-// The last two need loaded bars: an unbuilt series (CopyRates -1) proves nothing.
-bool LiqStartLost(const datetime start, const MqlRates &bars[], const int n,
-                  const datetime hfloor, const datetime term_first)
+// An item whose start the loaded bars cannot reach: lost for good, or only
+// pending? (shared by the replay and the probe, so they cannot disagree)
+//   1 floor  it starts before the earliest bar a program can ever get
+//   2 short  the request returned bars and the built M5 series already
+//            begins at or before the request's first time: every bar there
+//            is, is loaded - the start still lacks bars (ATR mode: its first
+//            14 after the floor, or a market gap in the lead-in). Final.
+//   0        otherwise the bars may only be late: pending.
+int LiqLossKind(const datetime start, const int got, const datetime req,
+                const datetime hfloor, const datetime m5_first)
   {
-   if(hfloor > 0 && start < hfloor)                                return(true);
-   if(n > 0 && hfloor > 0 && bars[0].time <= hfloor)               return(true);
-   if(n > 0 && term_first > 0 && term_first <= start - 3 * 86400) return(true);
-   return(false);
+   if(hfloor > 0 && start < hfloor)                    return(1);
+   if(got > 0 && m5_first > 0 && m5_first <= req)      return(2);
+   return(0);
+  }
+
+// Why a CopyRates came back empty - for the log only, never for a decision.
+string LiqFailKind(const datetime req)
+  {
+   datetime m5f = LiqM5First();
+   if(m5f == 0)                              return("NOT_BUILT");
+   if(LiqSeriesCapped() && req < m5f)        return("CAP");   // should not happen: requests are clamped
+   return("LOAD");
   }
 
 void LiqPendPush(const datetime start)
@@ -340,17 +370,20 @@ void LiqPendPush(const datetime start)
 // window, with each bar's own ATR threshold. No event is emitted - those
 // bars are outside the window - but the STATE is what a run that started
 // earlier would hold now. History that does not reach the start leaves the
-// state unknowable: UNKNOWN, never fires - for good when LiqStartLost says
-// so (counted in g_lr_unknown), otherwise pending (g_lh_pend[]).
+// state unknowable: UNKNOWN, never fires - for good when LiqLossKind says so
+// (counted in g_lr_unknown, the short ones also in g_lr_short), otherwise
+// pending (g_lh_pend[]).
 void LiqReplayItem(const int side, const double price, const datetime start, const datetime avail,
-                   const datetime hfloor, const datetime term_first,
+                   const datetime hfloor, const datetime req, const datetime m5_first,
                    int &state, int &pierce, datetime &ev_time)
   {
    if(start < avail)
      {
       state = LQ_UNKNOWN;
-      if(LiqStartLost(start, g_lr, g_lr_n, hfloor, term_first)) g_lr_unknown++;
-      else                                                     LiqPendPush(start);
+      int k = LiqLossKind(start, g_lr_n, req, hfloor, m5_first);
+      if(k == 0) { LiqPendPush(start); return; }
+      g_lr_unknown++;
+      if(k == 2) g_lr_short++;
       return;
      }
    for(int r = 0; r < g_lr_n; r++)
@@ -365,66 +398,92 @@ void LiqReplayItem(const int side, const double price, const datetime start, con
 // state; CopyRates on a range the terminal lacks returns at once and queues
 // the download, which is what keeps the retry non-blocking.
 // Returns "" while still waiting, else why a rebuild now settles every
-// pending item (the rebuild applies the same LiqStartLost to a request that
-// contains this one, so it cannot come back WAITING on the same facts):
+// pending item:
 //   ARRIVED       the bars reach the earliest recoverable pending start
 //   BEFORE_FLOOR  every pending start now lies before the history floor
-//   SETTLED       the bars are all in and the earliest one is still short
+//   SETTLED       every bar from the request start is in, and that start is
+//                 still short (LiqLossKind 2)
+// The rebuild asks from exactly this request start: items lost to the
+// floor never widen it (A-53), and every recoverable item is at or after the
+// target (a replayed item is always later than a pending one). Same request,
+// same answer - it cannot come back WAITING on the same facts.
 string LiqHistoryProbe()
   {
    if(g_lh_state != LH_WAITING || g_lh_pend_n <= 0 || g_m5_n <= 0) return("");
-   datetime first = g_m5[0].time;
+   datetime first  = g_m5[0].time;
    datetime hfloor = LiqHistoryFloor();
-   datetime tfst  = LiqTerminalFirst();
-   MqlRates none[];
    datetime target = 0;
    for(int i = 0; i < g_lh_pend_n; i++)
-      if(!LiqStartLost(g_lh_pend[i], none, 0, hfloor, tfst) && (target == 0 || g_lh_pend[i] < target))
+      if(!(hfloor > 0 && g_lh_pend[i] < hfloor) && (target == 0 || g_lh_pend[i] < target))
          target = g_lh_pend[i];
    if(target == 0) return("BEFORE_FLOOR");
    g_lh_need = target;                                 // log / panel only
 
+   datetime req = LiqRequestFrom(target, hfloor);
    MqlRates tmp[];
-   int got = CopyRates(_Symbol, PERIOD_M5, target - 3 * 86400, first - 1, tmp);
-   if(got <= 0) return("");                            // not built yet: no evidence either way
+   ResetLastError();
+   int got = CopyRates(_Symbol, PERIOD_M5, req, first - 1, tmp);
+   if(got <= 0) { g_lh_err = GetLastError(); g_lh_fail = LiqFailKind(req); return(""); }
+   g_lh_err = 0;  g_lh_fail = "";
    datetime avail = LiqReplayAvail(tmp, got);
-   if(avail > 0 && avail <= target)                    return("ARRIVED");
-   if(LiqStartLost(target, tmp, got, hfloor, tfst))     return("SETTLED");
+   if(avail > 0 && avail <= target)                              return("ARRIVED");
+   if(LiqLossKind(target, got, req, hfloor, LiqM5First()) == 2)  return("SETTLED");
    return("");
   }
 
 void LiqReplay()
   {
-   g_lr_n = 0;  g_lr_unknown = 0;  g_lh_need = 0;  g_lh_pend_n = 0;  g_lh_state = LH_READY;
+   g_lr_n = 0;  g_lr_unknown = 0;  g_lr_short = 0;  g_lh_need = 0;  g_lh_pend_n = 0;
+   g_lh_state = LH_READY;  g_lh_err = 0;  g_lh_fail = "";
    if(g_m5_n <= 0) return;
-   datetime first = g_m5[0].time;
-   datetime need  = first;
-   for(int i = 0; i < PL_COUNT; i++)
-      if(g_pl[i].valid && g_pl[i].from < need) need = g_pl[i].from;
-   for(int j = 0; j < g_liq_n; j++)
-      if(!g_liq[j].swept && g_liq[j].confirm_time < need) need = g_liq[j].confirm_time;
-   if(need >= first) return;                             // everything starts inside the window
+   datetime first  = g_m5[0].time;
+   datetime hfloor = LiqHistoryFloor();
 
-   // three extra days so ATR(14) is already valid at `need`, weekend or not
-   MqlRates tmp[];
-   int got = CopyRates(_Symbol, PERIOD_M5, need - 3 * 86400, first - 1, tmp);
-   if(got > 0)
+   // The earliest start that can still be replayed. Items lost to the floor
+   // stay UNKNOWN and never widen the request (A-53): asking from their
+   // lead-in would cross the floor, and CopyRates fails the whole request.
+   bool     has_pre = false;
+   datetime need = first;
+   for(int i = 0; i < PL_COUNT; i++)
      {
-      ArrayResize(g_lr, got);
-      for(int i = 0; i < got; i++) g_lr[i] = tmp[i];
-      g_lr_n = got;
-      SeriesComputeATR(g_lr, g_lr_n, g_lr_atr, 0);
+      if(!g_pl[i].valid || g_pl[i].from >= first) continue;
+      has_pre = true;
+      if(!(hfloor > 0 && g_pl[i].from < hfloor) && g_pl[i].from < need) need = g_pl[i].from;
+     }
+   for(int j = 0; j < g_liq_n; j++)
+     {
+      if(g_liq[j].swept || g_liq[j].confirm_time >= first) continue;
+      has_pre = true;
+      if(!(hfloor > 0 && g_liq[j].confirm_time < hfloor) && g_liq[j].confirm_time < need) need = g_liq[j].confirm_time;
+     }
+   if(!has_pre) return;                                    // everything starts inside the window
+
+   datetime req = 0;
+   int      got = 0;
+   if(need < first)
+     {
+      req = LiqRequestFrom(need, hfloor);
+      MqlRates tmp[];
+      ResetLastError();
+      got = CopyRates(_Symbol, PERIOD_M5, req, first - 1, tmp);
+      if(got > 0)
+        {
+         ArrayResize(g_lr, got);
+         for(int i = 0; i < got; i++) g_lr[i] = tmp[i];
+         g_lr_n = got;
+         SeriesComputeATR(g_lr, g_lr_n, g_lr_atr, 0);
+        }
+      else { g_lh_err = GetLastError(); g_lh_fail = LiqFailKind(req); }
      }
    datetime avail = LiqReplayAvail(g_lr, g_lr_n);
    if(avail == 0) avail = first;                         // nothing usable: nothing reached
-   datetime hfloor = LiqHistoryFloor();
-   datetime tfst  = LiqTerminalFirst();
+   datetime m5f = LiqM5First();
 
    for(int i = 0; i < PL_COUNT; i++)
      {
       if(!g_pl[i].valid || g_pl[i].from >= first) continue;
       int st = g_pl[i].lq_state, pi = g_pl[i].pierce_index;  datetime et = g_pl[i].event_time;
-      LiqReplayItem(g_pl[i].side, g_pl[i].price, g_pl[i].from, avail, hfloor, tfst, st, pi, et);
+      LiqReplayItem(g_pl[i].side, g_pl[i].price, g_pl[i].from, avail, hfloor, req, m5f, st, pi, et);
       g_pl[i].lq_state = st;  g_pl[i].pierce_index = pi;  g_pl[i].event_time = et;
      }
    for(int j = 0; j < g_liq_n; j++)
@@ -432,19 +491,23 @@ void LiqReplay()
       if(g_liq[j].swept || g_liq[j].confirm_time >= first) continue;
       int side = (g_liq[j].type == DIR_BULL ? +1 : -1);
       int st = g_liq[j].lq_state, pi = g_liq[j].pierce_index;  datetime et = g_liq[j].swept_time;
-      LiqReplayItem(side, g_liq[j].price, g_liq[j].confirm_time, avail, hfloor, tfst, st, pi, et);
+      LiqReplayItem(side, g_liq[j].price, g_liq[j].confirm_time, avail, hfloor, req, m5f, st, pi, et);
       g_liq[j].lq_state = st;  g_liq[j].pierce_index = pi;
       if(st == LQ_SWEPT || st == LQ_BROKEN || st == LQ_UNKNOWN) { g_liq[j].swept = true; g_liq[j].swept_time = et; }
      }
    g_lh_state = (g_lh_pend_n > 0 ? LH_WAITING : LH_READY);
 
    if(InpLogSignals)
-      PrintFormat("HMI-LIQ-REPLAY,%s,need_from=%s,have_from=%s,bars=%d,unknown=%d,waiting=%d,wait_from=%s,floor=%s,state=%s,attempt=%d,inst=%s,run=%I64d,init=%d",
-                  _Symbol, TimeToString(need, TIME_DATE|TIME_MINUTES),
+      PrintFormat("HMI-LIQ-REPLAY,%s,need_from=%s,req_from=%s,got=%d,err=%d,fail=%s,have_from=%s,floor=%s,m5_first=%s,capped=%d,"
+                  "unknown=%d,short=%d,waiting=%d,wait_from=%s,state=%s,attempt=%d,inst=%s,run=%I64d,init=%d",
+                  _Symbol, (need < first ? TimeToString(need, TIME_DATE|TIME_MINUTES) : "none"),
+                  (req > 0 ? TimeToString(req, TIME_DATE|TIME_MINUTES) : "none"), got, g_lh_err,
+                  (g_lh_fail != "" ? g_lh_fail : "-"),
                   (avail < first ? TimeToString(avail, TIME_DATE|TIME_MINUTES) : "none"),
-                  g_lr_n, g_lr_unknown, g_lh_pend_n,
-                  (g_lh_need > 0 ? TimeToString(g_lh_need, TIME_DATE|TIME_MINUTES) : "none"),
                   (hfloor > 0 ? TimeToString(hfloor, TIME_DATE|TIME_MINUTES) : "unknown"),
+                  (m5f > 0 ? TimeToString(m5f, TIME_DATE|TIME_MINUTES) : "none"), (LiqSeriesCapped() ? 1 : 0),
+                  g_lr_unknown, g_lr_short, g_lh_pend_n,
+                  (g_lh_need > 0 ? TimeToString(g_lh_need, TIME_DATE|TIME_MINUTES) : "none"),
                   (g_lh_state == LH_WAITING ? "WAITING" : "READY"), g_lh_attempts,
                   g_inst, g_run_id, g_init_seq);
   }

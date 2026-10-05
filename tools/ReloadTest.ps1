@@ -196,7 +196,7 @@ function New-Block($src, $head, $idx, $id) {
     $we = [datetime]::MinValue; $west = $false; $ws = ''
     if ($m.ContainsKey('warmup_end')) { $we = PT16 $m['warmup_end']; $ws = $m['warmup_end'] }
     else { $we = (PT16 $m['from']).AddMinutes(5 * $Warmup); $west = $true }     # pre-v2.44: estimate, flagged
-    [pscustomobject]@{ Src = $src; Head = $head; Rows = (New-Object System.Collections.ArrayList); Lines = (New-Object System.Collections.ArrayList); Tail = ''
+    $bk = [pscustomobject]@{ Src = $src; Head = $head; Rows = (New-Object System.Collections.ArrayList); Lines = (New-Object System.Collections.ArrayList); Tail = ''
                        Ver = $v; Params = $(if ($m.ContainsKey('params')) { $m['params'] } else { '?' })
                        Inst = $(if ($m.ContainsKey('inst')) { $m['inst'].ToUpper() } else { '?' })
                        Id = $id; Build = $(if ($m.ContainsKey('build')) { $m['build'] } else { '?' })
@@ -204,8 +204,17 @@ function New-Block($src, $head, $idx, $id) {
                        WarmEnd = $we; WarmEst = $west; WarmS = $ws; BeginIdx = $idx; EndIdx = -1
                        Liq = '?'; LiqEv = -1; Marks = -1; Unknown = -1; LiqWait = -1; ModelN = 0; LiqN = 0
                        Status = 'OPEN'; Why = (New-Object System.Collections.ArrayList); BadRows = 0
-                       Strict = $strict; V251 = ($vn -ge [decimal]2.51); NoIdRows = 0; BadKinds = @{} }
+                       Strict = $strict; V251 = ($vn -ge [decimal]2.51); NoIdRows = 0; BadKinds = @{}
+                       BuildReq = ($strict -or $vn -ge [decimal]2.44); BuildOk = $false }
+    # A-54: from v2.44 on every BEGIN carries build=, a positive integer. A
+    # missing or malformed one used to read as '?' - and '?' on both BEGIN and
+    # END compared equal, so a build with no number at all could still pass.
+    $bk.BuildOk = ValidBuild $bk.Build
+    if ($bk.BuildReq -and -not $bk.BuildOk) { [void]$bk.Why.Add("BEGIN without a valid build= ($(BuildShown $m))") }
+    return $bk
 }
+function ValidBuild([string]$b) { return ($b -match '^[1-9][0-9]{0,9}$') }
+function BuildShown($kv) { if ($kv.ContainsKey('build')) { return $kv['build'] } return 'missing' }
 function Note-Row($bk, [string]$msg, [string]$id) {
     # every TAGGED line inside a strict build carries the build's own identity
     if (-not $bk.Strict) { return }
@@ -241,7 +250,11 @@ for ($i = 0; $i -lt $all.Count; $i++) {
         $bk = $open[$src]; $bk.Tail = $Matches[1]; $bk.EndIdx = $i
         $e  = KV $Matches[1]
         $eb = $(if ($e.ContainsKey('build')) { $e['build'] } else { '?' })
-        if ($eb -ne $bk.Build) { [void]$bk.Why.Add("END build=$eb, BEGIN build=$($bk.Build)") }
+        if ($bk.BuildReq) {
+            if (-not (ValidBuild $eb)) { [void]$bk.Why.Add("END without a valid build= ($(BuildShown $e))") }
+            elseif ($bk.BuildOk -and $eb -ne $bk.Build) { [void]$bk.Why.Add("END build=$eb, BEGIN build=$($bk.Build)") }
+        }
+        elseif ($eb -ne $bk.Build) { [void]$bk.Why.Add("END build=$eb, BEGIN build=$($bk.Build)") }      # pre-v2.44 log
         if ($bk.Strict) {
             if (-not $id)                      { [void]$bk.Why.Add('END without run/init') }
             elseif ($bk.Id -and $id -ne $bk.Id) { [void]$bk.Why.Add("END run/init $id, BEGIN $($bk.Id)") }
@@ -750,7 +763,6 @@ function Show-LiveVsBuild([string]$src) {
                 continue
             }
         }
-        $cmp++
         $liqCmp = ($A.Liq -ne 'WAITING' -and $B.Liq -ne 'WAITING')
         if (-not $liqCmp) {
             $liqPend++
@@ -761,6 +773,14 @@ function Show-LiveVsBuild([string]$src) {
         $lOut = $rows.Count - $lIn.Count
         if ($lOut -gt 0) { $pendWhy += "build $($A.Build)->$($B.Build): $lOut live row(s) on an edge bar, not provably covered" }
         if (-not $liqCmp) { $lIn = @($lIn | Where-Object { (RowKind $_) -eq 'MODEL' }) }
+        # A-55: what is left after the pending LIQ rows and the edge rows are
+        # set aside is what this pair can prove. Nothing left = nothing compared.
+        if (($lIn.Count + $bIn.Count) -eq 0) {
+            $pend++
+            $pendWhy += "build $($A.Build)->$($B.Build): no judged event (LIQ pending or edge rows only) - not comparable"
+            continue
+        }
+        $cmp++
         $liveN += $lIn.Count
         $okRows += $lIn
         foreach ($d in (DiffRows $lIn $bIn)) {
@@ -903,11 +923,27 @@ function Compare-Builds($A, $B) {
     }
     $mm   = @($cls | Where-Object Class -eq 'MISMATCH')
     $pend = @($cls | Where-Object Class -eq 'pending (before region)')
+
+    # A-55: a verdict per category, and only over what was actually judged.
+    # MODEL rows are always judged; LIQ rows only between two READY builds.
+    # A WAITING build's LIQ rows are pending, so they cannot make up for an
+    # empty MODEL sample - and no judged row at all is never a pass.
+    $mmM = @($mm | Where-Object { (RowKind $_.Row) -eq 'MODEL' }).Count
+    $mmL = @($mm | Where-Object { (RowKind $_.Row) -eq 'LIQ' }).Count
+    $nM  = $mA.Count + $mB.Count
+    $nL  = $(if ($liqCmp) { $lA.Count + $lB.Count } else { 0 })
+    $vM  = $(if ($mmM) { "MISMATCH ($mmM)" } elseif ($nM -eq 0) { 'INSUFFICIENT SAMPLE - no MODEL row on either side' } else { "IDENTICAL over $($mA.Count) / $($mB.Count) row(s)" })
+    $vL  = $(if (-not $liqCmp) { 'PENDING - liquidity history WAITING in one build, LIQ rows not judged' }
+             elseif ($mmL) { "MISMATCH ($mmL)" } elseif ($nL -eq 0) { 'no event on either side (nothing judged)' }
+             else { "IDENTICAL over $($lA.Count) / $($lB.Count) row(s)" })
+    Write-Host "    MODEL  $vM" -ForegroundColor $(if ($mmM) { 'Red' } elseif ($nM -eq 0) { 'Yellow' } else { 'Gray' })
+    Write-Host "    LIQ    $vL" -ForegroundColor $(if ($mmL) { 'Red' } elseif (-not $liqCmp -or $nL -eq 0) { 'Yellow' } else { 'Gray' })
+
     if ($mm.Count -gt 0) {
         Write-Host "  $($mm.Count) event(s) differ INSIDE the comparable region - repaint or non-determinism:" -ForegroundColor Red
         $mm | Select-Object -First 20 | ForEach-Object { Write-Host ("    {0}  {1}" -f $_.Side, $_.Row) }
-    } elseif ($mA.Count -eq 0 -and $mB.Count -eq 0 -and ($lA.Count + $lB.Count) -eq 0) {
-        Write-Host "  INSUFFICIENT SAMPLE - no event on either side inside the comparable region; nothing was compared." -ForegroundColor Yellow
+    } elseif (($nM + $nL) -eq 0) {
+        Write-Host "  INSUFFICIENT SAMPLE - no judged event inside the comparable region; nothing was compared." -ForegroundColor Yellow
     } elseif ($pend.Count -gt 0 -or -not $known -or $A.WarmEst -or $B.WarmEst) {
         Write-Host "  no difference inside the comparable region - PENDING REVIEW, not a pass:" -ForegroundColor Yellow
         if ($pend.Count)            { Write-Host "    $($pend.Count) difference(s) before the region need a look (see file)" -ForegroundColor Yellow }

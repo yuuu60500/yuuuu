@@ -850,29 +850,31 @@ ATR   v2.42 4/18 · v2.46 0/18 · v2.47 0/18
 ATR 系数 2.0 定向：v2.46 2/48（PMH BROKEN 仅连续运行有）· v2.47 0/48
 ```
 
-### v2.51 验收清单（基础修复阶段；以 v2.48 交易规则为基线，任何参数下 MODEL 不变）
+### v2.52 验收清单（基础修复阶段；以 v2.48 交易规则为基线，任何参数下 MODEL 不变）
+
+已由验收方确认（v2.51，2026-10-05）：编译 0/0、规则撤回、随包测试复现、参数摘要与 v2.48 相同。
 
 ```
-0  编译 0 errors / 0 warnings（截图）
-1  版本：`starting on` 行 v2.51 run= init=；BEGIN ver=2.51，params= 与 v2.48 相同；每条 HMI- 行末尾 ,inst=,run=,init=
-2  固定窗口回归（A-52）：同一品种两张 M5 图，一张 v2.48（另放一个文件夹）、一张 v2.51，同一根 M5 内挂上；
-          `-Source "<品种>#<v2.48 实例>,M5" -Versus "<品种>#<v2.51 实例>,M5"`
-          → 「0 difference(s) over N / N MODEL row(s), same window and parameters」，N > 0
-          另以 InpStopIdentificationOnBlockInvalidation = true 两边各挂一次重复（锚点轮转已撤出，应同样 0 difference）
-3  P1 混合历史（A-49）：把「Max bars in chart」设为约 20000 并删除该品种本地历史后挂指标
-          （截断点落在最老的流动性池之后、PD/PW/PM 起点之前）。日志依次：
-          HMI-LIQ-REPLAY state=WAITING waiting>0 → HMI-LIQ-HIST ARRIVED 或 BEFORE_FLOOR → 第二个构建 END liq=READY liqwait=0
-          且 unknown>0（被截断的条目）；之后不动设置再重载一次（一开始就 READY），两次 READY 构建 `-Source` IDENTICAL (MODEL + LIQ)
-4  P1 超过快速探测（A-50）：首个构建 WAITING 后断网 > 5 分钟 → 日志 HMI-LIQ-HIST SLOW，面板仍 WAITING（slow retry）；
-          恢复网络 → ARRIVED → 重建 READY。断网期间不得出现 liq=READY 的 END
-5  P1 服务器确实没有：服务器历史较短的品种 → 首个构建 READY 或 BEFORE_FLOOR 后 READY，unknown>0 为信息提示
-6  分开报告：WAITING 构建 vs READY 构建 `-Source` → MODEL IDENTICAL，LIQ PENDING
-7  P2 严格校验（A-51）：删掉日志里某个构建的 END 或任意一行的 ,run=…,init=… → 该构建 INCOMPLETE，无结论；
-          `-Chain` 跳过并提示；`pwsh -File tools\logtests\Run-LogTests.ps1` → 25/25
-8  同版本重载：IDENTICAL inside the comparable region (MODEL + LIQ)
-9  实时 vs 重建：`-LiveVsBuild` 双向 0 MISMATCH，无「live rows without run/init」
+0  编译 0 errors / 0 warnings（v2.52 只改流动性模块与主文件日志）
+1  版本：`starting on` v2.52 run= init=；BEGIN ver=2.52，params= 与 v2.48 相同
+2  固定窗口回归：v2.48 与 v2.52 并排 → `-Source <v2.48 源> -Versus <v2.52 源>`
+          → 「0 difference(s) over N / N MODEL row(s), same window and parameters」，N > 0；
+          InpStopIdentificationOnBlockInvalidation = true 再做一次
+3  有限 Max bars（A-53）：把「Max bars in chart」设为约 20000 后重启终端、挂指标。看 HMI-LIQ-REPLAY：
+          capped=1；req_from 不早于 floor；fail 从不出现 CAP；got > 0 时 state=READY 或 waiting 只含可恢复条目；
+          同一 init 内 HMI-LIQ-HIST 的 ARRIVED / SETTLED / BEFORE_FLOOR 至多一次，且其后的 END 为 liq=READY；
+          unknown>0（被截断的条目）是信息提示
+4  延迟下载：删除该品种本地历史后挂指标 → state=WAITING（fail=LOAD 或 NOT_BUILT）→ ARRIVED → READY；
+          再重载一次（一开始就 READY），两次 READY 构建 `-Source` → MODEL / LIQ 两行均 IDENTICAL over …
+5  超过快速探测：首个构建 WAITING 后断网 > 5 分钟 → HMI-LIQ-HIST SLOW（带 err / fail），面板仍 WAITING；
+          恢复网络 → ARRIVED → READY。断网期间不得出现 liq=READY 的 END
+6  分开报告：WAITING 构建 vs READY 构建 → MODEL IDENTICAL over …，LIQ PENDING
+7  日志校验：`pwsh -File tools\logtests\Run-LogTests.ps1` → 35/35；
+          人工删去某构建 END 的 build=、或任一行的 ,run=…,init=… → INCOMPLETE
+8  同版本重载：MODEL / LIQ 两行均 IDENTICAL over a / b row(s)（行数 > 0）
+9  实时 vs 重建：`-LiveVsBuild` 双向 0 MISMATCH，live events compared > 0
 10 重启残留：强杀 terminal64.exe → 重启 → `removed the objects of instance`
 ```
 
-离线证据（不替代以上实测）：`python3 tools/liq_wait_sim.py` 9/9（`--v250` 对照 2/9）；
-`Run-LogTests.ps1` v2.51 脚本 25/25（v2.50 脚本 7/25）。
+离线证据（不替代以上实测）：`python3 tools/liq_wait_sim.py` 12/12（严格终端；`--logic v2.51` 8/12，
+`--logic v2.50` 2/12）；`Run-LogTests.ps1` v2.52 脚本 35/35（v2.51 脚本 26/35，v2.50 脚本 8/35）。

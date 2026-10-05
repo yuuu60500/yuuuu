@@ -1526,3 +1526,62 @@ Status:                  **FIXED —— v2.51**
 - `SERIES_SERVER_FIRSTDATE` 与 `Bars()` / `TERMINAL_MAXBARS` 截断按 MQL5 文档建模，未在终端观测。
   若截断识别失败，后果是该条目一直 WAITING（慢速重试、面板提示），不会被误判为 READY。
 - 「终端已持有起点前 3 天历史」用 `SERIES_TERMINAL_FIRSTDATE`（不分周期的本地首日）判断。
+
+
+## Audit Round 13 —— 验收方 v2.51 复核（2026-10-05）
+
+验收方：v2.51 MetaEditor 5.0.0.6230 X64 编译 0 errors / 0 warnings；随包测试复现通过；三项规则撤回确认。
+以下三项均在源码中核实成立，并已复现。
+
+### A-53 —— **流动性历史请求越过 Max bars 截断点**（成立，模型复现）
+
+```
+Severity:                流动性线 / SWEEP / BROKEN 恢复（Rule 69：MODEL 不受影响）
+Location:                HMI_LiquidityLevels.mqh LiqReplay / LiqHistoryProbe（v2.51）
+Actual Behavior:         1) LiqReplay 用全部条目的最早起点（含已注定丢失的条目）向前 3 天请求，下限在请求之后才读
+                         2) 探测直接请求 target 前 3 天，不受下限约束
+                         CopyRates 对越过 TERMINAL_MAXBARS 的区间返回 -1（不裁剪）；v2.51 的模型终端会裁剪，所以 9/9 没覆盖这条路径
+Evidence:                tools/liq_wait_sim.py 改为按文档返回 -1 后：
+                           R1（下限 9/14，A 9/10，B 9/16）v2.51 逻辑 B 一直 WAITING
+                           R2（B 9/18）v2.51 逻辑 ARRIVED -> 重建 -> WAITING 连续三轮
+                         与验收方独立模拟一致；--lenient（裁剪终端）下 v2.51 仍 12/12，说明上次是被裁剪掩盖
+Fix (v2.52):             先读下限，再定请求：
+                           LiqHistoryFloor   服务器首日与截断后 M5 序列首根（SERIES_FIRSTDATE，按周期）取较晚
+                           LiqRequestFrom    起点前 3 天，但不早于下限
+                           LiqReplay         need = 最早的、未因下限丢失的起点；因下限丢失的条目不再扩大请求
+                           LiqLossKind       回放与探测共用：1 = 早于下限；2 = 请求返回了 K 线且已构建的 M5 序列
+                                             首根不晚于请求起点（该区间所有 K 线都在，仍不够 = ATR 前 14 根或休市缺口，最终）；0 = pending
+                         探测与随后的重建使用同一请求起点（探测目标即重建的 need），同一事实不会再回到 WAITING。
+                         覆盖判断改用 SERIES_FIRSTDATE（按周期的已构建序列首根），不再用不分周期的 TERMINAL_FIRSTDATE。
+                         诊断：HMI-LIQ-REPLAY 加 req_from / got / err / fail（CAP / NOT_BUILT / LOAD）/ m5_first / capped / short；
+                         SLOW 日志带最近一次失败的 err / fail。fail=CAP 在 v2.52 不应出现（请求已按下限收紧）
+Verification:            liq_wait_sim.py 严格终端 v2.52 12/12（R1、R2 首个构建即 READY，无定时器重建）；
+                         宽松终端 12/12；对照 v2.51 8/12、v2.50 2/12
+Status:                  **FIXED —— v2.52，待编译与有限 Max bars 实测**
+```
+
+### A-54 —— **BEGIN 与 END 同时缺 build（或同为非数字）仍判一致**（成立，脚本复现）
+
+```
+Severity:                测试工具给出错误的 IDENTICAL
+Location:                tools/ReloadTest.ps1 New-Block / END 解析（v2.51）：缺失记为 '?'，两侧 '?' 相等
+Evidence:                合成日志 b01（两侧均缺）、b04（两侧 bogus）、b05（两侧 0）：v2.51 均输出 IDENTICAL
+Fix (v2.52):             v2.44 起（及任何严格格式构建）BEGIN 与 END 的 build 都必须是正整数，各自先验，再比相等；
+                         缺失或非法 → INCOMPLETE（原因中写出原值或 missing）。v2.43 及更早的日志仍按原规则
+Status:                  **FIXED —— v2.52**（合成日志 b01–b06）
+```
+
+### A-55 —— **WAITING 时没有 MODEL 样本仍报 MODEL 一致；LiveVsBuild 零事件仍报一致**（成立，脚本复现）
+
+```
+Severity:                测试工具给出没有比较内容的通过
+Location:                tools/ReloadTest.ps1 Compare-Builds 结论段；Show-LiveVsBuild（v2.51）
+Evidence:                w01（WAITING，0 MODEL）v2.51 输出「MODEL IDENTICAL ... (0 rows)」；
+                         w04（B 构建 WAITING，实时只有 LIQ 行）v2.51 输出「live events compared: 0 / AGREE BOTH WAYS」
+                         —— 后者是验收方建议复核的 LiveVsBuild，同样成立
+Fix (v2.52):             同版本比较逐类给结论：MODEL 总参与判定；LIQ 仅两侧 READY 时参与。
+                         每类输出 IDENTICAL over a / b row(s)、INSUFFICIENT SAMPLE、PENDING 或 MISMATCH；
+                         参与判定的行数为 0 → INSUFFICIENT SAMPLE，不给通过。
+                         LiveVsBuild：去掉 pending 的 LIQ 行和边缘行后为空的构建对不计入可比较
+Status:                  **FIXED —— v2.52**（合成日志 w01–w04）
+```

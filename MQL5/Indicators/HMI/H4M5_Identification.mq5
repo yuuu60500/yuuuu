@@ -9,7 +9,7 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "2.51"          // keep equal to HMI_VERSION (HMI_Defs.mqh)
+#property version   "2.52"          // keep equal to HMI_VERSION (HMI_Defs.mqh)
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window
@@ -450,9 +450,10 @@ void OnTimer()
       EventKillTimer();
       EventSetTimer(HMI_LH_SLOW_SEC);
       if(InpLogSignals)
-         PrintFormat("HMI-LIQ-HIST,%s,SLOW,attempt=%d,wait_from=%s,waiting=%d,every=%ds,inst=%s,run=%I64d,init=%d",
+         PrintFormat("HMI-LIQ-HIST,%s,SLOW,attempt=%d,wait_from=%s,waiting=%d,every=%ds,err=%d,fail=%s,inst=%s,run=%I64d,init=%d",
                      _Symbol, g_lh_attempts, TimeToString(g_lh_need, TIME_DATE|TIME_MINUTES),
-                     g_lh_pend_n, HMI_LH_SLOW_SEC, g_inst, g_run_id, g_init_seq);
+                     g_lh_pend_n, HMI_LH_SLOW_SEC, g_lh_err, (g_lh_fail != "" ? g_lh_fail : "-"),
+                     g_inst, g_run_id, g_init_seq);
      }
    OM_DrawPanel();                               // attempt count on the panel
    ChartRedraw();

@@ -1668,3 +1668,33 @@ Kept from v2.49 (do not touch the mark chain):
 Trading Logic Changed:  NO（相对 v2.48，任何参数下；参数摘要与 v2.48 相同）
 Compile Status:         NOT COMPILE VERIFIED（Rule 70）
 ```
+
+---
+
+## v2.52 — 验收方 v2.51 复核：历史请求不越过下限；build 字段必须有效；无判定样本不给通过
+
+```
+Version:  v2.52
+Date:     2026-10-05
+来源:     验收方「HMI v2.51 验收复核报告」（2026-10-05；v2.51 编译 0 errors / 0 warnings）
+
+P1 (A-53) 历史请求按下限收紧:
+  LiqHistoryFloor   截断时取 SERIES_FIRSTDATE（按周期的已构建 M5 首根）
+  LiqRequestFrom    max(起点 - 3 天, 下限)；回放与探测共用
+  LiqReplay         先读下限；因下限丢失的条目不扩大请求
+  LiqLossKind       回放与探测共用的丢失判定（floor / short / pending）
+  日志              HMI-LIQ-REPLAY: req_from got err fail m5_first capped short；SLOW: err fail
+P2 (A-54) build 字段:
+  ReloadTest.ps1    v2.44+ 与严格格式：BEGIN / END 的 build 必须是正整数，缺失或非法即 INCOMPLETE
+P2 (A-55) 判定样本:
+  ReloadTest.ps1    同版本比较逐类结论（MODEL / LIQ）；无参与判定的行 → INSUFFICIENT SAMPLE；
+                    LiveVsBuild 过滤后为空的构建对不计入可比较
+
+Tools:
+  tools/liq_wait_sim.py   终端按文档返回 -1（越过 TERMINAL_MAXBARS、需下载）；--lenient 为旧的裁剪终端；
+                          --logic v2.51 / v2.50 对照；新增 R1 R2 R3 容量场景。v2.52 12/12
+  tools/logtests          35 组（新增 b01–b06 build 字段、w01–w04 判定样本）。v2.52 脚本 35/35
+
+Trading Logic Changed:  NO（相对 v2.48，任何参数下；参数摘要与 v2.48 相同）
+Compile Status:         NOT COMPILE VERIFIED（v2.51 已由验收方编译通过；v2.52 只改动流动性模块与主文件日志）
+```
