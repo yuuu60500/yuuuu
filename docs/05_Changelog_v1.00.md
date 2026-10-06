@@ -1698,3 +1698,30 @@ Tools:
 Trading Logic Changed:  NO（相对 v2.48，任何参数下；参数摘要与 v2.48 相同）
 Compile Status:         NOT COMPILE VERIFIED（v2.51 已由验收方编译通过；v2.52 只改动流动性模块与主文件日志）
 ```
+
+---
+
+## v2.53 — BOS 去重（A-33）：一根 H4 至多一次结构事件
+
+```
+Version:  v2.53
+Date:     2026-10-06
+来源:     用户 2026-10-06：v2.52 固定为开发基线；v2.53 只处理 BOS 去重
+Baseline: v2.52 = 63379fd（docs/baselines/v2.52.md：源码指纹、241 个输入默认值、params=461F006E、测试记录）
+
+Trading logic (BRI-11 读法甲):
+  H4ConsumeSameDirBroken   新增。结构事件发生时，同一根收盘按同一余量突破的其它已确认、未处理同向摆动点
+                           一并标记已处理（含 TRANS_SAMELEG）。触发条件与主参考点不变
+  H4ContextOnBar           调用上者；CtxLog 加 also=；also>0 记 HMI-CTX-DEDUP
+Not changed:               余量、保护点、评分、TR、流动性池、参数（参数摘要仍 461F006E）
+
+Tools:
+  tools/h4_dedup_sim.py    H4 结构层 + H4 POI 链离线模型（v2.52 / v2.53），必验场景 4/4；真实 EURUSD 回放
+  tools/params_digest.py   按源码计算默认参数摘要（v2.48 / v2.52 / v2.53 均 461F006E）
+  tools/ReloadTest.ps1     HMI-CTX 作为判定类别（重载、实时 vs 重建）；跨版本逐条归因（A-56）
+  tools/logtests           45 组（新增 c01–c10）
+
+Evidence:  docs/evidence/v2.53_h4_dedup_offline.txt
+Trading Logic Changed:  YES —— 结构事件与强度；H4 状态仅在陈旧点推动 TRANSITION / RANGE 时改变
+Compile Status:         NOT COMPILE VERIFIED（本环境无 MetaEditor）
+```

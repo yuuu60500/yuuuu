@@ -17,3 +17,6 @@ reload_diff_*.txt
 live_vs_build_diff_*.txt
 poi_rejects_*.txt
 ctx_events.csv
+
+# Python bytecode from the offline models
+__pycache__/

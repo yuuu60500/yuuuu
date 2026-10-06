@@ -30,7 +30,7 @@ void CtxEnter(const CtxState st, const int pending, const datetime t)
 // HMI-REJECT made Rule 6's refusal side auditable: every state change comes
 // out with the swing it broke and the state it left behind, so `str N` on the
 // panel can be counted back from the log instead of taken on trust.
-void CtxLog(const string kind, const string dir, const int h, const int broken)
+void CtxLog(const string kind, const string dir, const int h, const int broken, const int also = 0)
   {
    if(!InpLogSignals) return;
    string sw_t = "", sw_p = "";
@@ -39,11 +39,11 @@ void CtxLog(const string kind, const string dir, const int h, const int broken)
       sw_t = TimeToString(g_h4sw[broken].bar_time, TIME_DATE|TIME_MINUTES);
       sw_p = DoubleToString(g_h4sw[broken].price, _Digits);
      }
-   PrintFormat("HMI-CTX,%s,%s,dir=%s,live=%d,ctx=%s,str=%d,messy=%d,bar=%s,swing=%s,swing_px=%s,close=%s,inst=%s,run=%I64d,init=%d",
+   PrintFormat("HMI-CTX,%s,%s,dir=%s,live=%d,ctx=%s,str=%d,messy=%d,bar=%s,swing=%s,swing_px=%s,close=%s,also=%d,inst=%s,run=%I64d,init=%d",
                _Symbol, kind, dir, (g_live ? 1 : 0),
                CtxName(g_ctx), g_ctx_strength, (g_ctx_messy ? 1 : 0),
                TimeToString(CloseTimeOf(g_h4[h].time, PERIOD_H4), TIME_DATE|TIME_MINUTES),
-               sw_t, sw_p, DoubleToString(g_h4[h].close, _Digits), g_inst, g_run_id, g_init_seq);
+               sw_t, sw_p, DoubleToString(g_h4[h].close, _Digits), also, g_inst, g_run_id, g_init_seq);
   }
 
 // Classify the raw break for bar h and drive the state machine.
@@ -70,6 +70,11 @@ CtxEventType H4ContextOnBar(const int h)
 
    datetime brk_confirm = (SafeIdx(broken, g_h4sw_n) ? g_h4sw[broken].confirm_time : 0);
    H4ConsumeSwing(broken, t);
+   // A-33: the same close processes every other same-direction swing it
+   // breaks - whatever the classification below, TRANS_SAMELEG included, so
+   // none of them can be broken "again" by a later bar without a new push.
+   string also_list = "";
+   int    also      = H4ConsumeSameDirBroken(h, brk, broken, t, also_list);
 
    CtxEventType ev   = EV_NONE;
    string       kind = "";                       // diagnostic label only
@@ -139,7 +144,18 @@ CtxEventType H4ContextOnBar(const int h)
         }
      }
 
-   if(kind != "") CtxLog(kind, vdir, h, broken);
+   if(kind != "") CtxLog(kind, vdir, h, broken, also);
+   // One row per de-duplicated bar: which swings were processed together with
+   // the primary. ReloadTest -Versus reads it to tell a BOS that v2.52 would
+   // have counted on a later bar (a suppressed duplicate) from any other
+   // difference (A-56).
+   if(also > 0 && InpLogSignals)
+      PrintFormat("HMI-CTX-DEDUP,%s,%s,dir=%s,bar=%s,primary=%s@%s,also=%d,swings=%s,inst=%s,run=%I64d,init=%d",
+                  _Symbol, kind, vdir,
+                  TimeToString(t, TIME_DATE|TIME_MINUTES),
+                  (SafeIdx(broken, g_h4sw_n) ? TimeToString(g_h4sw[broken].bar_time, TIME_DATE|TIME_MINUTES) : "-"),
+                  (SafeIdx(broken, g_h4sw_n) ? DoubleToString(g_h4sw[broken].price, _Digits) : "-"),
+                  also, also_list, g_inst, g_run_id, g_init_seq);
    return(ev);
   }
 

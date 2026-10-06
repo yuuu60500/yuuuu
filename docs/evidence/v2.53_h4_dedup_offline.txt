@@ -1,0 +1,57 @@
+# v2.53 offline evidence - H4 structure layer, v2.52 vs v2.53 (tools/h4_dedup_sim.py)
+# generated 2026-10-06T16:13Z; data: backtesting.py 0.6.6 backtesting/test/EURUSD.csv (H1 -> H4)
+# data sha256 81e977905a006cc8fbc034ebdb83c999a8ed6ba00191dc7ea5ef5b386fb74a82
+# models the rules, not MQL5; M5 chain (touch, session, blocks, models) is not modelled
+
+## python3 tools/h4_dedup_sim.py
+PASS  bull: one close beyond three old highs, price stays -> one BOS; new swing broken -> new BOS
+        v2.53 events (bar, kind, dir, also): [(13, 'BOS', 1, 2), (20, 'BOS', 1, 1)]
+        v2.52 events (bar, kind, dir):       [(13, 'BOS', 1), (14, 'BOS', 1), (20, 'BOS', 1), (21, 'BOS', 1)]
+        attribution: {'suppressed duplicate': 2, 'primary re-referenced': 0, 'strength renumbered': 1, 'path changed after a de-dup': 0, 'UNEXPLAINED': 0}
+PASS  bear: mirror image
+        v2.53 events (bar, kind, dir, also): [(13, 'BOS', -1, 2), (20, 'BOS', -1, 1)]
+        v2.52 events (bar, kind, dir):       [(13, 'BOS', -1), (14, 'BOS', -1), (20, 'BOS', -1), (21, 'BOS', -1)]
+        attribution: {'suppressed duplicate': 2, 'primary re-referenced': 0, 'strength renumbered': 1, 'path changed after a de-dup': 0, 'UNEXPLAINED': 0}
+PASS  shadowed: close between an older lower high and the latest high is no event; beyond -> one
+        v2.53 events (bar, kind, dir, also): [(11, 'BOS', 1, 1)]
+        v2.52 events (bar, kind, dir):       [(11, 'BOS', 1), (12, 'BOS', 1)]
+        attribution: {'suppressed duplicate': 1, 'primary re-referenced': 0, 'strength renumbered': 0, 'path changed after a de-dup': 0, 'UNEXPLAINED': 0}
+PASS  shadowed, bear mirror
+        v2.53 events (bar, kind, dir, also): [(11, 'BOS', -1, 1)]
+        v2.52 events (bar, kind, dir):       [(11, 'BOS', -1), (12, 'BOS', -1)]
+        attribution: {'suppressed duplicate': 1, 'primary re-referenced': 0, 'strength renumbered': 0, 'path changed after a de-dup': 0, 'UNEXPLAINED': 0}
+
+4/4 scenarios as expected
+
+## python3 tools/h4_dedup_sim.py --replay EURUSD_H1.csv
+replay EURUSD_H1.csv: 1292 H4 bars 2017.04.19 08:00 .. 2018.02.07 12:00
+
+structure events          v2.52   v2.53
+  BOS                       157      63
+  CHOCH                      45      45
+  TRANS_OK                   25      25
+  TRANS_FAIL                 19      19
+  TRANS_SAMELEG              32       8
+  TIMEOUT                     1       1
+  de-duplicated bars           -      79   (extra swings processed: 152)
+  max strength               17       7
+
+first de-dup bar: 2017.04.24 00:00
+CTX differences (v2.52 vs v2.53), by cause:
+  suppressed duplicate             118
+  primary re-referenced            12
+  strength renumbered              26
+  path changed after a de-dup      0
+  UNEXPLAINED                      0
+
+H4 state divergence intervals: 0
+  H4 bars in a different state: 0 of 1292
+
+POI events only in v2.52: 0, only in v2.53: 0
+  POI differences before the first state divergence (unexplained): 0
+
+prefix stability (cut every 25 bars; no event or POI changes when later bars arrive): v2.53 OK, v2.52 OK
+window start moved 1..30 H4 bars (events after 60 bars of settle): v2.52 2 of 30 shifts differ, 22 row(s)
+window start moved 1..30 H4 bars (events after 60 bars of settle): v2.53 1 of 30 shifts differ, 2 row(s)
+
+ALL DIFFERENCES TRACE TO BOS DE-DUPLICATION

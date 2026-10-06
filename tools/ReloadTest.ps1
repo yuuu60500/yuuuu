@@ -52,6 +52,12 @@
 #  2.51). Only a genuinely older build gets the lenient path.
 #  A comparison with no common region, or with no MODEL row on either side,
 #  is NOT COMPARABLE / INSUFFICIENT SAMPLE - never "0 difference".
+#  (v2.53) H4 structure events (HMI-CTX) are a third judged category next to
+#  MODEL and LIQ: reload and live-vs-rebuild must agree on them too. Between
+#  two VERSIONS, every structure difference is attributed using the newer
+#  build's HMI-CTX-DEDUP rows, and every POI / SESS / BLK / ARM / MODEL
+#  difference must come at or after the first bar where the two builds' H4
+#  state differs - otherwise it is UNEXPLAINED (A-56).
 #
 #     add  -Days 5  to merge the 5 most recent log files. MT5 starts a NEW
 #     log file every day: a live run that spans days leaves its marks in
@@ -180,6 +186,19 @@ function RowTime([string]$r) {
     if ($c.Count -gt 7) { [void][datetime]::TryParseExact($c[7], 'yyyy.MM.dd HH:mm:ss', $icx, [Globalization.DateTimeStyles]::None, [ref]$t) }
     return $t
 }
+# ---- v2.53 structure rows (A-56) ----------------------------------------------
+# HMI-CTX: one row per H4 structure event. Its key leaves out live= (live vs
+# rebuild) and also= (v2.52 does not log it); everything else must agree.
+function CtxParse([string]$msg) {
+    $c = $msg -split ','
+    if ($c.Count -lt 4) { return $null }
+    $f = @{}; foreach ($p in $c[3..($c.Count-1)]) { $kv = $p -split '=', 2; if ($kv.Count -eq 2) { $f[$kv[0]] = $kv[1] } }
+    $ev = "{0}|{1}|{2}|{3}|messy={4}" -f $f['bar'], $c[2], $f['dir'], $f['ctx'], $f['messy']
+    [pscustomobject]@{ Kind = $c[2]; Dir = $f['dir']; Ctx = $f['ctx']; Bar = (PT16 $f['bar']); BarS = $f['bar']; Swing = $f['swing']
+                       Key = "$ev|str=$($f['str'])|$($f['swing'])|$($f['swing_px'])|$($f['close'])"
+                       KeyNoStr = "$ev|$($f['swing'])|$($f['swing_px'])|$($f['close'])"
+                       Event = $ev }
+}
 function RowKind([string]$r) { $c = $r -split ','; if ($c.Count -gt 1) { return $c[1] } return '?' }
 function KV([string]$s) { $m = @{}; foreach ($p in ($s -split ',')) { $kv = $p -split '=', 2; if ($kv.Count -eq 2) { $m[$kv[0].Trim()] = $kv[1].Trim() } }; return $m }
 
@@ -230,7 +249,7 @@ function Close-Block($bk) {
     $bk.Status = $(if ($bk.Why.Count -eq 0) { 'COMPLETE' } else { 'INCOMPLETE' })
 }
 
-$blocks = @(); $open = @{}; $verNow = @{}; $liveAll = @(); $orphanRows = 0; $orphanEnds = 0
+$blocks = @(); $open = @{}; $verNow = @{}; $liveAll = @(); $liveCtx = @(); $orphanRows = 0; $orphanEnds = 0
 for ($i = 0; $i -lt $all.Count; $i++) {
     $l = $all[$i]
     if ($l -notmatch 'HMI') { continue }
@@ -284,6 +303,10 @@ for ($i = 0; $i -lt $all.Count; $i++) {
         if ($msg -match '^HMI-') { Note-Row $open[$src] $msg $id }
         if ($msg -match '^HMI-LIVE,') { [void]$open[$src].Why.Add('HMI-LIVE row inside a historical build') }
         [void]$open[$src].Lines.Add($msg)
+    }
+    elseif ($msg -match '^HMI-CTX,') {                          # a structure event outside a build = live
+        $cr = CtxParse $msg
+        if ($cr) { $liveCtx += [pscustomobject]@{ Src = $src; Idx = $i; Id = $id; C = $cr } }
     }
     if ($l -match 'HMI-BUILD,(.*)$') {
         if (-not $open.ContainsKey($src)) { $orphanRows++; continue }
@@ -714,6 +737,135 @@ function DiffRows($ra, $rb) {
         for ($j = 0; $j -lt $n; $j++) { $out += [pscustomobject]@{ Side = 'B only'; Row = $sb[$k]; Time = (RowTime $sb[$k]) } } }
     return @($out | Sort-Object Time)
 }
+# Multiset difference of objects carrying .Key: what each side has more of.
+function DiffKeys($a, $b, [string]$prop = 'Key') {
+    $ca = @{}; $cb = @{}
+    foreach ($x in $a) { $k = $x.$prop; if (-not $ca.ContainsKey($k)) { $ca[$k] = New-Object System.Collections.ArrayList }; [void]$ca[$k].Add($x) }
+    foreach ($x in $b) { $k = $x.$prop; if (-not $cb.ContainsKey($k)) { $cb[$k] = New-Object System.Collections.ArrayList }; [void]$cb[$k].Add($x) }
+    $oa = New-Object System.Collections.ArrayList; $ob = New-Object System.Collections.ArrayList
+    foreach ($k in $ca.Keys) { $n = $ca[$k].Count - $(if ($cb.ContainsKey($k)) { $cb[$k].Count } else { 0 }); for ($j = 0; $j -lt $n; $j++) { [void]$oa.Add($ca[$k][$j]) } }
+    foreach ($k in $cb.Keys) { $n = $cb[$k].Count - $(if ($ca.ContainsKey($k)) { $ca[$k].Count } else { 0 }); for ($j = 0; $j -lt $n; $j++) { [void]$ob.Add($cb[$k][$j]) } }
+    return [pscustomobject]@{ A = $oa; B = $ob }
+}
+
+# Structure rows of one build, read once: CTX events, the swings each version
+# processed (primary or, from v2.53, de-duplicated with it) and the chain
+# diagnostics, with their sequence ids removed (they are init-relative).
+function Get-Struct($bk) {
+    if ($bk.PSObject.Properties['Struct']) { return $bk.Struct }
+    $ctx = New-Object System.Collections.ArrayList; $proc = @{}; $dedupN = 0; $tDedup = [datetime]::MaxValue
+    $diag = New-Object System.Collections.ArrayList
+    foreach ($m in $bk.Lines) {
+        if ($m -match '^HMI-CTX,') {
+            $r = CtxParse $m
+            if ($r) { [void]$ctx.Add($r); if ($r.Swing) { $k = "$($r.Dir)|$($r.Swing)"; if (-not $proc.ContainsKey($k)) { $proc[$k] = $r.Bar } } }
+        } elseif ($m -match '^HMI-CTX-DEDUP,') {
+            $c = $m -split ','; $f = @{}
+            foreach ($p in $c[3..($c.Count-1)]) { $kv = $p -split '=', 2; if ($kv.Count -eq 2) { $f[$kv[0]] = $kv[1] } }
+            $bar = PT16 $f['bar']; $dedupN++; if ($bar -lt $tDedup) { $tDedup = $bar }
+            foreach ($s in ([string]$f['swings'] -split '\|')) {
+                $st = ($s -split '@')[0]; $k = "$($f['dir'])|$st"
+                if ($st -and -not $proc.ContainsKey($k)) { $proc[$k] = $bar }
+            }
+        } elseif ($m -match '^HMI-(POI|SESS|BLK|ARM),') {
+            $kind = $Matches[1]
+            $norm = (($m -split ',') | Where-Object { $_ -notmatch '^(id|poi|sess|block|blk_sess)=' }) -join ','
+            $bt = $(if ($m -match ',bar=([0-9.: ]+)') { PT16 $Matches[1] } else { [datetime]::MinValue })
+            [void]$diag.Add([pscustomobject]@{ Key = $norm; Time = $bt; Kind = $kind })
+        }
+    }
+    $s = [pscustomobject]@{ Ctx = $ctx; Proc = $proc; DedupN = $dedupN; TDedup = $tDedup; Diag = $diag }
+    $bk | Add-Member -NotePropertyName Struct -NotePropertyValue $s -Force
+    return $s
+}
+
+# H4 state of a build at every event bar: RANGE until its first event.
+# Returns the divergence intervals between two builds (start, end, stateA, stateB).
+function StateDivergence($ca, $cb) {
+    $ta = @($ca | Sort-Object Bar); $tb = @($cb | Sort-Object Bar)
+    $times = @(@($ta | ForEach-Object Bar) + @($tb | ForEach-Object Bar) | Sort-Object -Unique)
+    $ia = 0; $ib = 0; $sa = 'RANGE'; $sb = 'RANGE'; $out = @(); $cur = $null
+    foreach ($t in $times) {
+        while ($ia -lt $ta.Count -and $ta[$ia].Bar -le $t) { $sa = $ta[$ia].Ctx; $ia++ }
+        while ($ib -lt $tb.Count -and $tb[$ib].Bar -le $t) { $sb = $tb[$ib].Ctx; $ib++ }
+        if ($sa -ne $sb) { if (-not $cur) { $cur = [pscustomobject]@{ From = $t; To = $t; A = $sa; B = $sb } } else { $cur.To = $t } }
+        elseif ($cur) { $cur.To = $t; $out += $cur; $cur = $null }
+    }
+    if ($cur) { $cur | Add-Member -NotePropertyName Open -NotePropertyValue $true; $out += $cur }     # still different at the build's last event
+    return ,$out
+}
+
+# A-56: why do two versions differ? Old = the lower version, New = the higher.
+# CTX differences:  suppressed duplicate   the old build counted a swing the new
+#                                         one had processed on an earlier bar
+#                   primary re-referenced  same bar, same event, other primary
+#                                         swing: the old primary was such a swing
+#                   strength renumbered    same event, str differs
+#                   path changed           any other, at or after the new build's
+#                                         first de-duplicated bar
+#                   UNEXPLAINED            any other, before it (or no de-dup at all)
+# Chain differences (POI / SESS / BLK / ARM in the build, MODEL in the common
+# region) are explained only at or after the first bar where the two H4 states
+# differ: a suppressed duplicate inside a trend changes strength and nothing
+# the chain reads, so with no H4 state difference there must be none below.
+# Returns the number of UNEXPLAINED differences.
+function Show-StructAttribution($Old, $New, [datetime]$rs, [datetime]$re, $mOld, $mNew) {
+    $so = Get-Struct $Old; $sn = Get-Struct $New
+    Write-Host ("  structure attribution (v{0} -> v{1}, whole build): CTX events {2} / {3}; de-duplicated bars in v{1}: {4}{5}" -f `
+                $Old.Ver, $New.Ver, $so.Ctx.Count, $sn.Ctx.Count, $sn.DedupN,
+                $(if ($sn.DedupN) { ", first " + $sn.TDedup.ToString('yyyy.MM.dd HH:mm') } else { '' }))
+    $d1 = DiffKeys $so.Ctx $sn.Ctx 'Key'
+    $d0 = DiffKeys $so.Ctx $sn.Ctx 'KeyNoStr'
+    $cls = [ordered]@{ 'suppressed duplicate' = 0; 'primary re-referenced' = 0; 'strength renumbered' = ($d1.A.Count - $d0.A.Count)
+                       'path changed after a de-dup' = 0; 'UNEXPLAINED' = 0 }
+    $unex = @()
+    $newByEvent = @{}
+    foreach ($x in $d0.B) { if (-not $newByEvent.ContainsKey($x.Event)) { $newByEvent[$x.Event] = New-Object System.Collections.ArrayList }; [void]$newByEvent[$x.Event].Add($x) }
+    $paired = @{}
+    foreach ($x in $d0.A) {
+        $k = "$($x.Dir)|$($x.Swing)"
+        $dup = [bool]$x.Swing -and $sn.Proc.ContainsKey($k) -and $sn.Proc[$k] -lt $x.Bar
+        $mate = $null
+        if ($newByEvent.ContainsKey($x.Event)) { foreach ($y in $newByEvent[$x.Event]) { if (-not $paired.ContainsKey([string][System.Runtime.CompilerServices.RuntimeHelpers]::GetHashCode($y))) { $mate = $y; break } } }
+        if ($dup -and $mate) { $cls['primary re-referenced']++; $paired[[string][System.Runtime.CompilerServices.RuntimeHelpers]::GetHashCode($mate)] = 1 }
+        elseif ($dup)         { $cls['suppressed duplicate']++ }
+        elseif ($sn.DedupN -and $x.Bar -ge $sn.TDedup) { $cls['path changed after a de-dup']++ }
+        else                  { $cls['UNEXPLAINED']++; $unex += "v$($Old.Ver) only  $($x.Key)" }
+    }
+    foreach ($y in $d0.B) {
+        if ($paired.ContainsKey([string][System.Runtime.CompilerServices.RuntimeHelpers]::GetHashCode($y))) { continue }
+        if ($sn.DedupN -and $y.Bar -ge $sn.TDedup) { $cls['path changed after a de-dup']++ }
+        else { $cls['UNEXPLAINED']++; $unex += "v$($New.Ver) only  $($y.Key)" }
+    }
+    foreach ($k in $cls.Keys) { Write-Host ("    CTX {0,-30} {1,5}" -f $k, $cls[$k]) -ForegroundColor $(if ($k -eq 'UNEXPLAINED' -and $cls[$k]) { 'Red' } else { 'Gray' }) }
+
+    $div = StateDivergence $so.Ctx $sn.Ctx
+    $tState = $(if ($div.Count) { $div[0].From } else { [datetime]::MaxValue })
+    if ($div.Count) {
+        Write-Host ("    H4 state differs in {0} interval(s), first from {1}:" -f $div.Count, $tState.ToString('yyyy.MM.dd HH:mm')) -ForegroundColor Yellow
+        $div | Select-Object -First 10 | ForEach-Object {
+            $till = $(if ($_.PSObject.Properties['Open']) { 'end of build    ' } else { 'before ' + $_.To.ToString('yyyy.MM.dd HH:mm') })
+            Write-Host ("      {0} .. {1}   v{2} {3,-10}  v{4} {5}" -f $_.From.ToString('yyyy.MM.dd HH:mm'), $till, $Old.Ver, $_.A, $New.Ver, $_.B) }
+    } else {
+        Write-Host "    H4 state: identical at every event bar - so the chain below must be identical too" -ForegroundColor Gray
+    }
+
+    $dd = DiffKeys @($so.Diag | Where-Object { $_.Time -ge $rs -and $_.Time -le $re }) @($sn.Diag | Where-Object { $_.Time -ge $rs -and $_.Time -le $re }) 'Key'
+    $dm = @(DiffRows $mOld $mNew)
+    $chain = @(@($dd.A) + @($dd.B) | ForEach-Object { [pscustomobject]@{ Kind = $_.Kind; Time = $_.Time; Row = $_.Key } }) +
+             @($dm | ForEach-Object { [pscustomobject]@{ Kind = 'MODEL'; Time = $_.Time; Row = "$($_.Side)  $($_.Row)" } })
+    $byKind = ($chain | Group-Object Kind | Sort-Object Name | ForEach-Object { "$($_.Name) $($_.Count)" }) -join '   '
+    $early = @($chain | Where-Object { $_.Time -lt $tState })
+    Write-Host ("    chain differences in the common region: {0}" -f $(if ($chain.Count) { $byKind } else { 'none' }))
+    if ($chain.Count) {
+        Write-Host ("    of them before the first H4 state difference (UNEXPLAINED): {0}" -f $early.Count) -ForegroundColor $(if ($early.Count) { 'Red' } else { 'Gray' })
+        $early | Select-Object -First 10 | ForEach-Object { Write-Host ("      {0,-5} {1}" -f $_.Kind, $_.Row) -ForegroundColor Red }
+    }
+    $unex | Select-Object -First 10 | ForEach-Object { Write-Host "      $_" -ForegroundColor Red }
+    $script:lastAttrib = [pscustomobject]@{ ModelDiff = $dm.Count; Unexplained = ($cls['UNEXPLAINED'] + $early.Count) }
+    return ($cls['UNEXPLAINED'] + $early.Count)
+}
+
 function RowLabel([string]$r) { $c = $r -split ','; if ($c[1] -eq 'LIQ') { return "LIQ $($c[5]) $($c[6])" } return $c[6] }
 
 function Show-LiveVsBuild([string]$src) {
@@ -734,14 +886,18 @@ function Show-LiveVsBuild([string]$src) {
     $sel = @($blocks | Where-Object { $_.Src -eq $src })
     $lv  = @($liveAll | Where-Object { $_.Src -eq $src })
     if ($sel.Count -lt 2) { Write-Host "  fewer than two builds - nothing brackets a live stretch yet." -ForegroundColor Yellow; return }
-    $pairs = 0; $cmp = 0; $pend = 0; $liveN = 0; $bad = @(); $okRows = @(); $pendWhy = @(); $liqPend = 0
+    $pairs = 0; $cmp = 0; $pend = 0; $liveN = 0; $liveCtxN = 0; $strPend = 0; $bad = @(); $okRows = @(); $pendWhy = @(); $liqPend = 0
     for ($k = 1; $k -lt $sel.Count; $k++) {
         $A = $sel[$k - 1]; $B = $sel[$k]
         $rows = @($lv | Where-Object { $_.Idx -gt $A.EndIdx -and $_.Idx -lt $B.BeginIdx })
         $cs = $A.To.AddMinutes(10); $ce = $B.To
         if ($B.WarmEnd.AddMinutes(5) -gt $cs) { $cs = $B.WarmEnd.AddMinutes(5) }
         $bIn = @($B.Rows | Where-Object { $t = RowTime $_; $t -ge $cs -and $t -le $ce })
-        if ($rows.Count -eq 0 -and $bIn.Count -eq 0) { continue }
+        # A-56: structure events. An H4 bar the live run consumed closed after
+        # A's last M5 bar; B consumed it if it closed by B's last M5 bar.
+        $lc  = @($liveCtx | Where-Object { $_.Src -eq $src -and $_.Idx -gt $A.EndIdx -and $_.Idx -lt $B.BeginIdx })
+        $bc  = @((Get-Struct $B).Ctx | Where-Object { $_.Bar -gt $A.To -and $_.Bar -le $B.To })
+        if ($rows.Count -eq 0 -and $bIn.Count -eq 0 -and $lc.Count -eq 0 -and $bc.Count -eq 0) { continue }
         $pairs++
         $why = ''
         if ($A.Status -ne 'COMPLETE' -or $B.Status -ne 'COMPLETE') { $why = 'INCOMPLETE build: ' + ((@($A.Why) + @($B.Why)) -join '; ') }
@@ -755,8 +911,8 @@ function Show-LiveVsBuild([string]$src) {
         # lifetime that produced them), makes the pair PENDING - not a row
         # quietly set aside while the rest still passes.
         if ($A.Strict) {
-            $noId  = @($rows | Where-Object { -not $_.Id }).Count
-            $alien = @($rows | Where-Object { $_.Id -and $_.Id -ne $A.Id }).Count
+            $noId  = @(@($rows) + @($lc) | Where-Object { -not $_.Id }).Count
+            $alien = @(@($rows) + @($lc) | Where-Object { $_.Id -and $_.Id -ne $A.Id }).Count
             if ($noId -or $alien) {
                 $pend++
                 $pendWhy += "build $($A.Build)->$($B.Build): live rows without run/init $noId, from another run/init than build $($A.Build) $alien"
@@ -775,7 +931,8 @@ function Show-LiveVsBuild([string]$src) {
         if (-not $liqCmp) { $lIn = @($lIn | Where-Object { (RowKind $_) -eq 'MODEL' }) }
         # A-55: what is left after the pending LIQ rows and the edge rows are
         # set aside is what this pair can prove. Nothing left = nothing compared.
-        if (($lIn.Count + $bIn.Count) -eq 0) {
+        $lcIn = @($lc | Where-Object { $_.C.Bar -gt $A.To -and $_.C.Bar -le $B.To } | ForEach-Object { $_.C })
+        if (($lIn.Count + $bIn.Count + $lcIn.Count + $bc.Count) -eq 0) {
             $pend++
             $pendWhy += "build $($A.Build)->$($B.Build): no judged event (LIQ pending or edge rows only) - not comparable"
             continue
@@ -787,18 +944,26 @@ function Show-LiveVsBuild([string]$src) {
             $side = 'build only'; if ($d.Side -eq 'A only') { $side = 'live only' }
             $bad += [pscustomobject]@{ Side = $side; Row = $d.Row; Pair = "$($A.Build)->$($B.Build)" }
         }
+        $liveCtxN += $lcIn.Count
+        $dc  = DiffKeys $lcIn $bc 'KeyNoStr'
+        $dcs = DiffKeys $lcIn $bc 'Key'
+        foreach ($x in $dc.A) { $bad += [pscustomobject]@{ Side = 'live only';  Row = "CTX $($x.Key)"; Pair = "$($A.Build)->$($B.Build)" } }
+        foreach ($x in $dc.B) { $bad += [pscustomobject]@{ Side = 'build only'; Row = "CTX $($x.Key)"; Pair = "$($A.Build)->$($B.Build)" } }
+        $sn = $dcs.A.Count - $dc.A.Count
+        if ($sn -gt 0) { $strPend += $sn; $pendWhy += "build $($A.Build)->$($B.Build): $sn H4 event(s) agree on swing and state but not on the strength number (the rebuild's H4 history starts later)" }
     }
     Write-Host ("  build pairs with a live stretch: {0}   comparable: {1}   pending review: {2}   liquidity pending: {3}" -f $pairs, $cmp, $pend, $liqPend)
     foreach ($w in $pendWhy) { Write-Host "    pending: $w" -ForegroundColor Yellow }
     if ($cmp -eq 0) { Write-Host "  nothing comparable yet - no PASS can be given." -ForegroundColor Yellow; return }
-    Write-Host ("  live events compared: {0}" -f $liveN)
+    Write-Host ("  live events compared: {0} (+ {1} H4 structure event(s))" -f $liveN, $liveCtxN)
     if ($okRows.Count) {
         $bm = $okRows | Group-Object { RowLabel $_ } | Sort-Object Name | ForEach-Object { "$($_.Name) $($_.Count)" }
         Write-Host ("  by model: " + ($bm -join '  |  '))
     }
     if ($bad.Count -eq 0) {
         $what = $(if ($liqPend -eq 0) { 'MODEL + LIQ' } else { "MODEL only; LIQ pending in $liqPend pair(s)" })
-        Write-Host "  AGREE BOTH WAYS on every covered bar ($what)." -ForegroundColor $(if ($liqPend -eq 0) { 'Green' } else { 'Yellow' })
+        Write-Host "  AGREE BOTH WAYS on every covered bar ($what)." -ForegroundColor $(if ($liqPend -eq 0 -and $strPend -eq 0) { 'Green' } else { 'Yellow' })
+        if ($strPend -gt 0) { Write-Host "  $strPend H4 event(s) agree on swing and state but not on the strength number - PENDING REVIEW for those" -ForegroundColor Yellow }
         if ($pend -gt 0) { Write-Host "  (the pending pairs above are NOT included in this result)" -ForegroundColor Yellow }
     } else {
         Write-Host "  $($bad.Count) MISMATCH(ES) on covered bars:" -ForegroundColor Red
@@ -887,9 +1052,22 @@ function Compare-Builds($A, $B) {
             return
         }
         $d = @(DiffRows $mA $mB)
-        if ($d.Count) {
+        # A-56: with structure rows on both sides, attribute every difference
+        $hasCtx = ((Get-Struct $A).Ctx.Count -gt 0 -and (Get-Struct $B).Ctx.Count -gt 0)
+        $unexplained = -1
+        if ($hasCtx) {
+            $old = $A; $new = $B; $mo = $mA; $mn = $mB
+            if ((VerNum $A.Ver) -gt (VerNum $B.Ver)) { $old = $B; $new = $A; $mo = $mB; $mn = $mA }
+            $unexplained = Show-StructAttribution $old $new $rs $re $mo $mn
+            if ($moved) { Write-Host "    (windows start at different bars: an early difference can also come from the start - use a fixed window)" -ForegroundColor Yellow }
+        }
+        if ($d.Count -and $unexplained -eq 0) {
+            Write-Host ("  upgrade regression: {0} difference(s) over {1} / {2} MODEL row(s) - every one after an H4 state difference caused by the BOS de-dup" -f $d.Count, $mA.Count, $mB.Count) -ForegroundColor Yellow
+        } elseif ($d.Count) {
             Write-Host ("  upgrade regression: {0} difference(s) over {1} / {2} MODEL row(s)" -f $d.Count, $mA.Count, $mB.Count) -ForegroundColor Red
             $d | Select-Object -First 20 | ForEach-Object { Write-Host "    $($_.Side)  $($_.Row)" }
+        } elseif ($unexplained -gt 0) {
+            Write-Host ("  upgrade regression: 0 MODEL difference(s) over {0} / {1} row(s), but {2} structure / chain difference(s) are UNEXPLAINED" -f $mA.Count, $mB.Count, $unexplained) -ForegroundColor Red
         } elseif ($moved -or -not $known) {
             Write-Host ("  upgrade regression: 0 difference(s) over {0} / {1} MODEL row(s) - PENDING REVIEW, not a pass:" -f $mA.Count, $mB.Count) -ForegroundColor Yellow
             if ($moved)      { Write-Host "    the windows start at different bars: state carried from before the later start may differ" -ForegroundColor Yellow
@@ -932,20 +1110,41 @@ function Compare-Builds($A, $B) {
     $mmL = @($mm | Where-Object { (RowKind $_.Row) -eq 'LIQ' }).Count
     $nM  = $mA.Count + $mB.Count
     $nL  = $(if ($liqCmp) { $lA.Count + $lB.Count } else { 0 })
+    # A-56: H4 structure events, a judged category of their own
+    $cA = @((Get-Struct $A).Ctx | Where-Object { $_.Bar -ge $rs -and $_.Bar -le $re })
+    $cB = @((Get-Struct $B).Ctx | Where-Object { $_.Bar -ge $rs -and $_.Bar -le $re })
+    # A different event, swing or state is a MISMATCH. The same event with only
+    # str (the leg's BOS count) numbered differently is not: str counts from
+    # where the H4 history lets the leg begin, so two builds whose H4 windows
+    # start at different bars can number a leg that began before the later
+    # start differently. That is PENDING REVIEW - neither a pass nor a repaint.
+    $dC  = DiffKeys $cA $cB 'KeyNoStr'
+    $dCs = DiffKeys $cA $cB 'Key'
+    $mmC = $dC.A.Count + $dC.B.Count
+    $strC = $dCs.A.Count - $dC.A.Count
+    $nC  = $cA.Count + $cB.Count
+    foreach ($x in $dC.A) { $cls += [pscustomobject]@{ Class = 'MISMATCH'; Side = 'A only'; Time = $x.Bar; Row = "CTX $($x.Key)" } }
+    foreach ($x in $dC.B) { $cls += [pscustomobject]@{ Class = 'MISMATCH'; Side = 'B only'; Time = $x.Bar; Row = "CTX $($x.Key)" } }
+    $mm = @($cls | Where-Object Class -eq 'MISMATCH')
+    $vC = $(if ($mmC) { "MISMATCH ($mmC)" } elseif ($nC -eq 0) { 'no event on either side (nothing judged)' }
+            elseif ($strC) { "same events, strength numbered differently on $strC - PENDING REVIEW" }
+            else { "IDENTICAL over $($cA.Count) / $($cB.Count) event(s)" })
     $vM  = $(if ($mmM) { "MISMATCH ($mmM)" } elseif ($nM -eq 0) { 'INSUFFICIENT SAMPLE - no MODEL row on either side' } else { "IDENTICAL over $($mA.Count) / $($mB.Count) row(s)" })
     $vL  = $(if (-not $liqCmp) { 'PENDING - liquidity history WAITING in one build, LIQ rows not judged' }
              elseif ($mmL) { "MISMATCH ($mmL)" } elseif ($nL -eq 0) { 'no event on either side (nothing judged)' }
              else { "IDENTICAL over $($lA.Count) / $($lB.Count) row(s)" })
     Write-Host "    MODEL  $vM" -ForegroundColor $(if ($mmM) { 'Red' } elseif ($nM -eq 0) { 'Yellow' } else { 'Gray' })
     Write-Host "    LIQ    $vL" -ForegroundColor $(if ($mmL) { 'Red' } elseif (-not $liqCmp -or $nL -eq 0) { 'Yellow' } else { 'Gray' })
+    Write-Host "    CTX    $vC" -ForegroundColor $(if ($mmC) { 'Red' } elseif ($nC -eq 0 -or $strC) { 'Yellow' } else { 'Gray' })
 
     if ($mm.Count -gt 0) {
         Write-Host "  $($mm.Count) event(s) differ INSIDE the comparable region - repaint or non-determinism:" -ForegroundColor Red
         $mm | Select-Object -First 20 | ForEach-Object { Write-Host ("    {0}  {1}" -f $_.Side, $_.Row) }
-    } elseif (($nM + $nL) -eq 0) {
+    } elseif (($nM + $nL + $nC) -eq 0) {
         Write-Host "  INSUFFICIENT SAMPLE - no judged event inside the comparable region; nothing was compared." -ForegroundColor Yellow
-    } elseif ($pend.Count -gt 0 -or -not $known -or $A.WarmEst -or $B.WarmEst) {
+    } elseif ($pend.Count -gt 0 -or -not $known -or $A.WarmEst -or $B.WarmEst -or $strC) {
         Write-Host "  no difference inside the comparable region - PENDING REVIEW, not a pass:" -ForegroundColor Yellow
+        if ($strC)                  { Write-Host "    $strC H4 event(s) with the same swing and state but another strength number (H4 history start)" -ForegroundColor Yellow }
         if ($pend.Count)            { Write-Host "    $($pend.Count) difference(s) before the region need a look (see file)" -ForegroundColor Yellow }
         if (-not $known)            { Write-Host "    parameter digest not logged (pre-v2.44 build)" -ForegroundColor Yellow }
         if ($A.WarmEst -or $B.WarmEst) { Write-Host "    warm-up end estimated, not logged (pre-v2.44 build)" -ForegroundColor Yellow }

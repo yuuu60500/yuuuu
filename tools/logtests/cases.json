@@ -449,5 +449,139 @@
   "forbid": [
    "AGREE BOTH WAYS"
   ]
+ },
+ "c01_ctx_identical": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "CTX    IDENTICAL over 2 / 2 event(s)",
+   "IDENTICAL inside the comparable region"
+  ],
+  "forbid": []
+ },
+ "c02_ctx_mismatch": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "CTX    MISMATCH (1)",
+   "differ INSIDE the comparable region"
+  ],
+  "forbid": [
+   "IDENTICAL inside"
+  ]
+ },
+ "c03_live_ctx_ok": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "AGREE BOTH WAYS on every covered bar (MODEL + LIQ)",
+   "(+ 1 H4 structure event(s))"
+  ],
+  "forbid": []
+ },
+ "c04_live_ctx_missing": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "MISMATCH(ES) on covered bars",
+   "live only  [1->2] CTX"
+  ],
+  "forbid": [
+   "AGREE BOTH WAYS"
+  ]
+ },
+ "c05_versus_dedup_only": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "suppressed duplicate               1",
+   "strength renumbered                1",
+   "UNEXPLAINED                        0",
+   "H4 state: identical at every event bar",
+   "upgrade regression: 0 difference(s) over 3 / 3 MODEL row(s), same window and parameters."
+  ],
+  "forbid": []
+ },
+ "c06_versus_state_divergence": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "suppressed duplicate               1",
+   "H4 state differs in 1 interval(s), first from 2026.09.10 08:00",
+   "before the first H4 state difference (UNEXPLAINED): 0",
+   "every one after an H4 state difference caused by the BOS de-dup"
+  ],
+  "forbid": [
+   "UNEXPLAINED                        1"
+  ]
+ },
+ "c07_versus_model_unexplained": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "H4 state: identical at every event bar",
+   "before the first H4 state difference (UNEXPLAINED): 1",
+   "upgrade regression: 1 difference(s) over 4 / 3 MODEL row(s)"
+  ],
+  "forbid": [
+   "caused by the BOS de-dup"
+  ]
+ },
+ "c08_versus_ctx_unexplained": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "UNEXPLAINED                        1",
+   "but 1 structure / chain difference(s) are UNEXPLAINED"
+  ],
+  "forbid": []
+ },
+ "c09_ctx_strength_only": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "same events, strength numbered differently on 1 - PENDING REVIEW",
+   "PENDING REVIEW, not a pass"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "CTX    MISMATCH"
+  ]
+ },
+ "c10_live_ctx_strength_only": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "AGREE BOTH WAYS on every covered bar",
+   "1 H4 event(s) agree on swing and state but not on the strength number"
+  ],
+  "forbid": [
+   "MISMATCH(ES)"
+  ]
  }
 }

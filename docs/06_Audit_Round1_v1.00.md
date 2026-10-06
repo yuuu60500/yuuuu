@@ -1085,7 +1085,7 @@ Impact:                  1) g_ctx_strength 系统性虚高 —— 面板强度�
 Historical Repaint:      NO
 Future Leak:             NO
 Business Logic Impact:   **YES —— 修复会改变 Context 与全部下游信号**
-Status:                  **OPEN —— 属 v2.00 级变更，见下方评估**
+Status:                  ~~OPEN —— 属 v2.00 级变更，见下方评估~~ **FIXED —— v2.53**（BRI-11 读法甲；Audit Round 14）
 Confidence:              HIGH
 ```
 
@@ -1584,4 +1584,58 @@ Fix (v2.52):             同版本比较逐类给结论：MODEL 总参与判定�
                          参与判定的行数为 0 → INSUFFICIENT SAMPLE，不给通过。
                          LiveVsBuild：去掉 pending 的 LIQ 行和边缘行后为空的构建对不计入可比较
 Status:                  **FIXED —— v2.52**（合成日志 w01–w04）
+```
+
+
+## Audit Round 14 —— v2.53 BOS 去重（2026-10-06）
+
+### A-33 修复 —— **一根 H4 至多一次结构事件**
+
+```
+Location:                HMI_H4StructureEngine.mqh  H4ConsumeSameDirBroken()（新增）
+                         HMI_H4ContextEngine.mqh    H4ContextOnBar() / CtxLog()
+Rule:                    触发与主参考点不变（最近已确认未处理同向点被 Close ± 余量突破）；
+                         事件发生时，同一根收盘按同一余量突破的其它已确认未处理同向点一并处理
+                         （含 TRANS_SAMELEG）。仅用 confirm_time <= 该 H4 收盘的点；反向点不动
+Not changed:             余量（D-6）、保护点 / leg_anchor（§4.2）、强度 / 质量评分、TR、流动性池
+                         （流动性池是独立记录，不读摆动点的已处理标记）
+Logs:                    HMI-CTX 加 also=<一并处理个数>；also>0 时另记
+                         HMI-CTX-DEDUP,<sym>,<kind>,dir=,bar=,primary=<时间@价>,also=,swings=<时间@价|...>
+Status:                  **FIXED —— v2.53，待编译与 MT5 回放**
+```
+
+离线证据（`tools/h4_dedup_sim.py`，逐函数镜像 H4 结构层与 H4 POI 链；全文见
+`docs/evidence/v2.53_h4_dedup_offline.txt`）：
+
+```
+必验场景 4/4
+  多头：一根收盘越过 1.1000 / 1.1010 / 1.1020 后价格停留 → v2.53 一次 BOS（also=2）；
+        v2.52 多计第 14 根（1.1010）。之后新高 1.1080 形成并被突破 → 两版都产生新事件
+  空头：镜像，结果对称
+  被遮挡：较新更高点未破时，越过较老更低点不是事件（两版相同）；越过较新点 → 一次事件，带走较老点
+真实数据（EURUSD H1→H4，2017-04-19..2018-02-07，1292 根）
+  BOS 157 → 63；TRANS_SAMELEG 32 → 8；CHOCH / TRANS_OK / TRANS_FAIL / TIMEOUT 不变；最大强度 17 → 7
+  结构差异 156 条：被抑制的重复 118、主参考点改指 12、强度重编号 26、无法解释 0
+  H4 状态：1292 根全部相同 → H4 POI 生成 / 失效 / 过期 0 差异
+  前缀稳定（每 25 根截断重跑）：事件与 POI 不随后续 K 线改变
+  H4 窗口起点移动 1..30 根：v2.52 2/30 有差异（22 行），v2.53 1/30（2 行）—— 均只是强度编号
+```
+
+结论（就此样本）：去重只改变了结构事件计数与强度，H4 状态未变，因此 POI / Session / MODEL
+不会变 —— 链路只读 H4 方向（CtxDirection）。其它品种 / 时段若出现 v2.52 的陈旧点把
+TRANSITION 或 RANGE 推入趋势（v2.53 不会），H4 状态才会分歧，下游才会变化；
+`ReloadTest -Versus` 会逐条列出并检查它们都发生在状态分歧之后。
+
+### A-56 —— **验收工具不比较结构事件；跨版本差异无法归因**（工具）
+
+```
+Fix (v2.53):             ReloadTest.ps1
+                         - HMI-CTX 成为与 MODEL / LIQ 并列的判定类别：同版本重载与实时 vs 重建都比较
+                           （键不含 live= / also=）。同一事件、同一主参考点、同一状态，仅强度编号不同
+                           → PENDING REVIEW（强度从 H4 历史起点起算，重建的 H4 窗口晚开始时可能不同）
+                         - 跨版本：用新版本的 HMI-CTX-DEDUP 把每条结构差异归为 被抑制的重复 / 主参考点改指 /
+                           强度重编号 / 去重后路径改变；POI / SESS / BLK / ARM / MODEL 差异必须发生在两版
+                           H4 状态首次不同之后，否则 UNEXPLAINED（红）
+Evidence:                tools/logtests 45 组：v2.53 脚本 45/45；v2.52 脚本 35/45（新增 10 组均失败）
+Status:                  **FIXED —— v2.53**
 ```

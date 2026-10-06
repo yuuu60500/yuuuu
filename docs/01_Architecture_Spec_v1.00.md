@@ -160,6 +160,12 @@ Context 只被以下**已关闭 H4 K 线**产生的事件驱动：
 | `EV_CHOCH_DOWN` | 在 BULLISH 中，Close < 最近一个已确认 Higher Low − BreakMargin |
 | `EV_TIMEOUT` | TRANSITION 持续超过 `InpH4TransitionMaxBars` 根 H4 |
 
+> **v2.53 / A-33（BOS 去重）：**「最近一个已确认 Swing」= 最近一个**已确认且未处理**的同向摆动点
+> （只用该 H4 收盘时已确认的点），被 Close ± BreakMargin 突破即为一次结构事件，触发条件不变。
+> 事件发生时，同一根收盘按同一余量**也**突破的其它已确认、未处理同向旧点一并标记为已处理，
+> 无论事件分类为何（含 TRANS_SAMELEG）。一根 H4 至多一次结构事件；被一并处理的旧点之后
+> 不能再被逐根补计。未被这根收盘突破的旧点、反方向的点不受影响。读法见 docs/02 BRI-11。
+
 BOS 与 CHOCH 的区分只看**当前 Context**：
 顺着当前 Context 方向破坏结构 = BOS；逆着当前 Context 方向破坏结构 = CHOCH。
 初始 `CTX_RANGE` 状态下没有"顺逆"，第一次结构突破一律视为 BOS。

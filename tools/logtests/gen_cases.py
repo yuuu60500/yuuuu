@@ -123,5 +123,69 @@ b2w = blk(2, init=2, to="2026.09.30 14:00", liqs=LQ + [("2026.09.30 13:05:00", "
 case("w04_live_only_liq_waiting", [start()] + blk(1) + [live_liq] + [start(init=2)] + b2w, ["-LiveVsBuild"],
      ["no judged event (LIQ pending", "nothing comparable yet - no PASS can be given."], ["AGREE BOTH WAYS"])
 
+# ---- v2.53: H4 structure events as a judged category, version attribution (A-56)
+def ctx(kind, d, cx, st, bar, sw, px, close, inst="0001", run=7, init=1, live=0, also=None, messy=0, src=SRC):
+    s = f"HMI-CTX,USDJPY,{kind},dir={d},live={live},ctx={cx},str={st},messy={messy},bar={bar},swing={sw},swing_px={px},close={close}"
+    if also is not None: s += f",also={also}"
+    return L(src, s + tail(inst, run, init))
+def dedup(kind, d, bar, prim, swings, inst="0001", run=7, init=1, src=SRC):
+    return L(src, f"HMI-CTX-DEDUP,USDJPY,{kind},dir={d},bar={bar},primary={prim},also={len(swings)},swings={'|'.join(swings)}" + tail(inst, run, init))
+
+E1 = ("BOS", "UP", "BULLISH", 1, "2026.09.08 08:00", "2026.09.07 20:00", "1.23000", "1.23100")
+E2s = ("BOS", "UP", "BULLISH", 2, "2026.09.08 12:00", "2026.09.06 12:00", "1.22900", "1.23050")   # stale in v2.52
+E3 = ("BOS", "UP", "BULLISH", 3, "2026.09.10 08:00", "2026.09.09 16:00", "1.23300", "1.23400")
+STALE = "2026.09.06 12:00@1.22900"
+def ctx_rows(rows, **kw): return [ctx(*r, **kw) for r in rows]
+
+same = ctx_rows([E1, E3[:3] + (2,) + E3[4:]], also=0)
+case("c01_ctx_identical", [start()] + blk(1, extra_rows=same) + blk(2, extra_rows=same), R,
+     ["CTX    IDENTICAL over 2 / 2 event(s)", "IDENTICAL inside the comparable region"])
+case("c02_ctx_mismatch",  [start()] + blk(1, extra_rows=same) + blk(2, extra_rows=same + ctx_rows([E2s], also=0)), R,
+     ["CTX    MISMATCH (1)", "differ INSIDE the comparable region"], ["IDENTICAL inside"])
+lctx = ctx(*E3[:4], "2026.09.30 13:00", *E3[5:], live=1, also=0)
+bctx = ctx(*E3[:4], "2026.09.30 13:00", *E3[5:], live=0, also=0, init=2)
+b2c = blk(2, init=2, to="2026.09.30 14:00", marks=MK + ["2026.09.30 13:05:00"], extra_rows=[bctx])
+case("c03_live_ctx_ok",      [start()] + blk(1) + [live_ok, lctx] + [start(init=2)] + b2c, ["-LiveVsBuild"],
+     ["AGREE BOTH WAYS on every covered bar (MODEL + LIQ)", "(+ 1 H4 structure event(s))"])
+b2n = blk(2, init=2, to="2026.09.30 14:00", marks=MK + ["2026.09.30 13:05:00"])
+case("c04_live_ctx_missing", [start()] + blk(1) + [live_ok, lctx] + [start(init=2)] + b2n, ["-LiveVsBuild"],
+     ["MISMATCH(ES) on covered bars", "live only  [1->2] CTX"], ["AGREE BOTH WAYS"])
+
+A52, B53 = "USDJPY#0A52,M5", "USDJPY#0B53,M5"
+def side(ver, inst, init, rows, marks=MK, extra=()):
+    return [start(ver, inst, 7, init)] + blk(1, ver=ver, inst=inst, init=init, marks=marks, extra_rows=list(rows) + list(extra))
+V = ["-Source", A52, "-Versus", B53]
+old52 = [ctx(*E1, inst="0A52", init=1), ctx(*E2s, inst="0A52", init=1), ctx(*E3, inst="0A52", init=1)]
+new53 = [ctx(*E1, inst="0B53", init=2, also=1), dedup("BOS", "UP", E1[4], "2026.09.07 20:00@1.23000", [STALE], inst="0B53", init=2),
+         ctx(*E3[:3], 2, *E3[4:], inst="0B53", init=2, also=0)]
+case("c05_versus_dedup_only", side("2.52", "0A52", 1, old52) + side("2.53", "0B53", 2, new53), V,
+     ["suppressed duplicate               1", "strength renumbered                1", "UNEXPLAINED                        0",
+      "H4 state: identical at every event bar", "upgrade regression: 0 difference(s) over 3 / 3 MODEL row(s), same window and parameters."])
+CH = ("CHOCH", "DOWN", "TRANSITION", 0, "2026.09.09 08:00", "2026.09.08 20:00", "1.22950", "1.22900")
+TF = ("TRANS_FAIL", "UP", "BULLISH", 1, "2026.09.10 08:00", "2026.09.06 12:00", "1.22900", "1.23000")
+poi52 = diag(SRC.replace("USDJPY,M5", "USDJPY,M5"), "HMI-POI,NEW", "2026.09.10 08:00", "0A52", 7, 1, extra="id=77,dir=1,lo=1.22800,hi=1.22900,origin=2026.09.10 00:00")
+old52b = [ctx(*E1, inst="0A52", init=1), ctx(*CH, inst="0A52", init=1), ctx(*TF, inst="0A52", init=1, messy=1), poi52]
+new53b = [ctx(*E1, inst="0B53", init=2, also=1), dedup("BOS", "UP", E1[4], "2026.09.07 20:00@1.23000", [STALE], inst="0B53", init=2),
+          ctx(*CH, inst="0B53", init=2, also=0)]
+case("c06_versus_state_divergence", side("2.52", "0A52", 1, old52b, marks=MK + ["2026.09.12 10:05:00"]) + side("2.53", "0B53", 2, new53b), V,
+     ["suppressed duplicate               1", "H4 state differs in 1 interval(s), first from 2026.09.10 08:00",
+      "before the first H4 state difference (UNEXPLAINED): 0", "every one after an H4 state difference caused by the BOS de-dup"],
+     ["UNEXPLAINED                        1"])
+case("c07_versus_model_unexplained", side("2.52", "0A52", 1, [ctx(*E1, inst="0A52", init=1)], marks=MK + ["2026.09.12 10:05:00"])
+                                     + side("2.53", "0B53", 2, [ctx(*E1, inst="0B53", init=2, also=0)]), V,
+     ["H4 state: identical at every event bar", "before the first H4 state difference (UNEXPLAINED): 1",
+      "upgrade regression: 1 difference(s) over 4 / 3 MODEL row(s)"], ["caused by the BOS de-dup"])
+case("c08_versus_ctx_unexplained", side("2.52", "0A52", 1, old52) + side("2.53", "0B53", 2, [ctx(*E1, inst="0B53", init=2, also=0), ctx(*E3[:3], 2, *E3[4:], inst="0B53", init=2, also=0)]), V,
+     ["UNEXPLAINED                        1", "but 1 structure / chain difference(s) are UNEXPLAINED"])
+
+# strength number only: same event, same swing, same state, str counted from another H4 start
+same_s = ctx_rows([E1, E3[:3] + (5,) + E3[4:]], also=0)
+case("c09_ctx_strength_only", [start()] + blk(1, extra_rows=same) + blk(2, extra_rows=same_s), R,
+     ["same events, strength numbered differently on 1 - PENDING REVIEW", "PENDING REVIEW, not a pass"], ["IDENTICAL inside", "CTX    MISMATCH"])
+bctx_s = ctx(*E3[:3], 7, "2026.09.30 13:00", *E3[5:], live=0, also=0, init=2)
+b2s = blk(2, init=2, to="2026.09.30 14:00", marks=MK + ["2026.09.30 13:05:00"], extra_rows=[bctx_s])
+case("c10_live_ctx_strength_only", [start()] + blk(1) + [live_ok, lctx] + [start(init=2)] + b2s, ["-LiveVsBuild"],
+     ["AGREE BOTH WAYS on every covered bar", "1 H4 event(s) agree on swing and state but not on the strength number"], ["MISMATCH(ES)"])
+
 json.dump(C, open("cases.json", "w"), indent=1)
 print(len(C), "cases")

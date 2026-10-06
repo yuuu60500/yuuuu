@@ -878,3 +878,26 @@ ATR 系数 2.0 定向：v2.46 2/48（PMH BROKEN 仅连续运行有）· v2.47 0/
 
 离线证据（不替代以上实测）：`python3 tools/liq_wait_sim.py` 12/12（严格终端；`--logic v2.51` 8/12，
 `--logic v2.50` 2/12）；`Run-LogTests.ps1` v2.52 脚本 35/35（v2.51 脚本 26/35，v2.50 脚本 8/35）。
+
+### v2.53 验收清单（BOS 去重；基线 v2.52 = 63379fd）
+
+```
+0  编译 0 errors / 0 warnings
+1  版本：starting on v2.53；BEGIN ver=2.53；默认参数下 params=461F006E（与 v2.52 相同）
+2  去重可见：日志出现 HMI-CTX-DEDUP（also>0）；`-Ctx` 的「A-33 stale BOS」应为 0，
+          强度分布明显低于 v2.52（离线样本最大强度 17 → 7）
+3  必验场景（离线，python3 tools/h4_dedup_sim.py 4/4）：
+          一根收盘越过多个旧高后停留只计一次 BOS；空头对称；新摆动结构被有效突破产生新事件
+4  实时 vs 重建：`-LiveVsBuild` → MODEL / LIQ 双向 0 MISMATCH，「+ N H4 structure event(s)」N > 0；
+          只因强度编号不同的条目为 PENDING REVIEW（说明见 A-56），事件 / 主参考点 / 状态不同则为 MISMATCH
+5  同版本重载：MODEL / LIQ / CTX 三行均 IDENTICAL
+6  对比 v2.52（固定窗口，四品种）：v2.52 与 v2.53 两个实例同一根 M5 内挂上，
+          `-Source <v2.52 源> -Versus <v2.53 源>` 逐品种：
+            CTX 归因 UNEXPLAINED = 0
+            「H4 state: identical」→ MODEL / POI / SESS / BLK / ARM 必须 0 差异
+            「H4 state differs」→ 列出区间；链路差异「before the first H4 state difference」= 0
+          每品种保存输出，作为「去重引起的 H4 状态、POI、Session、MODEL 差异」清单
+```
+
+离线证据：`docs/evidence/v2.53_h4_dedup_offline.txt`（场景 4/4；EURUSD 回放全部差异可追溯，H4 状态 0 分歧）；
+`Run-LogTests.ps1` v2.53 脚本 45/45（v2.52 脚本 35/45）。
