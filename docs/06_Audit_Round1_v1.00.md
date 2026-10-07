@@ -1728,3 +1728,20 @@ Not covered:             D-5（InpStopIdentificationOnBlockInvalidation，默认
                          Python 模型（h4_dedup_sim.py）不含 M5 链路，本项只在 ReloadTest.ps1 与日志用例中
 Status:                  **FIXED —— 工具修订（MQL5 源码不变，编译结果仍有效）**
 ```
+
+
+## Audit Round 17 —— 验收方 v2.53r3 复核（2026-10-07）
+
+```
+结论:                    工具修补验收通过，无新增必须修改项
+已确认:                  MQL 23/23 与已编译的 v2.53 字节相同（编译结论 0/0 沿用）；随包 60/60（含逐条归因文件检查）；
+                         独立复测 12/12（原反例 + 同根 / 周期边界变体）；Python 三个脚本与 r2 字节相同
+A-58 复核:               MODEL 早于 ARMED -> 5 explained / 1 UNEXPLAINED；块早于会话 -> 3 / 2 PENDING / 1 UNEXPLAINED，
+                         异常块及其下游均未被解释；PA REJECTION 当根（D-4 开）通过、加 -NoArmedBarPA 拒绝；
+                         CISD 当根拒绝；旧周期 CISD 与新 ARMED 同根通过、移到下一根 UNEXPLAINED
+使用条件（记入 docs/04 v2.53 清单第 7 项）:
+                         D-4 关闭时归因加 -NoArmedBarPA；D-5 开启时块失效提前关闭周期无日志行，工具不覆盖，相关周期人工核对
+下一步:                  MT5 运行证据（同版本重载、实时 vs 重建、四品种 v2.52 vs v2.53）；通过后冻结 v2.53，进入 v2.54 保护点与波段锚点，
+                         随后 BRI-08、强度评分、质量评分、趋势面板；图形调整留在显示阶段
+Status:                  **工具阶段 PASS**；待运行证据
+```

@@ -904,6 +904,12 @@ ATR 系数 2.0 定向：v2.46 2/48（PMH BROKEN 仅连续运行有）· v2.47 0/
             违反 → UNEXPLAINED；父节点 / 时间 / 结束信息缺失 → PENDING；父节点为 UNEXPLAINED 的子行 → PENDING
             另一版的会话结束只解释其后的块 / ARMED，不解释更早的差异
           每品种保存控制台输出与 attribution_*.txt，作为「去重引起的 H4 状态、POI、Session、MODEL 差异」清单
+7  运行记录（验收方 2026-10-07 要求，每项随证据保存）：
+          - 4 / 5：各类别实际比较的行数（MODEL / LIQ / CTX；live events compared）。某类没有事件 = 尚无该类一致性样本，
+            不算通过；出现 PENDING REVIEW 须写明原因
+          - 6：图表的 InpPAAllowArmedBarConfirm（D-4）。为 false 时归因必须加 -NoArmedBarPA
+          - 6：图表的 InpStopIdentificationOnBlockInvalidation（D-5）。为 true 时块失效提前关闭周期没有日志行，
+            工具不覆盖这一关闭边界：相关周期按图表与记录人工核对，不能把工具输出当作该路径已自动验证
 ```
 
 离线证据：`docs/evidence/v2.53_h4_dedup_offline.txt`（场景 4/4；EURUSD 回放全部差异可追溯，H4 状态 0 分歧）；
@@ -911,3 +917,5 @@ ATR 系数 2.0 定向：v2.46 2/48（PMH BROKEN 仅连续运行有）· v2.47 0/
 c15–c25 为 A-58 生命周期用例，其中 c17 / c20 / c22 / c24 是合法边界，新旧脚本都须通过）；`h4_dedup_sim.py` 场景 4/4、归因防护 6/6
 （Python 模型不含 M5 链路，生命周期核对只在 ReloadTest.ps1 与日志用例中）。
 验收方已确认（2026-10-06）：v2.53 编译 0/0、45/45、4/4、12/12、params=461F006E。
+验收方已确认（2026-10-07）：v2.53r3 工具修补通过——MQL 23/23 与 v2.53 字节相同，60/60，独立复测 12/12；
+剩余为 MT5 运行证据（第 4、5、6 项及第 7 项记录）。通过后冻结 v2.53，再开始 v2.54 保护点与波段锚点。
