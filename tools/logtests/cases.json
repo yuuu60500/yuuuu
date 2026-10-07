@@ -627,6 +627,187 @@
    "traced to the BOS de-dup with a concrete link"
   ]
  },
+ "c15_cx_model_before_armed": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "outside its parent's lifetime in v2.52: confirmed 2026.09.11 09:35, before its cycle's ARMED 2026.09.11 10:00",
+   "verdicts: explained 5   PENDING_ATTRIBUTION 0   UNEXPLAINED 1",
+   "UNEXPLAINED - not traced"
+  ],
+  "forbid": [
+   "traced to the BOS de-dup with a concrete link",
+   "explained            MODEL v2.52 only USDJPY,MODEL,1,79,79,OB,CISD,2026.09.11 09:35:00"
+  ]
+ },
+ "c16_cx_block_before_session": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "outside its parent's lifetime in v2.52: confirmed 2026.09.11 08:30, before its session started 2026.09.11 09:05",
+   "its parent row (BLK) is UNEXPLAINED above: nothing hanging on it is attributed",
+   "verdicts: explained 3   PENDING_ATTRIBUTION 2   UNEXPLAINED 1",
+   "UNEXPLAINED - not traced"
+  ],
+  "forbid": [
+   "traced to the BOS de-dup with a concrete link",
+   "explained            BLK v2.52 only 1|2026.09.10 00:00|1.22800|1.22900|2026.09.11 09:05|1|OB|0|2026.09.11 08:30",
+   "explained            ARM v2.52 only 1|2026.09.10 00:00|1.22800|1.22900|2026.09.11 09:05|1|OB|0|2026.09.11 08:30"
+  ]
+ },
+ "c17_ok_pa_on_armed_bar": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "verdicts: explained 6   PENDING_ATTRIBUTION 0   UNEXPLAINED 0",
+   "all 6 difference(s) traced to the BOS de-dup with a concrete link"
+  ],
+  "forbid": [
+   "PENDING_ATTRIBUTION - a manual",
+   "UNEXPLAINED - not traced"
+  ]
+ },
+ "c18_cx_cisd_on_armed_bar": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "CISD on its cycle's ARMED bar 2026.09.11 10:00: Phase 4 needs n > A",
+   "UNEXPLAINED - not traced"
+  ],
+  "forbid": [
+   "traced to the BOS de-dup with a concrete link"
+  ]
+ },
+ "c19_cx_pa_armed_bar_d4_off": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5",
+   "-NoArmedBarPA"
+  ],
+  "expect": [
+   "D-4 (PA ENGULFING / REJECTION on the ARMED bar) OFF",
+   "-NoArmedBarPA says D-4 was off",
+   "UNEXPLAINED - not traced"
+  ],
+  "forbid": [
+   "traced to the BOS de-dup with a concrete link"
+  ]
+ },
+ "c20_ok_cycle_switch_same_bar": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "verdicts: explained 8   PENDING_ATTRIBUTION 0   UNEXPLAINED 0",
+   "all 8 difference(s) traced to the BOS de-dup with a concrete link"
+  ],
+  "forbid": [
+   "PENDING_ATTRIBUTION - a manual",
+   "UNEXPLAINED - not traced"
+  ]
+ },
+ "c21_cx_model_after_cycle_closed": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "confirmed 2026.09.12 10:10, after the ARMED 2026.09.12 10:05 that closed its cycle",
+   "UNEXPLAINED - not traced"
+  ],
+  "forbid": [
+   "traced to the BOS de-dup with a concrete link"
+  ]
+ },
+ "c22_ok_block_on_new_session_end_bar": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "verdicts: explained 10   PENDING_ATTRIBUTION 0   UNEXPLAINED 0",
+   "all 10 difference(s) traced to the BOS de-dup with a concrete link"
+  ],
+  "forbid": [
+   "PENDING_ATTRIBUTION - a manual",
+   "UNEXPLAINED - not traced"
+  ]
+ },
+ "c23_cx_block_after_new_session_end": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "confirmed 2026.09.11 09:35, after its session ended 2026.09.11 09:30 (NEW_SESSION)",
+   "UNEXPLAINED - not traced"
+  ],
+  "forbid": [
+   "traced to the BOS de-dup with a concrete link"
+  ]
+ },
+ "c24_ok_session_end_explains_later_block": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "v2.52 had ended its session at 2026.09.10 12:05 (CONTEXT_NEUTRAL, explained)",
+   "a session ends once: v2.52 had already ended it at 2026.09.10 12:05",
+   "verdicts: explained 6   PENDING_ATTRIBUTION 0   UNEXPLAINED 0",
+   "all 6 difference(s) traced to the BOS de-dup with a concrete link"
+  ],
+  "forbid": [
+   "PENDING_ATTRIBUTION - a manual",
+   "UNEXPLAINED - not traced"
+  ]
+ },
+ "c25_cx_later_end_explains_earlier_block": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "v2.52 ended its session only at 2026.09.10 12:05 (CONTEXT_NEUTRAL), after this block",
+   "verdicts: explained 5   PENDING_ATTRIBUTION 1   UNEXPLAINED 0",
+   "PENDING_ATTRIBUTION - a manual conclusion"
+  ],
+  "forbid": [
+   "traced to the BOS de-dup with a concrete link",
+   "explained            BLK v2.53 only"
+  ]
+ },
  "c09_ctx_strength_only": {
   "args": [
    "-Source",

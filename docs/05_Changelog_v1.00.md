@@ -1741,3 +1741,20 @@ tools/ReloadTest.ps1   跨版本归因三档：explained（具体链接）/ UNEX
 tools/h4_dedup_sim.py  同规则；归因防护自测 6/6
 tools/logtests         49 组（c05–c08 改为新判据；c06 补完整链；新增 c11–c14 反例）；合成诊断行改为真实字段顺序
 ```
+
+---
+
+## v2.53 工具修订（A-58）—— 链路归因先核对生命周期（MQL5 不变）
+
+```
+Date:     2026-10-07
+来源:     验收方「HMI v2.53r2 验收复核报告」（2026-10-07）P2
+MQL5:     不变（与验收方编译的 v2.53 字节相同，HMI_VERSION 仍 2.53）
+
+tools/ReloadTest.ps1   SESS / BLK / ARM / MODEL 每一行先按本构建的父节点有效期核对（指标的相位顺序），通过后才看上游是否已解释：
+                       越界 -> UNEXPLAINED；父节点 / 时间 / 结束缺失 -> PENDING；父节点为 UNEXPLAINED 的子行 -> PENDING；
+                       另一版的会话结束只解释其后发生的块 / ARMED；会话结束差异可由另一版更早的已解释结束解释（会话只结束一次）；
+                       新增 -NoArmedBarPA（构建关闭 D-4 时使用；默认按指标默认值 D-4 开）
+tools/logtests         60 组：新增 c15–c25（验收方两个反例 + 合法边界 / 越界成对用例）；
+                       Run-LogTests.ps1 同时读取 attribution_*.txt（运行前删除旧文件）
+```

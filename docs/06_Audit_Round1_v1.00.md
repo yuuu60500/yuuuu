@@ -1679,5 +1679,52 @@ Verification:            tools/logtests 49 组：修订后 49/49；交付的 v2.
                            无配对新增事件 -> PENDING）；EURUSD 回放 156 条差异全部 explained，PENDING 0，UNEXPLAINED 0
 Also found:              合成日志生成器的 POI / SESS / BLK 行字段顺序与真实格式不符（HMI-POI,NEW,<sym> 应为 HMI-POI,<sym>,NEW），
                          以前的链路用例因此从未真正被解析；已改为真实格式
+Status:                  **FIXED —— 工具修订（MQL5 源码不变，编译结果仍有效）**；链路生命周期核对由 A-58 补充
+```
+
+
+## Audit Round 16 —— 验收方 v2.53r2 复核（2026-10-07）
+
+验收方：23/23 个 MQL 源文件与 v2.53 字节相同，编译结论（MetaEditor 5.0.0.6230，0/0）沿用；随包 49/49、场景 4/4、防护 6/6；
+上轮三个反例正确判定（c11 / c12 UNEXPLAINED，c13 PENDING）；c06 完整链 6 条 explained。
+
+### A-58 —— **已解释的父节点自动证明子事件有效：链路缺少生命周期时间校验**（P2，成立，两个反例复现）
+
+```
+Location:                tools/ReloadTest.ps1 Show-StructAttribution（BLK 分支、MODEL 分支；ARM 的会话结束分支同类）
+Actual Behavior:         BLK：所属会话的开始或结束差异已解释 -> 直接 explained；MODEL：所属 ARMED 已解释 -> 直接 explained；
+                         ARM：会话在另一版「结束过」即 explained。三处都不核对子行发生时父节点是否已存在、是否仍有效，
+                         也不核对另一版的会话结束是否早于该子行
+Evidence:                以 c06 为对照、各改一个时间字段：
+                           MODEL 早于 ARMED：周期 79 的 CISD 2026.09.12 10:05 -> 2026.09.11 09:35（ARMED 09.11 10:00）
+                           Block 早于 Session：块 79 确认 09:30 -> 08:30（会话 78 开始 09:05）
+                         v2.53r2 脚本两例都输出「explained 6 / 0 / 0 … all 6 difference(s) traced … with a concrete link」
+                         另：会话在两版都存在、一版较晚结束时，较晚的结束可被用来解释更早发生的块差异（c25 复现）
+Fix:                     链路行先按本构建的父节点有效期核对，时间界限取自 ProcessClosedM5Bar 的相位顺序（日志时间均为收盘时间）：
+                           SESS 开始    其 POI 的 NEW 行存在且确认早于开始（POI 只在确认根之后可被触碰）
+                           SESS 结束    其开始行存在且早于结束
+                           BLK          所属会话开始 ≤ 确认（Spec 5.2）；会话由 Phase 0b 结束（POI_INVALID / CONTEXT_* / TIMEOUT）
+                                        时确认 < 结束；NEW_SESSION 在 Phase 3 结束，确认 ≤ 结束（同根合法）
+                           ARM          块确认 < ARMED（防泄漏：只触碰更早确认的块）；会话开始 < ARMED < 会话结束（任何原因）；
+                                        ARMED 方向 = 会话方向
+                           MODEL        周期 ARMED ≤ 确认 ≤ 下一个 ARMED（Phase 4 先于 Phase 5：旧周期在切换根上的模型合法）；
+                                        确认 = ARMED 只允许 PA ENGULFING / REJECTION（D-4，§9.5.1；-NoArmedBarPA 时不允许）；
+                                        方向 = 周期方向；周期不随会话结束（Rule 15），模型可晚于会话结束
+                         判定：越界 -> UNEXPLAINED；父节点 / 时间缺失、会话无 END 行却已有更晚的会话开始 -> PENDING；
+                               父节点本身为 UNEXPLAINED -> 子行 PENDING（不在不可能的行之上做归因）
+                         跨版本：另一版的会话结束只在早于子行时才解释它（块：Phase 0b 结束 ≤ 确认，NEW_SESSION 结束 < 确认；
+                               ARMED：结束 ≤ ARMED），否则 PENDING；会话结束差异可由另一版更早的已解释结束解释（会话只结束一次）
+Verification:            tools/logtests 60 组：修订后 60/60；v2.53r2 脚本 52/60（c15 / c16 / c18 / c19 / c21 / c23 / c24 / c25 失败）
+                           c15 MODEL 早于 ARMED -> UNEXPLAINED（5 explained / 1 UNEXPLAINED）
+                           c16 块早于会话 -> UNEXPLAINED，其 ARMED、MODEL -> PENDING（3 / 2 / 1）
+                           c17 PA ENGULFING 在 ARMED 根（D-4）-> 6 条全部 explained；c18 同根 CISD -> UNEXPLAINED；
+                           c19 同 c17 加 -NoArmedBarPA -> UNEXPLAINED
+                           c20 旧周期模型与新 ARMED 同根 -> 8 条全部 explained；c21 晚于关闭它的 ARMED -> UNEXPLAINED
+                           c22 块与 NEW_SESSION 结束同根 -> 10 条全部 explained；c23 块晚于 NEW_SESSION 结束 -> UNEXPLAINED
+                           c24 两版同一会话，v2.52 因陈旧 CHOCH 先结束：其后的块 / ARMED / MODEL 与 v2.53 的 TIMEOUT 结束 -> 6 条全部 explained
+                           c25 同 c24、块提前到 v2.52 结束之前 -> 该块 PENDING（不再被较晚的结束解释）
+                         合法边界（c17 / c20 / c22 / c24）新旧脚本都通过：修补没有取消任何合法例外
+Not covered:             D-5（InpStopIdentificationOnBlockInvalidation，默认关）提前关闭周期时日志无对应行，工具不据此判越界；
+                         Python 模型（h4_dedup_sim.py）不含 M5 链路，本项只在 ReloadTest.ps1 与日志用例中
 Status:                  **FIXED —— 工具修订（MQL5 源码不变，编译结果仍有效）**
 ```

@@ -4,7 +4,9 @@
 #  Every folder here holds one synthetic MT5 log; cases.json says which
 #  ReloadTest arguments to run on it, which lines MUST appear in the output
 #  and which must NOT (a forbidden "IDENTICAL" on a damaged log is the
-#  failure this guards against). Needs PowerShell only:
+#  failure this guards against). The attribution_*.txt a version comparison
+#  writes (one verdict per line) is read as part of the output. Needs
+#  PowerShell only:
 #
 #     pwsh -File .\Run-LogTests.ps1                       the ReloadTest.ps1 one folder up
 #     pwsh -File .\Run-LogTests.ps1 -Script <path>        any other copy (e.g. v2.50, as a control)
@@ -20,7 +22,9 @@ $ok = 0; $n = 0; $bad = @()
 foreach ($p in $cases.PSObject.Properties) {
     $n++; $c = $p.Value
     Push-Location (Join-Path $PSScriptRoot $p.Name)
-    $out = (& $exe -NoProfile -File $Script @($c.args) 2>&1 | Out-String)
+    Remove-Item 'attribution_*.txt' -ErrorAction SilentlyContinue      # (A-58) the per-verdict file is checked too:
+    $out = (& $exe -NoProfile -File $Script @($c.args) 2>&1 | Out-String)   # never one left by an earlier run
+    foreach ($f in @(Get-ChildItem 'attribution_*.txt' -ErrorAction SilentlyContinue)) { $out += "`n" + (Get-Content $f.FullName -Raw) }
     Pop-Location
     $miss = @($c.expect | Where-Object { -not $out.Contains($_) })
     $hit  = @($c.forbid | Where-Object { $out.Contains($_) })

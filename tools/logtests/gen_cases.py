@@ -29,15 +29,17 @@ SRC = "USDJPY,M5"
 
 def blk(b, ver="2.51", inst="0001", run=7, init=1, marks=MK, liqs=LQ, end_kw=None, with_end=True, row_id=None, diag_id=None,
         frm="2026.09.07 03:40", to="2026.09.30 12:35", warm="2026.09.07 12:00", src=SRC, params="ABCD1234", extra_rows=(), begin_b="same",
-        cycles=None):
+        cycles=None, chain=True, names=None):
     rid = row_id or (run, init)
     did = diag_id or (run, init)
     out = [begin(src, b if begin_b == "same" else begin_b, ver, inst, run, init, frm, to, warm, params)]
-    out.append(diag(src, "HMI-POI,NEW", "2026.09.08 08:00", inst, *did, extra="id=55,dir=1,lo=1.22700,hi=1.22800,origin=2026.09.08 00:00"))
-    out.append(diag(src, "HMI-SESS,START", "2026.09.10 09:55", inst, *did, extra="id=60,poi=55,dir=1"))
-    out.append(diag(src, "HMI-BLK,NEW", "2026.09.10 09:58", inst, *did, extra="id=61,sess=60,dir=1,type=OB,counter=0"))
-    out.append(diag(src, "HMI-ARM", "2026.09.10 10:00", inst, *did, extra="block=61,sess=60,dir=1"))
-    for i, t in enumerate(marks): out.append(model(src, "HMI-BUILD", t, inst, *rid, cyc=(cycles[i] if cycles else 100 + i)))
+    if chain:
+        out.append(diag(src, "HMI-POI,NEW", "2026.09.08 08:00", inst, *did, extra="id=55,dir=1,lo=1.22700,hi=1.22800,origin=2026.09.08 00:00"))
+        out.append(diag(src, "HMI-SESS,START", "2026.09.10 09:55", inst, *did, extra="id=60,poi=55,dir=1"))
+        out.append(diag(src, "HMI-BLK,NEW", "2026.09.10 09:58", inst, *did, extra="id=61,sess=60,dir=1,type=OB,counter=0"))
+        out.append(diag(src, "HMI-ARM", "2026.09.10 10:00", inst, *did, extra="block=61,sess=60,dir=1"))
+    for i, t in enumerate(marks): out.append(model(src, "HMI-BUILD", t, inst, *rid, cyc=(cycles[i] if cycles else 100 + i),
+                                                   name=(names[i] if names else "CISD")))
     for (t, l, k) in liqs: out.append(liq(src, "HMI-BUILD", t, l, k, inst, *rid))
     out += list(extra_rows)
     if with_end:
@@ -154,8 +156,8 @@ case("c04_live_ctx_missing", [start()] + blk(1) + [live_ok, lctx] + [start(init=
      ["MISMATCH(ES) on covered bars", "live only  [1->2] CTX"], ["AGREE BOTH WAYS"])
 
 A52, B53 = "USDJPY#0A52,M5", "USDJPY#0B53,M5"
-def side(ver, inst, init, rows, marks=MK, extra=(), cycles=None, price_at=None):
-    blkrows = blk(1, ver=ver, inst=inst, init=init, marks=marks, extra_rows=list(rows) + list(extra), cycles=cycles)
+def side(ver, inst, init, rows, marks=MK, extra=(), cycles=None, price_at=None, chain=True, names=None):
+    blkrows = blk(1, ver=ver, inst=inst, init=init, marks=marks, extra_rows=list(rows) + list(extra), cycles=cycles, chain=chain, names=names)
     if price_at:                                     # A-57 counterexample: one MODEL price changed
         blkrows = [l.replace("1.23456", "9.99900") if ("MODEL" in l and price_at in l) else l for l in blkrows]
     return [start(ver, inst, 7, init)] + blkrows
@@ -174,12 +176,13 @@ case("c05_versus_dedup_only", side("2.52", "0A52", 1, old52_rows()) + side("2.53
 # TRANSITION. In v2.52 only, the BULLISH bar lets a POI be made, a session start on it, a block, ARMED, a model.
 CH = ("CHOCH", "DOWN", "TRANSITION", 0, "2026.09.09 08:00", "2026.09.08 20:00", "1.22950", "1.22900")
 TF = ("TRANS_FAIL", "UP", "BULLISH", 1, "2026.09.10 08:00", "2026.09.06 12:00", "1.22900", "1.23000")
-def chain52(inst="0A52"):
+def chain52(inst="0A52", blk79="2026.09.11 09:30", extra=()):
     return [diag(SRC, "HMI-POI,NEW",   "2026.09.10 08:00", inst, 7, 1, extra="id=77,dir=1,lo=1.22800,hi=1.22900,origin=2026.09.10 00:00"),
             diag(SRC, "HMI-SESS,START", "2026.09.11 09:05", inst, 7, 1, extra="id=78,poi=77,dir=1"),
-            diag(SRC, "HMI-BLK,NEW",   "2026.09.11 09:30", inst, 7, 1, extra="id=79,sess=78,dir=1,type=OB,counter=0"),
-            diag(SRC, "HMI-ARM",       "2026.09.11 10:00", inst, 7, 1, extra="block=79,sess=78,dir=1")]
-old52b = [ctx(*E1, inst="0A52", init=1), ctx(*CH, inst="0A52", init=1), ctx(*TF, inst="0A52", init=1, messy=1)] + chain52()
+            diag(SRC, "HMI-BLK,NEW",   blk79,              inst, 7, 1, extra="id=79,sess=78,dir=1,type=OB,counter=0"),
+            diag(SRC, "HMI-ARM",       "2026.09.11 10:00", inst, 7, 1, extra="block=79,sess=78,dir=1")] + list(extra)
+ctx52b = [ctx(*E1, inst="0A52", init=1), ctx(*CH, inst="0A52", init=1), ctx(*TF, inst="0A52", init=1, messy=1)]
+old52b = ctx52b + chain52()
 new53b = [ctx(*E1, inst="0B53", init=2, also=1), dedup("BOS", "UP", E1[4], "2026.09.07 20:00@1.23000", [STALE], inst="0B53", init=2),
           ctx(*CH, inst="0B53", init=2, also=0)]
 case("c06_versus_state_divergence", side("2.52", "0A52", 1, old52b, marks=MK + ["2026.09.12 10:05:00"], cycles=[100, 101, 102, 79])
@@ -203,6 +206,83 @@ case("c13_cx_model_price_changed", side("2.52", "0A52", 1, old52b, marks=MK + ["
 case("c14_cx_model_open_cycle", side("2.52", "0A52", 1, old52b, marks=MK + ["2026.09.12 10:05:00"], cycles=[61, 101, 102, 79])
                                 + side("2.53", "0B53", 2, new53b, cycles=[61, 101, 102], price_at="2026.09.10 10:05"), V,
      ["same anchor, cycle open in both builds at this bar", "UNEXPLAINED - not traced"], ["traced to the BOS de-dup with a concrete link"])
+
+# ---- A-58: a link is not a lifetime. Each case is c06 (or one of the two
+# stories below) with ONE field changed; "ok" cases keep the legal edges.
+NOTRACE = ["traced to the BOS de-dup with a concrete link"]
+def as_explained(item): return "{:<20} {}".format("explained", item)     # the attribution file's line layout
+def v52(rows, marks, cycles, names=None, **kw):
+    return side("2.52", "0A52", 1, rows, marks=MK + marks, cycles=[100, 101, 102] + cycles, names=(["CISD"] * 3 + names) if names else None, **kw)
+NEW53 = side("2.53", "0B53", 2, new53b)
+case("c15_cx_model_before_armed",  v52(old52b, ["2026.09.11 09:35:00"], [79]) + NEW53, V,
+     ["outside its parent's lifetime in v2.52: confirmed 2026.09.11 09:35, before its cycle's ARMED 2026.09.11 10:00",
+      "verdicts: explained 5   PENDING_ATTRIBUTION 0   UNEXPLAINED 1", "UNEXPLAINED - not traced"],
+     NOTRACE + [as_explained("MODEL v2.52 only USDJPY,MODEL,1,79,79,OB,CISD,2026.09.11 09:35:00")])
+case("c16_cx_block_before_session", v52(ctx52b + chain52(blk79="2026.09.11 08:30"), ["2026.09.12 10:05:00"], [79]) + NEW53, V,
+     ["outside its parent's lifetime in v2.52: confirmed 2026.09.11 08:30, before its session started 2026.09.11 09:05",
+      "its parent row (BLK) is UNEXPLAINED above: nothing hanging on it is attributed",
+      "verdicts: explained 3   PENDING_ATTRIBUTION 2   UNEXPLAINED 1", "UNEXPLAINED - not traced"],
+     NOTRACE + [as_explained("BLK v2.52 only 1|2026.09.10 00:00|1.22800|1.22900|2026.09.11 09:05|1|OB|0|2026.09.11 08:30"),
+                as_explained("ARM v2.52 only 1|2026.09.10 00:00|1.22800|1.22900|2026.09.11 09:05|1|OB|0|2026.09.11 08:30")])
+# the D-4 exception: PA ENGULFING / REJECTION may confirm on the ARMED bar itself (n == A), nothing else may
+PA_ON_A = v52(old52b, ["2026.09.11 10:00:00"], [79], names=["PA ENGULFING"]) + NEW53
+case("c17_ok_pa_on_armed_bar",     PA_ON_A, V,
+     ["verdicts: explained 6   PENDING_ATTRIBUTION 0   UNEXPLAINED 0", "all 6 difference(s) traced to the BOS de-dup with a concrete link"], OK_NOT)
+case("c18_cx_cisd_on_armed_bar",   v52(old52b, ["2026.09.11 10:00:00"], [79]) + NEW53, V,
+     ["CISD on its cycle's ARMED bar 2026.09.11 10:00: Phase 4 needs n > A", "UNEXPLAINED - not traced"], NOTRACE)
+case("c19_cx_pa_armed_bar_d4_off", PA_ON_A, V + ["-NoArmedBarPA"],
+     ["D-4 (PA ENGULFING / REJECTION on the ARMED bar) OFF", "-NoArmedBarPA says D-4 was off", "UNEXPLAINED - not traced"], NOTRACE)
+# cycle switch on one bar: the old cycle's Phase 4 model and the new ARMED (Phase 5) share the bar
+SW = [diag(SRC, "HMI-BLK,NEW", "2026.09.11 11:30", "0A52", 7, 1, extra="id=80,sess=78,dir=1,type=OB,counter=0"),
+      diag(SRC, "HMI-ARM",     "2026.09.12 10:05", "0A52", 7, 1, extra="block=80,sess=78,dir=1")]
+case("c20_ok_cycle_switch_same_bar", v52(ctx52b + chain52(extra=SW), ["2026.09.12 10:05:00"], [79]) + NEW53, V,
+     ["verdicts: explained 8   PENDING_ATTRIBUTION 0   UNEXPLAINED 0", "all 8 difference(s) traced to the BOS de-dup with a concrete link"], OK_NOT)
+case("c21_cx_model_after_cycle_closed", v52(ctx52b + chain52(extra=SW), ["2026.09.12 10:10:00"], [79]) + NEW53, V,
+     ["confirmed 2026.09.12 10:10, after the ARMED 2026.09.12 10:05 that closed its cycle", "UNEXPLAINED - not traced"], NOTRACE)
+# NEW_SESSION ends the old session at Phase 3, after Phase 1 made that bar's blocks
+def chain_ns(blk79="2026.09.11 09:30", inst="0A52"):
+    d = lambda k, bar, extra: diag(SRC, k, bar, inst, 7, 1, extra=extra)
+    return [d("HMI-POI,NEW",    "2026.09.10 08:00", "id=77,dir=1,lo=1.22800,hi=1.22900,origin=2026.09.10 00:00"),
+            d("HMI-POI,NEW",    "2026.09.10 12:00", "id=82,dir=1,lo=1.22600,hi=1.22700,origin=2026.09.10 04:00"),
+            d("HMI-SESS,START", "2026.09.11 09:05", "id=78,poi=77,dir=1"),
+            d("HMI-BLK,NEW",    blk79,              "id=79,sess=78,dir=1,type=OB,counter=0"),
+            d("HMI-SESS,END",   "2026.09.11 09:30", "id=78,poi=77,dir=1,reason=NEW_SESSION"),
+            d("HMI-SESS,START", "2026.09.11 09:30", "id=83,poi=82,dir=1"),
+            d("HMI-BLK,NEW",    "2026.09.11 09:45", "id=84,sess=83,dir=1,type=OB,counter=0"),
+            d("HMI-ARM",        "2026.09.11 10:00", "block=84,sess=83,dir=1")]
+case("c22_ok_block_on_new_session_end_bar", v52(ctx52b + chain_ns(), ["2026.09.12 10:05:00"], [84]) + NEW53, V,
+     ["verdicts: explained 10   PENDING_ATTRIBUTION 0   UNEXPLAINED 0", "all 10 difference(s) traced to the BOS de-dup with a concrete link"], OK_NOT)
+case("c23_cx_block_after_new_session_end", v52(ctx52b + chain_ns(blk79="2026.09.11 09:35"), ["2026.09.12 10:05:00"], [84]) + NEW53, V,
+     ["confirmed 2026.09.11 09:35, after its session ended 2026.09.11 09:30 (NEW_SESSION)", "UNEXPLAINED - not traced"], NOTRACE)
+# A session in BOTH builds; v2.52 counts a stale low as CHOCH (v2.53 had processed it), so v2.52 ends the
+# session by CONTEXT_NEUTRAL and v2.53 goes on: a block after v2.52's end is explained by it, one BEFORE it
+# (the session alive in both) is not - a later end does not explain an earlier change.
+D1 = ("BOS", "DOWN", "BEARISH", 1, "2026.09.07 08:00", "2026.09.06 16:00", "1.22000", "1.21900")
+U1 = ("CHOCH", "UP", "TRANSITION", 0, "2026.09.08 08:00", "2026.09.07 20:00", "1.22600", "1.22700")
+U2 = ("TRANS_OK", "UP", "BULLISH", 1, "2026.09.08 16:00", "2026.09.08 12:00", "1.22800", "1.22900")
+XS = ("CHOCH", "DOWN", "TRANSITION", 0, "2026.09.10 12:00", "2026.09.06 04:00", "1.22100", "1.22050")     # stale low, v2.52 only
+def story(inst, init, ver_new):
+    d = lambda k, bar, extra: diag(SRC, k, bar, inst, 7, init, extra=extra)
+    return [d("HMI-POI,NEW", "2026.09.08 20:00", "id=91,dir=1,lo=1.22500,hi=1.22600,origin=2026.09.08 12:00"),
+            d("HMI-SESS,START", "2026.09.10 02:05", "id=92,poi=91,dir=1")]
+def story52():
+    return ([ctx(*r, inst="0A52", init=1) for r in (D1, U1, U2, XS)] + story("0A52", 1, False)
+            + [diag(SRC, "HMI-SESS,END", "2026.09.10 12:05", "0A52", 7, 1, extra="id=92,poi=91,dir=1,reason=CONTEXT_NEUTRAL")])
+def story53(blk93):
+    d = lambda k, bar, extra: diag(SRC, k, bar, "0B53", 7, 2, extra=extra)
+    return ([ctx(*D1, inst="0B53", init=2, also=1), dedup("BOS", "DOWN", D1[4], "2026.09.06 16:00@1.22000", ["2026.09.06 04:00@1.22100"], inst="0B53", init=2),
+             ctx(*U1, inst="0B53", init=2, also=0), ctx(*U2, inst="0B53", init=2, also=0)] + story("0B53", 2, True)
+            + [d("HMI-BLK,NEW", blk93, "id=93,sess=92,dir=1,type=OB,counter=0"),
+               d("HMI-ARM", "2026.09.10 14:00", "block=93,sess=92,dir=1"),
+               d("HMI-SESS,END", "2026.09.11 02:10", "id=92,poi=91,dir=1,reason=TIMEOUT")])
+S52 = side("2.52", "0A52", 1, story52(), chain=False)
+def S53(blk93): return side("2.53", "0B53", 2, story53(blk93), marks=MK + ["2026.09.10 15:05:00"], cycles=[100, 101, 102, 93], chain=False)
+case("c24_ok_session_end_explains_later_block", S52 + S53("2026.09.10 13:30"), V,
+     ["v2.52 had ended its session at 2026.09.10 12:05 (CONTEXT_NEUTRAL, explained)", "a session ends once: v2.52 had already ended it at 2026.09.10 12:05",
+      "verdicts: explained 6   PENDING_ATTRIBUTION 0   UNEXPLAINED 0", "all 6 difference(s) traced to the BOS de-dup with a concrete link"], OK_NOT)
+case("c25_cx_later_end_explains_earlier_block", S52 + S53("2026.09.10 12:00"), V,
+     ["v2.52 ended its session only at 2026.09.10 12:05 (CONTEXT_NEUTRAL), after this block", "verdicts: explained 5   PENDING_ATTRIBUTION 1   UNEXPLAINED 0",
+      "PENDING_ATTRIBUTION - a manual conclusion"], NOTRACE + [as_explained("BLK v2.53 only")])
 
 # strength number only: same event, same swing, same state, str counted from another H4 start
 same_s = ctx_rows([E1, E3[:3] + (5,) + E3[4:]], also=0)

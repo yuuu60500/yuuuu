@@ -64,6 +64,17 @@
 #                         whose cycle is identical and open in both builds
 #    PENDING_ATTRIBUTION  neither: listed for a manual conclusion
 #  Only "every difference explained" is a pass; time order alone explains nothing.
+#  (A-58) A link is not enough either: before anything upstream may explain a
+#  SESS / BLK / ARM / MODEL row, the row must sit inside its parent's lifetime
+#  in its own build (session start..end, block confirm, the cycle from its
+#  ARMED to the next ARMED), by the indicator's phase order. A row outside it
+#  is UNEXPLAINED; a parent, time or end that is not in the log leaves it
+#  PENDING_ATTRIBUTION. A session end explains only what comes after it.
+#
+#     -NoArmedBarPA     the builds ran with InpPAAllowArmedBarConfirm = false
+#                       (D-4 off): then no model may confirm on its ARMED bar.
+#                       Default: D-4 on, the indicator default - PA ENGULFING /
+#                       REJECTION may confirm on the ARMED bar, nothing else.
 #
 #     add  -Days 5  to merge the 5 most recent log files. MT5 starts a NEW
 #     log file every day: a live run that spans days leaves its marks in
@@ -76,7 +87,7 @@
 # ============================================================
 param([string]$Source = "", [switch]$LiveVsBuild, [switch]$Rejects, [switch]$Live,
       [switch]$Ctx, [switch]$Quiet, [switch]$Chain, [int]$Days = 1, [string]$LogDir = "", [int]$Warmup = 100,
-      [int]$SettleHours = 24, [string]$Versus = "")
+      [int]$SettleHours = 24, [string]$Versus = "", [switch]$NoArmedBarPA)
 
 # Row layout after the tag is stripped:
 #   0 symbol  1 "MODEL"  2 dir  3 cycle_id  4 block_id  5 anchor  6 model
@@ -807,7 +818,7 @@ function Get-Struct($bk) {
             '^HMI-BLK,' {
                 $sk = $(if ($sessById.ContainsKey($f['sess'])) { $sessById[$f['sess']] } else { "?id$($f['sess'])" })
                 $bkey = "$sk|$($f['dir'])|$($f['type'])|$($f['counter'])|$($f['bar'])"; $blkById[$f['id']] = $bkey
-                [void]$blk.Add([pscustomobject]@{ B = $bkey; S = $sk; Time = $t; Key = $bkey })
+                [void]$blk.Add([pscustomobject]@{ B = $bkey; S = $sk; Dir = [int]$f['dir']; Time = $t; Key = $bkey })
                 break }
             '^HMI-ARM,' {
                 $bkey = $(if ($blkById.ContainsKey($f['block'])) { $blkById[$f['block']] } else { "?id$($f['block'])" })
@@ -817,9 +828,18 @@ function Get-Struct($bk) {
     }
     # MODEL rows: column 4 is the block id = the cycle's anchor (Spec 9.1)
     $models = New-Object System.Collections.ArrayList
-    foreach ($r in $bk.Rows) { if ((RowKind $r) -eq 'MODEL') { $c = $r -split ','; [void]$models.Add([pscustomobject]@{ Row = $r; Key = (Key $r); BlockId = $c[4]; Time = (RowTime $r) }) } }
+    foreach ($r in $bk.Rows) { if ((RowKind $r) -eq 'MODEL') { $c = $r -split ','; [void]$models.Add([pscustomobject]@{ Row = $r; Key = (Key $r); BlockId = $c[4]; Dir = [int]$c[2]; Name = $c[6]; Time = (RowTime $r) }) } }
+    # lifetimes (A-58): first START / END per session, sessions in start order,
+    # blocks by key, ARMED rows per block and in time order, POI creation
+    $sessStart = @{}; $sessEnd = @{}
+    foreach ($x in $sess) { if ($x.Kind -eq 'START') { if (-not $sessStart.ContainsKey($x.S)) { $sessStart[$x.S] = $x } } elseif (-not $sessEnd.ContainsKey($x.S)) { $sessEnd[$x.S] = $x } }
+    $blkBy = @{}; foreach ($x in $blk) { if (-not $blkBy.ContainsKey($x.B)) { $blkBy[$x.B] = $x } }
+    $armOf = @{}; foreach ($x in @($arm | Sort-Object Time)) { if (-not $armOf.ContainsKey($x.BlockId)) { $armOf[$x.BlockId] = New-Object System.Collections.ArrayList }; [void]$armOf[$x.BlockId].Add($x) }
+    $poiNew = @{}; foreach ($x in $poi) { if ($x.Kind -eq 'NEW' -and -not $poiNew.ContainsKey($x.P)) { $poiNew[$x.P] = $x } }
     $s = [pscustomobject]@{ Ctx = $ctx; Proc = $proc; DedupN = $dedupN; TDedup = $tDedup
-                            Poi = $poi; Sess = $sess; Blk = $blk; Arm = $arm; Models = $models }
+                            Poi = $poi; Sess = $sess; Blk = $blk; Arm = $arm; Models = $models
+                            SessStart = $sessStart; SessEnd = $sessEnd; Starts = @($sess | Where-Object { $_.Kind -eq 'START' } | Sort-Object Time)
+                            BlkBy = $blkBy; ArmOf = $armOf; ArmSorted = @($arm | Sort-Object Time); PoiNew = $poiNew }
     $bk | Add-Member -NotePropertyName Struct -NotePropertyValue $s -Force
     return $s
 }
@@ -874,6 +894,103 @@ function StrengthCheck($rows) {
 }
 
 function ObjId($o) { return [string][System.Runtime.CompilerServices.RuntimeHelpers]::GetHashCode($o) }
+
+# ---- A-58: lifetimes ---------------------------------------------------------
+# A chain row is a child of the row above it. Knowing WHICH parent (ids inside
+# a build, stable keys across builds) does not show the parent existed, or was
+# still alive, when the child happened. The bounds below are the indicator's
+# own phase order (ProcessClosedM5Bar), all times as logged (bar CLOSE):
+#   0b SessionMaintain: POI_INVALID / CONTEXT_FLIP / CONTEXT_NEUTRAL / TIMEOUT
+#      end the session BEFORE Phase 1 of that bar
+#   1  M5BlocksOnFVG: a block only while the session is active; its confirm
+#      time is this bar's close, after the session's start bar (Spec 5.2:
+#      confirm_time >= session start - only the OB's origin candle may be older)
+#   3  SessionStart: NEW_SESSION ends the old one AFTER Phase 1 of that bar
+#   4  models of the active cycle only for n > A, A = its ARMED bar
+#   5  ARMED: a block confirmed on an EARLIER bar (anti-leak), of the ACTIVE
+#      session, in the session's direction; it closes the previous cycle, so
+#      that cycle's last models are the ones Phase 4 found on this same bar
+#   5b on the ARMED bar itself only PA ENGULFING / PA REJECTION, and only
+#      with D-4 on (InpPAAllowArmedBarConfirm, Spec 9.5.1)
+# A cycle outlives its session (Rule 15): a model may follow the session end.
+function SessBounds($s, [string]$sk) {
+    if (-not $sk -or -not $s.SessStart.ContainsKey($sk)) { return $null }
+    $st = $s.SessStart[$sk]; $en = $null; $nx = $null
+    if ($s.SessEnd.ContainsKey($sk)) { $en = $s.SessEnd[$sk] }
+    else { foreach ($o in $s.Starts) { if ($o.Time -gt $st.Time) { $nx = $o; break } } }
+    return [pscustomobject]@{ Start = $st; End = $en; NextStart = $nx }
+}
+function T16([datetime]$t) { return $t.ToString('yyyy.MM.dd HH:mm') }
+# The ARMED row that opened a model's cycle: the block's last ARMED at or
+# before the model (a block arms once; $null = every ARMED is later).
+function CycleArm($s, $x) {
+    $a = $null
+    if ($s.ArmOf.ContainsKey($x.BlockId)) { foreach ($c in $s.ArmOf[$x.BlockId]) { if ($c.Time -le $x.Time) { $a = $c } } }
+    return $a
+}
+# $null when the row fits its parents' lifetimes in its own build; else
+# UNEXPLAINED (a bound the indicator cannot break is broken) or
+# PENDING_ATTRIBUTION (a parent, a time or an end is not in the log).
+function ChainLife($s, [string]$type, $x) {
+    $bad  = { param([string]$w) [pscustomobject]@{ V = 'UNEXPLAINED'; Why = $w } }
+    $miss = { param([string]$w) [pscustomobject]@{ V = 'PENDING_ATTRIBUTION'; Why = $w } }
+    if ($x.Time -eq [datetime]::MinValue) { return & $miss 'the row carries no time' }
+    $unended = { param($w) "its session (start $(T16 $w.Start.Time)) has no END row although the session at $(T16 $w.NextStart.Time) started later: when it ended is not in the log" }
+    switch ($type) {
+        'SESS' {
+            if ($x.Kind -eq 'START') {
+                if ($x.P.StartsWith('?') -or -not $s.PoiNew.ContainsKey($x.P)) { return & $miss "its POI's NEW row is not in this build" }
+                $p = $s.PoiNew[$x.P]
+                if ($p.Time -ge $x.Time) { return & $bad "starts $(T16 $x.Time) on a POI confirmed $(T16 $p.Time): a POI is touched only after its confirm bar" }
+                return $null
+            }
+            if (-not $s.SessStart.ContainsKey($x.S)) { return & $miss "its session's START row is not in this build" }
+            $st = $s.SessStart[$x.S]
+            if ($st.Time -ge $x.Time) { return & $bad "ends $(T16 $x.Time), not after its start $(T16 $st.Time)" }
+            return $null
+        }
+        'BLK' {
+            $w = SessBounds $s $x.S
+            if (-not $w) { return & $miss "its session's START row is not in this build" }
+            if ($x.Time -lt $w.Start.Time) { return & $bad "confirmed $(T16 $x.Time), before its session started $(T16 $w.Start.Time) (Spec 5.2: confirm_time >= session start)" }
+            if ($w.End) {
+                if ($w.End.Reason -eq 'NEW_SESSION') {
+                    if ($x.Time -gt $w.End.Time) { return & $bad "confirmed $(T16 $x.Time), after its session ended $(T16 $w.End.Time) (NEW_SESSION)" }
+                } elseif ($x.Time -ge $w.End.Time) {
+                    return & $bad "confirmed $(T16 $x.Time), but its session ended $(T16 $w.End.Time) ($($w.End.Reason)) - Phase 0b ends it before Phase 1 makes any block on that bar"
+                }
+            } elseif ($w.NextStart) { return & $miss (& $unended $w) }
+            return $null
+        }
+        'ARM' {
+            if ($x.B.StartsWith('?') -or -not $s.BlkBy.ContainsKey($x.B)) { return & $miss "its block's NEW row is not in this build" }
+            $b = $s.BlkBy[$x.B]
+            if ($x.Time -le $b.Time) { return & $bad "ARMED $(T16 $x.Time), its block confirmed $(T16 $b.Time): a block is touched only on a later bar" }
+            $w = SessBounds $s $b.S
+            if (-not $w) { return & $miss "its block's session START row is not in this build" }
+            if ($x.Time -le $w.Start.Time) { return & $bad "ARMED $(T16 $x.Time), its session started $(T16 $w.Start.Time)" }
+            if ($w.End) {
+                if ($x.Time -ge $w.End.Time) { return & $bad "ARMED $(T16 $x.Time), but its session ended $(T16 $w.End.Time) ($($w.End.Reason)) - Phase 5 arms only a block of the active session" }
+            } elseif ($w.NextStart) { return & $miss (& $unended $w) }
+            if ($x.Dir -ne $w.Start.Dir) { return & $bad "ARMED dir $($x.Dir) in a dir $($w.Start.Dir) session: only a block in the session's direction is armed" }
+            return $null
+        }
+        'MODEL' {
+            if (-not $s.ArmOf.ContainsKey($x.BlockId)) { return & $miss "its cycle's ARMED row (block $($x.BlockId)) is not in the log" }
+            $a = CycleArm $s $x
+            if (-not $a) { return & $bad "confirmed $(T16 $x.Time), before its cycle's ARMED $(T16 $s.ArmOf[$x.BlockId][0].Time): a cycle's models start at its ARMED bar (Phase 4: n > A)" }
+            if ($x.Time -eq $a.Time) {
+                if ($x.Name -ne 'PA ENGULFING' -and $x.Name -ne 'PA REJECTION') { return & $bad "$($x.Name) on its cycle's ARMED bar $(T16 $a.Time): Phase 4 needs n > A; only PA ENGULFING / REJECTION may confirm on bar A (D-4)" }
+                if ($NoArmedBarPA) { return & $bad "$($x.Name) on its cycle's ARMED bar $(T16 $a.Time), and -NoArmedBarPA says D-4 was off" }
+            }
+            $nx = $null; foreach ($c in $s.ArmSorted) { if ($c.Time -gt $a.Time) { $nx = $c; break } }
+            if ($nx -and $x.Time -gt $nx.Time) { return & $bad "confirmed $(T16 $x.Time), after the ARMED $(T16 $nx.Time) that closed its cycle (Rule 15; its last models are Phase 4 of that bar)" }
+            if ($x.Dir -ne $a.Dir) { return & $bad "dir $($x.Dir), its cycle's ARMED dir $($a.Dir)" }
+            return $null
+        }
+    }
+    return $null
+}
 
 # A-57: why do two versions differ? Old = the lower version, New = the higher.
 # Writes every verdict to attribution_<source>.txt and returns
@@ -979,15 +1096,40 @@ function Show-StructAttribution($Old, $New, [datetime]$rs, [datetime]$re) {
     }
 
     # ---- chain: POI -> SESS -> BLK -> ARM -> MODEL -------------------------------
+    Write-Host ("    chain rows are checked against their parents' lifetimes first (A-58); D-4 (PA ENGULFING / REJECTION on the ARMED bar) {0}" -f `
+                $(if ($NoArmedBarPA) { 'OFF (-NoArmedBarPA)' } else { 'ON, the indicator default (-NoArmedBarPA if the builds ran with it off)' })) -ForegroundColor DarkGray
     # Every chain item reads the H4 trend direction (POI creation, session
     # eligibility and end, the ARMED guard) or the item above it. Before the
     # first DIRECTION difference nothing in the chain can differ (UNEXPLAINED);
     # after it, a verdict needs the concrete link named in each rule below.
     $inR = { param($t) $t -ge $rs -and $t -le $re }
-    $side = { param($x, $setA) if ($setA) { return @{ Has = $Old.Ver; Hasnt = $New.Ver; HasCtx = $co; NotCtx = $cn } } return @{ Has = $New.Ver; Hasnt = $Old.Ver; HasCtx = $cn; NotCtx = $co } }
-    $ex = @{}                                       # "TYPE|key" -> 1 for explained chain items
+    $side = { param($x, $setA) if ($setA) { return @{ Has = $Old.Ver; Hasnt = $New.Ver; HasCtx = $co; NotCtx = $cn; HasS = $so; NotS = $sn } }
+                                return @{ Has = $New.Ver; Hasnt = $Old.Ver; HasCtx = $cn; NotCtx = $co; HasS = $sn; NotS = $so } }
+    $ex = @{}                                       # "TYPE|key" -> 1 for explained chain items ("SESSEND|ver|key" per build)
     $chainCount = [ordered]@{ POI = 0; SESS = 0; BLK = 0; ARM = 0; MODEL = 0 }
     $early = { param($t) $t -lt $tDir }
+    # A-58: a row outside its parents' lifetime (own build) is UNEXPLAINED, a
+    # row whose parent / time / end is missing is PENDING - checked BEFORE any
+    # upstream verdict may carry over. A row whose own parent was judged
+    # UNEXPLAINED is PENDING too: nothing hanging on an impossible row is
+    # attributed. Returns $true when it gave the verdict.
+    $taint = @{}                                    # "TYPE|key" of chain rows judged UNEXPLAINED
+    $gate = { param([string]$type, $x, $sd, [string]$what, [string]$self, [string]$parent)
+        $lf = ChainLife $sd.HasS $type $x
+        if ($lf -and $lf.V -eq 'UNEXPLAINED') { if ($self) { $taint[$self] = 1 }; & $verdict 'UNEXPLAINED' $what "outside its parent's lifetime in v$($sd.Has): $($lf.Why)"; return $true }
+        if (& $early $x.Time) { if ($self) { $taint[$self] = 1 }; & $verdict 'UNEXPLAINED' $what 'before the first H4 direction difference'; return $true }
+        if ($lf) { & $verdict 'PENDING_ATTRIBUTION' $what $lf.Why; return $true }
+        if ($parent -and $taint.ContainsKey($parent)) { & $verdict 'PENDING_ATTRIBUTION' $what "its parent row ($($parent -replace '\|.*$','')) is UNEXPLAINED above: nothing hanging on it is attributed"; return $true }
+        return $false }
+    # The other build's END of this session, when it is explained and came
+    # early enough to keep this row out of that build: no block from the
+    # session's end bar on (NEW_SESSION: from the next bar), no ARMED from it.
+    $endBefore = { param($sd, [string]$sk, [datetime]$t, [bool]$isBlock)
+        if (-not $sd.NotS.SessEnd.ContainsKey($sk)) { return $null }
+        $e = $sd.NotS.SessEnd[$sk]
+        if (-not $ex.ContainsKey("SESSEND|$($sd.Hasnt)|$sk")) { return $null }
+        $ok = $(if ($isBlock -and $e.Reason -eq 'NEW_SESSION') { $e.Time -lt $t } else { $e.Time -le $t })
+        return [pscustomobject]@{ End = $e; Before = $ok } }
 
     # POI events
     $pO = @{}; foreach ($p in $so.Poi) { if ($p.Kind -eq 'NEW') { $pO[$p.P] = $p } }
@@ -999,7 +1141,7 @@ function Show-StructAttribution($Old, $New, [datetime]$rs, [datetime]$re) {
     foreach ($it in $poiItems) {
         $x = $it.X; $sd = & $side $x $it.InOld; $chainCount.POI++
         $what = "POI v$($sd.Has) only $($x.Key)"
-        if (& $early $x.Time) { & $verdict 'UNEXPLAINED' $what 'before the first H4 direction difference'; continue }
+        if (& $early $x.Time) { if ($x.Kind -eq 'NEW') { $taint["POI|$($x.P)"] = 1 }; & $verdict 'UNEXPLAINED' $what 'before the first H4 direction difference'; continue }
         $inBoth = $pO.ContainsKey($x.P) -and $pN.ContainsKey($x.P)
         if ($x.Kind -eq 'NEW') {
             $dh = DirAt $sd.HasCtx $x.Time $false; $dn = DirAt $sd.NotCtx $x.Time $false
@@ -1025,7 +1167,8 @@ function Show-StructAttribution($Old, $New, [datetime]$rs, [datetime]$re) {
     foreach ($it in $sessItems) {
         $x = $it.X; $sd = & $side $x $it.InOld; $chainCount.SESS++
         $what = "SESS v$($sd.Has) only $($x.Key)"
-        if (& $early $x.Time) { & $verdict 'UNEXPLAINED' $what 'before the first H4 direction difference'; continue }
+        $self = $(if ($x.Kind -eq 'START') { "SESS|$($x.S)" } else { '' }); $par = $(if ($x.Kind -eq 'START') { "POI|$($x.P)" } else { "SESS|$($x.S)" })
+        if (& $gate 'SESS' $x $sd $what $self $par) { continue }
         if ($x.Kind -eq 'START') {
             $dh = DirAt $sd.HasCtx $x.Time $true; $dn = DirAt $sd.NotCtx $x.Time $true
             if ($ex.ContainsKey("POI|$($x.P)")) { $ex["SESS|$($x.S)"] = 1; $explainedStartTimes += $x.Time; & $verdict 'explained' $what 'its POI exists in one build only, explained' }
@@ -1035,15 +1178,18 @@ function Show-StructAttribution($Old, $New, [datetime]$rs, [datetime]$re) {
         } else {
             $inBoth = $sessO.ContainsKey($x.S) -and $sessN.ContainsKey($x.S)
             if (-not $inBoth) {
-                if ($ex.ContainsKey("SESS|$($x.S)")) { & $verdict 'explained' $what 'the session exists in one build only, its start is explained' }
+                if ($ex.ContainsKey("SESS|$($x.S)")) { $ex["SESSEND|$($sd.Has)|$($x.S)"] = 1; & $verdict 'explained' $what 'the session exists in one build only, its start is explained' }
                 else { & $verdict 'PENDING_ATTRIBUTION' $what 'the session exists in one build only and its start is not explained' }
                 continue
             }
             $dh = DirAt $sd.HasCtx $x.Time $true; $dn = DirAt $sd.NotCtx $x.Time $true
-            if (($x.Reason -eq 'CONTEXT_FLIP' -or $x.Reason -eq 'CONTEXT_NEUTRAL') -and $dh -ne $dn) { $ex["SESSEND|$($x.S)"] = 1
+            $oe = $(if ($sd.NotS.SessEnd.ContainsKey($x.S)) { $sd.NotS.SessEnd[$x.S] } else { $null })
+            if (($x.Reason -eq 'CONTEXT_FLIP' -or $x.Reason -eq 'CONTEXT_NEUTRAL') -and $dh -ne $dn) { $ex["SESSEND|$($sd.Has)|$($x.S)"] = 1
                 & $verdict 'explained' $what "ended by the H4 direction, which differs at that bar: v$($sd.Has) $dh, v$($sd.Hasnt) $dn" }
-            elseif ($x.Reason -eq 'NEW_SESSION' -and @($explainedStartTimes | Where-Object { $_ -eq $x.Time }).Count) { $ex["SESSEND|$($x.S)"] = 1
+            elseif ($x.Reason -eq 'NEW_SESSION' -and @($explainedStartTimes | Where-Object { $_ -eq $x.Time }).Count) { $ex["SESSEND|$($sd.Has)|$($x.S)"] = 1
                 & $verdict 'explained' $what 'ended by a new session whose start is explained' }
+            elseif ($oe -and $oe.Time -lt $x.Time -and $ex.ContainsKey("SESSEND|$($sd.Hasnt)|$($x.S)")) { $ex["SESSEND|$($sd.Has)|$($x.S)"] = 1
+                & $verdict 'explained' $what ("a session ends once: v{0} had already ended it at {1} ({2}, explained)" -f $sd.Hasnt, (T16 $oe.Time), $oe.Reason) }
             else { & $verdict 'PENDING_ATTRIBUTION' $what "same session in both, end ($($x.Reason)) not linked to an explained difference" }
         }
     }
@@ -1056,15 +1202,17 @@ function Show-StructAttribution($Old, $New, [datetime]$rs, [datetime]$re) {
     }
 
     # blocks and ARMED
-    $bO = @{}; foreach ($b in $so.Blk) { $bO[$b.B] = $b }
-    $bN = @{}; foreach ($b in $sn.Blk) { $bN[$b.B] = $b }
     $dB = DiffKeys @($so.Blk | Where-Object { & $inR $_.Time }) @($sn.Blk | Where-Object { & $inR $_.Time }) 'Key'
     foreach ($it in @(@($dB.A | ForEach-Object { [pscustomobject]@{ X = $_; InOld = $true } }) + @($dB.B | ForEach-Object { [pscustomobject]@{ X = $_; InOld = $false } }))) {
         $x = $it.X; $sd = & $side $x $it.InOld; $chainCount.BLK++
         $what = "BLK v$($sd.Has) only $($x.Key)"
-        if (& $early $x.Time) { & $verdict 'UNEXPLAINED' $what 'before the first H4 direction difference'; continue }
-        if ($ex.ContainsKey("SESS|$($x.S)") -or $ex.ContainsKey("SESSEND|$($x.S)")) { $ex["BLK|$($x.B)"] = 1; & $verdict 'explained' $what 'blocks are made only inside their session, whose start or end differs (explained)' }
-        else { & $verdict 'PENDING_ATTRIBUTION' $what 'its session is the same in both builds' }
+        if (& $gate 'BLK' $x $sd $what "BLK|$($x.B)" "SESS|$($x.S)") { continue }
+        $eb = & $endBefore $sd $x.S $x.Time $true
+        if ($ex.ContainsKey("SESS|$($x.S)")) { $ex["BLK|$($x.B)"] = 1; & $verdict 'explained' $what 'blocks are made only inside their own session, which exists in one build only (start explained)' }
+        elseif ($eb -and $eb.Before) { $ex["BLK|$($x.B)"] = 1
+            & $verdict 'explained' $what ("v{0} had ended its session at {1} ({2}, explained): no block of it there from then on" -f $sd.Hasnt, (T16 $eb.End.Time), $eb.End.Reason) }
+        elseif ($eb) { & $verdict 'PENDING_ATTRIBUTION' $what ("v{0} ended its session only at {1} ({2}), after this block: the session was active in both builds here" -f $sd.Hasnt, (T16 $eb.End.Time), $eb.End.Reason) }
+        else { & $verdict 'PENDING_ATTRIBUTION' $what 'its session is the same in both builds and alive in both at this bar' }
     }
     $dA = DiffKeys @($so.Arm | Where-Object { & $inR $_.Time }) @($sn.Arm | Where-Object { & $inR $_.Time }) 'Key'
     $armItems = @(@($dA.A | ForEach-Object { [pscustomobject]@{ X = $_; InOld = $true } }) + @($dA.B | ForEach-Object { [pscustomobject]@{ X = $_; InOld = $false } }))
@@ -1072,30 +1220,29 @@ function Show-StructAttribution($Old, $New, [datetime]$rs, [datetime]$re) {
     foreach ($it in $armItems) {
         $x = $it.X; $sd = & $side $x $it.InOld; $chainCount.ARM++
         $what = "ARM v$($sd.Has) only $($x.Key)"
-        if (& $early $x.Time) { & $verdict 'UNEXPLAINED' $what 'before the first H4 direction difference'; continue }
-        $sk = ($x.B -split '\|')[0..4] -join '|'
-        $sessOf = $(if ($bO.ContainsKey($x.B)) { $bO[$x.B].S } elseif ($bN.ContainsKey($x.B)) { $bN[$x.B].S } else { '' })
+        if (& $gate 'ARM' $x $sd $what "ARM|$($x.A)" "BLK|$($x.B)") { continue }
+        $sessOf = $sd.HasS.BlkBy[$x.B].S
+        $eb = & $endBefore $sd $sessOf $x.Time $false
         $dh = DirAt $sd.HasCtx $x.Time $true; $dn = DirAt $sd.NotCtx $x.Time $true
         if ($ex.ContainsKey("BLK|$($x.B)")) { $ex["ARM|$($x.A)"] = 1; $explainedArmTimes += $x.Time; & $verdict 'explained' $what 'its block exists in one build only, explained' }
-        elseif ($sessOf -and $ex.ContainsKey("SESSEND|$sessOf")) { $ex["ARM|$($x.A)"] = 1; $explainedArmTimes += $x.Time; & $verdict 'explained' $what 'its session ended earlier in the other build (explained)' }
+        elseif ($eb -and $eb.Before) { $ex["ARM|$($x.A)"] = 1; $explainedArmTimes += $x.Time
+            & $verdict 'explained' $what ("v{0} had ended the block's session at {1} ({2}, explained): nothing of it is ARMED there from then on" -f $sd.Hasnt, (T16 $eb.End.Time), $eb.End.Reason) }
         elseif ($dh -ne $dn) { $ex["ARM|$($x.A)"] = 1; $explainedArmTimes += $x.Time; & $verdict 'explained' $what "ARMED needs the H4 trend in the session's direction: v$($sd.Has) $dh, v$($sd.Hasnt) $dn" }
+        elseif ($eb) { & $verdict 'PENDING_ATTRIBUTION' $what ("v{0} ended the block's session only at {1} ({2}), after this ARMED; same H4 direction in both" -f $sd.Hasnt, (T16 $eb.End.Time), $eb.End.Reason) }
         else { & $verdict 'PENDING_ATTRIBUTION' $what 'same block and session in both, same H4 direction' }
     }
 
     # models: a cycle lives from its ARMED bar to the next ARMED bar (Rule 15)
-    $armByBlockO = @{}; foreach ($a in $so.Arm) { $armByBlockO[$a.BlockId] = $a }
-    $armByBlockN = @{}; foreach ($a in $sn.Arm) { $armByBlockN[$a.BlockId] = $a }
-    $armsO = @($so.Arm | Sort-Object Time); $armsN = @($sn.Arm | Sort-Object Time)
+    $armsO = $so.ArmSorted; $armsN = $sn.ArmSorted
     $nextArm = { param($arms, [datetime]$t) foreach ($a in $arms) { if ($a.Time -gt $t) { return $a } }; return $null }
     $dM = DiffKeys @($so.Models | Where-Object { & $inR $_.Time }) @($sn.Models | Where-Object { & $inR $_.Time }) 'Key'
     foreach ($it in @(@($dM.A | ForEach-Object { [pscustomobject]@{ X = $_; InOld = $true } }) + @($dM.B | ForEach-Object { [pscustomobject]@{ X = $_; InOld = $false } }))) {
         $x = $it.X; $sd = & $side $x $it.InOld; $chainCount.MODEL++
         $what = "MODEL v$($sd.Has) only $($x.Row)"
-        if (& $early $x.Time) { & $verdict 'UNEXPLAINED' $what 'before the first H4 direction difference'; continue }
-        $mine = $(if ($it.InOld) { $armByBlockO } else { $armByBlockN }); $armsMine = $(if ($it.InOld) { $armsO } else { $armsN }); $armsOther = $(if ($it.InOld) { $armsN } else { $armsO })
-        if (-not $mine.ContainsKey($x.BlockId)) { & $verdict 'PENDING_ATTRIBUTION' $what "its cycle's ARMED row (block $($x.BlockId)) is not in the log"; continue }
-        $a = $mine[$x.BlockId]
-        if ($ex.ContainsKey("ARM|$($a.A)")) { & $verdict 'explained' $what 'its cycle (ARMED) exists in one build only, explained'; continue }
+        $a = CycleArm $sd.HasS $x                    # the gate checks the model lies inside this cycle
+        if (& $gate 'MODEL' $x $sd $what '' $(if ($a) { "ARM|$($a.A)" } else { '' })) { continue }
+        $armsMine = $(if ($it.InOld) { $armsO } else { $armsN }); $armsOther = $(if ($it.InOld) { $armsN } else { $armsO })
+        if ($ex.ContainsKey("ARM|$($a.A)")) { & $verdict 'explained' $what ("its cycle (ARMED {0}) exists in one build only, explained, and the model lies inside it" -f (T16 $a.Time)); continue }
         $twin = @($armsOther | Where-Object { $_.A -eq $a.A }) | Select-Object -First 1
         if (-not $twin) { & $verdict 'PENDING_ATTRIBUTION' $what 'its ARMED differs between the builds and is not explained'; continue }
         $endMine = & $nextArm $armsMine $a.Time; $endOther = & $nextArm $armsOther $twin.Time

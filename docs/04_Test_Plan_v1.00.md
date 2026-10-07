@@ -896,9 +896,18 @@ ATR 系数 2.0 定向：v2.46 2/48（PMH BROKEN 仅连续运行有）· v2.47 0/
             verdicts 行 UNEXPLAINED = 0
             PENDING_ATTRIBUTION = 0；不为 0 时逐条给出人工结论（attribution_*.txt 每行一条）后方可通过
             「H4 state: identical」→ 链路差异必须为 none
+          链路行先核对生命周期（A-58），再看上游是否已解释：
+            SESS 开始晚于其 POI 确认；BLK 确认 ≥ 会话开始、早于会话结束（NEW_SESSION 结束可同根）；
+            ARMED 晚于块确认、在会话开始之后且结束之前、方向与会话一致；
+            MODEL 在其周期 ARMED 之后、不晚于下一个 ARMED（同根周期切换允许）；
+            ARMED 当根只允许 PA ENGULFING / REJECTION（D-4，默认开；构建关闭 D-4 时加 -NoArmedBarPA）
+            违反 → UNEXPLAINED；父节点 / 时间 / 结束信息缺失 → PENDING；父节点为 UNEXPLAINED 的子行 → PENDING
+            另一版的会话结束只解释其后的块 / ARMED，不解释更早的差异
           每品种保存控制台输出与 attribution_*.txt，作为「去重引起的 H4 状态、POI、Session、MODEL 差异」清单
 ```
 
 离线证据：`docs/evidence/v2.53_h4_dedup_offline.txt`（场景 4/4；EURUSD 回放全部差异可追溯，H4 状态 0 分歧）；
-`Run-LogTests.ps1` 修订脚本 49/49（交付的 v2.53 脚本 41/49，v2.52 脚本 35/49）；`h4_dedup_sim.py` 场景 4/4、归因防护 6/6。
+`Run-LogTests.ps1` 修订脚本 60/60（v2.53r2 脚本 52/60，交付的 v2.53 脚本 41/60，v2.52 脚本 35/60；
+c15–c25 为 A-58 生命周期用例，其中 c17 / c20 / c22 / c24 是合法边界，新旧脚本都须通过）；`h4_dedup_sim.py` 场景 4/4、归因防护 6/6
+（Python 模型不含 M5 链路，生命周期核对只在 ReloadTest.ps1 与日志用例中）。
 验收方已确认（2026-10-06）：v2.53 编译 0/0、45/45、4/4、12/12、params=461F006E。
