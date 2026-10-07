@@ -892,12 +892,13 @@ ATR 系数 2.0 定向：v2.46 2/48（PMH BROKEN 仅连续运行有）· v2.47 0/
           只因强度编号不同的条目为 PENDING REVIEW（说明见 A-56），事件 / 主参考点 / 状态不同则为 MISMATCH
 5  同版本重载：MODEL / LIQ / CTX 三行均 IDENTICAL
 6  对比 v2.52（固定窗口，四品种）：v2.52 与 v2.53 两个实例同一根 M5 内挂上，
-          `-Source <v2.52 源> -Versus <v2.53 源>` 逐品种：
-            CTX 归因 UNEXPLAINED = 0
-            「H4 state: identical」→ MODEL / POI / SESS / BLK / ARM 必须 0 差异
-            「H4 state differs」→ 列出区间；链路差异「before the first H4 state difference」= 0
-          每品种保存输出，作为「去重引起的 H4 状态、POI、Session、MODEL 差异」清单
+          `-Source <v2.52 源> -Versus <v2.53 源>` 逐品种（A-57 判据）：
+            verdicts 行 UNEXPLAINED = 0
+            PENDING_ATTRIBUTION = 0；不为 0 时逐条给出人工结论（attribution_*.txt 每行一条）后方可通过
+            「H4 state: identical」→ 链路差异必须为 none
+          每品种保存控制台输出与 attribution_*.txt，作为「去重引起的 H4 状态、POI、Session、MODEL 差异」清单
 ```
 
 离线证据：`docs/evidence/v2.53_h4_dedup_offline.txt`（场景 4/4；EURUSD 回放全部差异可追溯，H4 状态 0 分歧）；
-`Run-LogTests.ps1` v2.53 脚本 45/45（v2.52 脚本 35/45）。
+`Run-LogTests.ps1` 修订脚本 49/49（交付的 v2.53 脚本 41/49，v2.52 脚本 35/49）；`h4_dedup_sim.py` 场景 4/4、归因防护 6/6。
+验收方已确认（2026-10-06）：v2.53 编译 0/0、45/45、4/4、12/12、params=461F006E。

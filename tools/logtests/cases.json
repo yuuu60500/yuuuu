@@ -506,11 +506,15 @@
   "expect": [
    "suppressed duplicate               1",
    "strength renumbered                1",
+   "PENDING_ATTRIBUTION                0",
    "UNEXPLAINED                        0",
    "H4 state: identical at every event bar",
-   "upgrade regression: 0 difference(s) over 3 / 3 MODEL row(s), same window and parameters."
+   "all 2 difference(s) traced to the BOS de-dup with a concrete link"
   ],
-  "forbid": []
+  "forbid": [
+   "PENDING_ATTRIBUTION - a manual",
+   "UNEXPLAINED - not traced"
+  ]
  },
  "c06_versus_state_divergence": {
   "args": [
@@ -522,11 +526,13 @@
   "expect": [
    "suppressed duplicate               1",
    "H4 state differs in 1 interval(s), first from 2026.09.10 08:00",
-   "before the first H4 state difference (UNEXPLAINED): 0",
-   "every one after an H4 state difference caused by the BOS de-dup"
+   "chain differences in the common region: POI 1   SESS 1   BLK 1   ARM 1   MODEL 1",
+   "verdicts: explained 6   PENDING_ATTRIBUTION 0   UNEXPLAINED 0",
+   "all 6 difference(s) traced to the BOS de-dup with a concrete link"
   ],
   "forbid": [
-   "UNEXPLAINED                        1"
+   "PENDING_ATTRIBUTION - a manual",
+   "UNEXPLAINED - not traced"
   ]
  },
  "c07_versus_model_unexplained": {
@@ -538,11 +544,11 @@
   ],
   "expect": [
    "H4 state: identical at every event bar",
-   "before the first H4 state difference (UNEXPLAINED): 1",
-   "upgrade regression: 1 difference(s) over 4 / 3 MODEL row(s)"
+   "<- before the first H4 direction difference",
+   "1 difference(s) UNEXPLAINED - not traced"
   ],
   "forbid": [
-   "caused by the BOS de-dup"
+   "traced to the BOS de-dup with a concrete link"
   ]
  },
  "c08_versus_ctx_unexplained": {
@@ -553,10 +559,73 @@
    "USDJPY#0B53,M5"
   ],
   "expect": [
-   "UNEXPLAINED                        1",
-   "but 1 structure / chain difference(s) are UNEXPLAINED"
+   "CTX UNEXPLAINED                        1",
+   "before the first de-dup the two versions are the same code path",
+   "UNEXPLAINED - not traced"
   ],
-  "forbid": []
+  "forbid": [
+   "traced to the BOS de-dup with a concrete link"
+  ]
+ },
+ "c11_cx_h4_close_changed": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "the market data differs, the de-dup does not move a close",
+   "UNEXPLAINED - not traced"
+  ],
+  "forbid": [
+   "traced to the BOS de-dup with a concrete link"
+  ]
+ },
+ "c12_cx_first_bos_str9": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "str=9 but the strength rule gives 1",
+   "UNEXPLAINED - not traced"
+  ],
+  "forbid": [
+   "traced to the BOS de-dup with a concrete link"
+  ]
+ },
+ "c13_cx_model_price_changed": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "its cycle's ARMED row (block 101) is not in the log",
+   "PENDING_ATTRIBUTION - a manual conclusion"
+  ],
+  "forbid": [
+   "traced to the BOS de-dup with a concrete link"
+  ]
+ },
+ "c14_cx_model_open_cycle": {
+  "args": [
+   "-Source",
+   "USDJPY#0A52,M5",
+   "-Versus",
+   "USDJPY#0B53,M5"
+  ],
+  "expect": [
+   "same anchor, cycle open in both builds at this bar",
+   "UNEXPLAINED - not traced"
+  ],
+  "forbid": [
+   "traced to the BOS de-dup with a concrete link"
+  ]
  },
  "c09_ctx_strength_only": {
   "args": [

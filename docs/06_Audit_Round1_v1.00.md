@@ -1637,5 +1637,47 @@ Fix (v2.53):             ReloadTest.ps1
                            强度重编号 / 去重后路径改变；POI / SESS / BLK / ARM / MODEL 差异必须发生在两版
                            H4 状态首次不同之后，否则 UNEXPLAINED（红）
 Evidence:                tools/logtests 45 组：v2.53 脚本 45/45；v2.52 脚本 35/45（新增 10 组均失败）
-Status:                  **FIXED —— v2.53**
+Status:                  **FIXED —— v2.53**；跨版本归因规则被验收方证明过宽，由 A-57 取代
+```
+
+
+## Audit Round 15 —— 验收方 v2.53 复核（2026-10-06）
+
+验收方：v2.53 MetaEditor 5.0.0.6230 X64 编译 0 errors / 0 warnings；45/45、4/4、12/12；参数摘要 461F006E；
+BOS 去重源码阶段通过，BRI-11 读法甲接受。23 个源文件中 19 个与 v2.52 字节相同，2 个只改版本号，2 个 H4 引擎承担去重。
+
+### A-57 —— **跨版本归因把时间先后当成因果**（P2，成立，三个反例复现）
+
+```
+Location:                tools/ReloadTest.ps1 Show-StructAttribution；tools/h4_dedup_sim.py attribute()（同类兜底）
+Actual Behavior:         1) 无法匹配的 CTX 差异，只要在首次去重之后就记「path changed after a de-dup」= 已解释
+                         2) 仅 str 不同即记「strength renumbered」，不核对计数能否由删除的 BOS 推出
+                         3) POI / SESS / BLK / ARM / MODEL 差异只要不早于首次状态分歧就称「由去重造成」
+Evidence:                反例（各改一个字段）：v2.53 CTX close 1.23400 -> 9.99900；首次 BOS str 1 -> 9；
+                         MODEL 价位 1.23456 -> 9.99900。交付脚本分别输出 path changed=2 / strength renumbered=2 /
+                         「every one after an H4 state difference caused by the BOS de-dup」；
+                         前两个甚至给出绿色「0 difference ... same window and parameters」
+Fix:                     三档结论，时间顺序只能排除、不能证明：
+                           explained            有具体链接：被抑制的重复（旧版计数的摆动点已被新版在更早的根处理）、
+                                                主参考点改指（同根同事件、同收盘，新版主参考点在本根首次处理）、
+                                                强度重编号（两版强度都符合规则、同一趋势段起点、段内单边 BOS 均为已解释项）、
+                                                POI 新建（本根 H4 方向在两版不同且等于 POI 方向）、POI 移出窗口（之前有已解释的 POI 新建）、
+                                                会话开始（POI 仅一版有且已解释，或触碰时 H4 方向不同）、会话结束（方向结束且方向不同 / 被已解释的新会话结束）、
+                                                块（所属会话开始或结束已解释）、ARMED（块已解释 / 会话已提前结束 / 方向不同）、
+                                                MODEL（其周期的 ARMED 已解释，或另一版用已解释的 ARMED 提前关闭了该周期）
+                           UNEXPLAINED          可证明不是去重：H4 收盘或摆动点价格不同、强度违反规则、首次去重之前的 CTX 差异、
+                                                首次 H4 方向分歧之前的链路差异、同一锚点且两版周期都未关闭的 MODEL 差异
+                           PENDING_ATTRIBUTION  其余，逐条写入 attribution_<旧源>__<新源>.txt 供人工结论
+                         链路在实例内按 id 关联（MODEL 第 4 列 = 块 id -> ARM -> BLK -> SESS -> POI），跨版本按稳定字段对应：
+                         POI = 方向|origin|lo|hi；SESS = POI|开始根；BLK = SESS|方向|类型|counter|确认根；ARM = BLK|ARMED 根
+                         最终结论：UNEXPLAINED > 0 红；PENDING > 0 黄（明确写「NOT all from the de-dup」）；全部 explained 才称已追溯
+Verification:            tools/logtests 49 组：修订后 49/49；交付的 v2.53 脚本 41/49（c05–c08、c11–c14 失败）
+                           c11 收盘价改动 -> UNEXPLAINED；c12 首次 BOS str 9 -> UNEXPLAINED；
+                           c13 MODEL 价位改动（周期 ARMED 不在日志）-> PENDING；c14 同一锚点、周期两版都未关闭 -> UNEXPLAINED；
+                           c06 完整链（TRANS_FAIL 陈旧点 -> 方向分歧 -> POI -> SESS -> BLK -> ARM -> MODEL）-> 6 条全部 explained
+                         tools/h4_dedup_sim.py：同规则；归因防护自测 6/6（改收盘 / 改 str / 改摆动点价位 / 无分歧多 POI -> UNEXPLAINED；
+                           无配对新增事件 -> PENDING）；EURUSD 回放 156 条差异全部 explained，PENDING 0，UNEXPLAINED 0
+Also found:              合成日志生成器的 POI / SESS / BLK 行字段顺序与真实格式不符（HMI-POI,NEW,<sym> 应为 HMI-POI,<sym>,NEW），
+                         以前的链路用例因此从未真正被解析；已改为真实格式
+Status:                  **FIXED —— 工具修订（MQL5 源码不变，编译结果仍有效）**
 ```

@@ -20,22 +20,24 @@ def model(src, tag, t, inst, run, init, cyc, name="CISD"):
 def liq(src, tag, t, lvl, kind, inst, run, init):
     return L(src, f"{tag},USDJPY,LIQ,1,0,0,{lvl},{kind},{t},1.23500,2026.09.10 10:55:00,0" + tail(inst, run, init))
 def diag(src, kind, bar, inst, run, init, extra="id=55,dir=1"):
-    return L(src, f"{kind},USDJPY,{extra},bar={bar}" + tail(inst, run, init))
+    head, *sub = kind.split(",")                      # real layout: HMI-POI,<sym>,NEW,...
+    return L(src, f"{head},USDJPY," + "".join(s + "," for s in sub) + f"{extra},bar={bar}" + tail(inst, run, init))
 
 MK = ["2026.09.10 10:05:00", "2026.09.15 14:35:00", "2026.09.22 08:20:00"]
 LQ = [("2026.09.12 09:05:00", "PDH", "SWEEP"), ("2026.09.18 16:10:00", "PWL", "BROKEN")]
 SRC = "USDJPY,M5"
 
 def blk(b, ver="2.51", inst="0001", run=7, init=1, marks=MK, liqs=LQ, end_kw=None, with_end=True, row_id=None, diag_id=None,
-        frm="2026.09.07 03:40", to="2026.09.30 12:35", warm="2026.09.07 12:00", src=SRC, params="ABCD1234", extra_rows=(), begin_b="same"):
+        frm="2026.09.07 03:40", to="2026.09.30 12:35", warm="2026.09.07 12:00", src=SRC, params="ABCD1234", extra_rows=(), begin_b="same",
+        cycles=None):
     rid = row_id or (run, init)
     did = diag_id or (run, init)
     out = [begin(src, b if begin_b == "same" else begin_b, ver, inst, run, init, frm, to, warm, params)]
-    out.append(diag(src, "HMI-POI,NEW", "2026.09.08 08:00", inst, *did))
+    out.append(diag(src, "HMI-POI,NEW", "2026.09.08 08:00", inst, *did, extra="id=55,dir=1,lo=1.22700,hi=1.22800,origin=2026.09.08 00:00"))
     out.append(diag(src, "HMI-SESS,START", "2026.09.10 09:55", inst, *did, extra="id=60,poi=55,dir=1"))
     out.append(diag(src, "HMI-BLK,NEW", "2026.09.10 09:58", inst, *did, extra="id=61,sess=60,dir=1,type=OB,counter=0"))
     out.append(diag(src, "HMI-ARM", "2026.09.10 10:00", inst, *did, extra="block=61,sess=60,dir=1"))
-    for i, t in enumerate(marks): out.append(model(src, "HMI-BUILD", t, inst, *rid, cyc=100 + i))
+    for i, t in enumerate(marks): out.append(model(src, "HMI-BUILD", t, inst, *rid, cyc=(cycles[i] if cycles else 100 + i)))
     for (t, l, k) in liqs: out.append(liq(src, "HMI-BUILD", t, l, k, inst, *rid))
     out += list(extra_rows)
     if with_end:
@@ -152,31 +154,55 @@ case("c04_live_ctx_missing", [start()] + blk(1) + [live_ok, lctx] + [start(init=
      ["MISMATCH(ES) on covered bars", "live only  [1->2] CTX"], ["AGREE BOTH WAYS"])
 
 A52, B53 = "USDJPY#0A52,M5", "USDJPY#0B53,M5"
-def side(ver, inst, init, rows, marks=MK, extra=()):
-    return [start(ver, inst, 7, init)] + blk(1, ver=ver, inst=inst, init=init, marks=marks, extra_rows=list(rows) + list(extra))
+def side(ver, inst, init, rows, marks=MK, extra=(), cycles=None, price_at=None):
+    blkrows = blk(1, ver=ver, inst=inst, init=init, marks=marks, extra_rows=list(rows) + list(extra), cycles=cycles)
+    if price_at:                                     # A-57 counterexample: one MODEL price changed
+        blkrows = [l.replace("1.23456", "9.99900") if ("MODEL" in l and price_at in l) else l for l in blkrows]
+    return [start(ver, inst, 7, init)] + blkrows
 V = ["-Source", A52, "-Versus", B53]
-old52 = [ctx(*E1, inst="0A52", init=1), ctx(*E2s, inst="0A52", init=1), ctx(*E3, inst="0A52", init=1)]
-new53 = [ctx(*E1, inst="0B53", init=2, also=1), dedup("BOS", "UP", E1[4], "2026.09.07 20:00@1.23000", [STALE], inst="0B53", init=2),
-         ctx(*E3[:3], 2, *E3[4:], inst="0B53", init=2, also=0)]
-case("c05_versus_dedup_only", side("2.52", "0A52", 1, old52) + side("2.53", "0B53", 2, new53), V,
-     ["suppressed duplicate               1", "strength renumbered                1", "UNEXPLAINED                        0",
-      "H4 state: identical at every event bar", "upgrade regression: 0 difference(s) over 3 / 3 MODEL row(s), same window and parameters."])
+def old52_rows(e1=E1, inst="0A52"): return [ctx(*e1, inst=inst, init=1), ctx(*E2s, inst=inst, init=1), ctx(*E3, inst=inst, init=1)]
+def new53_rows(e1=E1, e3=None, inst="0B53"):
+    e3 = e3 or (E3[:3] + (2,) + E3[4:])
+    return [ctx(*e1, inst=inst, init=2, also=1), dedup("BOS", "UP", E1[4], "2026.09.07 20:00@1.23000", [STALE], inst=inst, init=2),
+            ctx(*e3, inst=inst, init=2, also=0)]
+OK_NOT = ["PENDING_ATTRIBUTION - a manual", "UNEXPLAINED - not traced"]
+case("c05_versus_dedup_only", side("2.52", "0A52", 1, old52_rows()) + side("2.53", "0B53", 2, new53_rows()), V,
+     ["suppressed duplicate               1", "strength renumbered                1", "PENDING_ATTRIBUTION                0", "UNEXPLAINED                        0",
+      "H4 state: identical at every event bar", "all 2 difference(s) traced to the BOS de-dup with a concrete link"], OK_NOT)
+
+# c06: v2.52 counts a stale high in TRANSITION (TRANS_FAIL -> BULLISH); v2.53 had processed it and stays in
+# TRANSITION. In v2.52 only, the BULLISH bar lets a POI be made, a session start on it, a block, ARMED, a model.
 CH = ("CHOCH", "DOWN", "TRANSITION", 0, "2026.09.09 08:00", "2026.09.08 20:00", "1.22950", "1.22900")
 TF = ("TRANS_FAIL", "UP", "BULLISH", 1, "2026.09.10 08:00", "2026.09.06 12:00", "1.22900", "1.23000")
-poi52 = diag(SRC.replace("USDJPY,M5", "USDJPY,M5"), "HMI-POI,NEW", "2026.09.10 08:00", "0A52", 7, 1, extra="id=77,dir=1,lo=1.22800,hi=1.22900,origin=2026.09.10 00:00")
-old52b = [ctx(*E1, inst="0A52", init=1), ctx(*CH, inst="0A52", init=1), ctx(*TF, inst="0A52", init=1, messy=1), poi52]
+def chain52(inst="0A52"):
+    return [diag(SRC, "HMI-POI,NEW",   "2026.09.10 08:00", inst, 7, 1, extra="id=77,dir=1,lo=1.22800,hi=1.22900,origin=2026.09.10 00:00"),
+            diag(SRC, "HMI-SESS,START", "2026.09.11 09:05", inst, 7, 1, extra="id=78,poi=77,dir=1"),
+            diag(SRC, "HMI-BLK,NEW",   "2026.09.11 09:30", inst, 7, 1, extra="id=79,sess=78,dir=1,type=OB,counter=0"),
+            diag(SRC, "HMI-ARM",       "2026.09.11 10:00", inst, 7, 1, extra="block=79,sess=78,dir=1")]
+old52b = [ctx(*E1, inst="0A52", init=1), ctx(*CH, inst="0A52", init=1), ctx(*TF, inst="0A52", init=1, messy=1)] + chain52()
 new53b = [ctx(*E1, inst="0B53", init=2, also=1), dedup("BOS", "UP", E1[4], "2026.09.07 20:00@1.23000", [STALE], inst="0B53", init=2),
           ctx(*CH, inst="0B53", init=2, also=0)]
-case("c06_versus_state_divergence", side("2.52", "0A52", 1, old52b, marks=MK + ["2026.09.12 10:05:00"]) + side("2.53", "0B53", 2, new53b), V,
+case("c06_versus_state_divergence", side("2.52", "0A52", 1, old52b, marks=MK + ["2026.09.12 10:05:00"], cycles=[100, 101, 102, 79])
+                                    + side("2.53", "0B53", 2, new53b), V,
      ["suppressed duplicate               1", "H4 state differs in 1 interval(s), first from 2026.09.10 08:00",
-      "before the first H4 state difference (UNEXPLAINED): 0", "every one after an H4 state difference caused by the BOS de-dup"],
-     ["UNEXPLAINED                        1"])
+      "chain differences in the common region: POI 1   SESS 1   BLK 1   ARM 1   MODEL 1",
+      "verdicts: explained 6   PENDING_ATTRIBUTION 0   UNEXPLAINED 0", "all 6 difference(s) traced to the BOS de-dup with a concrete link"], OK_NOT)
 case("c07_versus_model_unexplained", side("2.52", "0A52", 1, [ctx(*E1, inst="0A52", init=1)], marks=MK + ["2026.09.12 10:05:00"])
                                      + side("2.53", "0B53", 2, [ctx(*E1, inst="0B53", init=2, also=0)]), V,
-     ["H4 state: identical at every event bar", "before the first H4 state difference (UNEXPLAINED): 1",
-      "upgrade regression: 1 difference(s) over 4 / 3 MODEL row(s)"], ["caused by the BOS de-dup"])
-case("c08_versus_ctx_unexplained", side("2.52", "0A52", 1, old52) + side("2.53", "0B53", 2, [ctx(*E1, inst="0B53", init=2, also=0), ctx(*E3[:3], 2, *E3[4:], inst="0B53", init=2, also=0)]), V,
-     ["UNEXPLAINED                        1", "but 1 structure / chain difference(s) are UNEXPLAINED"])
+     ["H4 state: identical at every event bar", "<- before the first H4 direction difference", "1 difference(s) UNEXPLAINED - not traced"], ["traced to the BOS de-dup with a concrete link"])
+case("c08_versus_ctx_unexplained", side("2.52", "0A52", 1, old52_rows()) + side("2.53", "0B53", 2, [ctx(*E1, inst="0B53", init=2, also=0), ctx(*E3[:3], 2, *E3[4:], inst="0B53", init=2, also=0)]), V,
+     ["CTX UNEXPLAINED                        1", "before the first de-dup the two versions are the same code path", "UNEXPLAINED - not traced"], ["traced to the BOS de-dup with a concrete link"])
+# ---- A-57: the reviewer's three counterexamples, plus a model of an unchanged open cycle
+case("c11_cx_h4_close_changed", side("2.52", "0A52", 1, old52_rows()) + side("2.53", "0B53", 2, new53_rows(e3=E3[:3] + (2,) + E3[4:7] + ("9.99900",))), V,
+     ["the market data differs, the de-dup does not move a close", "UNEXPLAINED - not traced"], ["traced to the BOS de-dup with a concrete link"])
+case("c12_cx_first_bos_str9", side("2.52", "0A52", 1, old52_rows()) + side("2.53", "0B53", 2, new53_rows(e1=E1[:3] + (9,) + E1[4:])), V,
+     ["str=9 but the strength rule gives 1", "UNEXPLAINED - not traced"], ["traced to the BOS de-dup with a concrete link"])
+case("c13_cx_model_price_changed", side("2.52", "0A52", 1, old52b, marks=MK + ["2026.09.12 10:05:00"], cycles=[100, 101, 102, 79])
+                                   + side("2.53", "0B53", 2, new53b, price_at="2026.09.15 14:35"), V,
+     ["its cycle's ARMED row (block 101) is not in the log", "PENDING_ATTRIBUTION - a manual conclusion"], ["traced to the BOS de-dup with a concrete link"])
+case("c14_cx_model_open_cycle", side("2.52", "0A52", 1, old52b, marks=MK + ["2026.09.12 10:05:00"], cycles=[61, 101, 102, 79])
+                                + side("2.53", "0B53", 2, new53b, cycles=[61, 101, 102], price_at="2026.09.10 10:05"), V,
+     ["same anchor, cycle open in both builds at this bar", "UNEXPLAINED - not traced"], ["traced to the BOS de-dup with a concrete link"])
 
 # strength number only: same event, same swing, same state, str counted from another H4 start
 same_s = ctx_rows([E1, E3[:3] + (5,) + E3[4:]], also=0)

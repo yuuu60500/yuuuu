@@ -15,6 +15,7 @@ poi_rejects.txt
 # including into the synthetic case folders under tools/logtests
 reload_diff_*.txt
 live_vs_build_diff_*.txt
+attribution_*.txt
 poi_rejects_*.txt
 ctx_events.csv
 

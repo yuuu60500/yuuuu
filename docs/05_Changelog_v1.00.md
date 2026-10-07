@@ -1725,3 +1725,19 @@ Evidence:  docs/evidence/v2.53_h4_dedup_offline.txt
 Trading Logic Changed:  YES —— 结构事件与强度；H4 状态仅在陈旧点推动 TRANSITION / RANGE 时改变
 Compile Status:         NOT COMPILE VERIFIED（本环境无 MetaEditor）
 ```
+
+---
+
+## v2.53 工具修订（A-57）—— 跨版本归因只认具体证据（MQL5 不变）
+
+```
+Date:     2026-10-07
+来源:     验收方「HMI v2.53 验收复核报告」（2026-10-06）P2
+MQL5:     不变（与验收方编译的 v2.53 字节相同，HMI_VERSION 仍 2.53）
+
+tools/ReloadTest.ps1   跨版本归因三档：explained（具体链接）/ UNEXPLAINED（可证明非去重）/ PENDING_ATTRIBUTION（人工复核），
+                       逐条写入 attribution_<旧源>__<新源>.txt；链路 POI -> SESS -> BLK -> ARM -> MODEL 实例内按 id、跨版本按稳定字段对应；
+                       H4 收盘 / 摆动点价位一致性与强度规则核对；取消按时间先后的自动解释
+tools/h4_dedup_sim.py  同规则；归因防护自测 6/6
+tools/logtests         49 组（c05–c08 改为新判据；c06 补完整链；新增 c11–c14 反例）；合成诊断行改为真实字段顺序
+```

@@ -274,71 +274,126 @@ def multiset_diff(a, b):
     return list((ca - cb).elements()), list((cb - ca).elements())
 
 
+def strength_check(rows):
+    """The context engine's strength rule (Spec 2.4). Annotates each row with the value
+    the rule gives and the bar its leg began; returns the rows whose str breaks it."""
+    prev, s, leg, bad = RANGE, 0, None, []
+    for r in rows:
+        k = r["kind"]
+        if k == "BOS":
+            if prev in (BULL_CTX, BEAR_CTX): s += 1
+            else: s, leg = 1, r["bar"]
+        elif k == "CHOCH": s, leg = 0, r["bar"]
+        elif k in ("TRANS_OK", "TRANS_FAIL"): s, leg = 1, r["bar"]
+        r["str_rule"], r["leg"] = s, leg
+        if r["str"] != s: bad.append(r)
+        prev = r["ctx"]
+    return bad
+
+
 def attribute(old, new):
-    """old = v2.52 engine, new = v2.53 engine. Returns a report dict."""
+    """old = v2.52 engine, new = v2.53 engine. The same three verdicts as ReloadTest -Versus
+    (A-57): explained needs a concrete link; UNEXPLAINED is provably not the de-dup;
+    everything else is PENDING_ATTRIBUTION. Time order alone explains nothing."""
     t_dedup = min([d["bar"] for d in new.dedup_rows], default=None)
-    processed_new = {}                     # (dir, swing time) -> bar it was processed in v2.53
+    proc = {}
     for r in new.ctx_rows:
-        if r["swing"]:
-            processed_new.setdefault((r["dir"], r["swing"]), r["bar"])
+        if r["swing"]: proc.setdefault((r["dir"], r["swing"]), r["bar"])
     for d in new.dedup_rows:
-        for (dd, st, _) in d["extra"]:
-            processed_new.setdefault((dd, st), d["bar"])
+        for (dd, st, _) in d["extra"]: proc.setdefault((dd, st), d["bar"])
+    v = {"explained": [], "PENDING_ATTRIBUTION": [], "UNEXPLAINED": []}
+    cls = {"suppressed duplicate": 0, "primary re-referenced": 0, "strength renumbered": 0, "PENDING_ATTRIBUTION": 0, "UNEXPLAINED": 0}
 
-    only_old, only_new = multiset_diff([ctx_key(r) for r in old.ctx_rows], [ctx_key(r) for r in new.ctx_rows])
-    # same event, strength renumbered
-    so, sn = multiset_diff([ctx_key(r, False) for r in old.ctx_rows], [ctx_key(r, False) for r in new.ctx_rows])
-    renumbered = len(only_old) - len(so)
+    # facts no de-dup can change: the H4 close of a bar, a swing's price, the strength rule
+    close_o = {r["bar"]: r["close"] for r in old.ctx_rows}
+    px_o = {(r["dir"], r["swing"]): r["swing_px"] for r in old.ctx_rows if r["swing"]}
+    for r in new.ctx_rows:
+        if r["bar"] in close_o and close_o[r["bar"]] != r["close"]:
+            v["UNEXPLAINED"].append(("CTX", r["bar"], "H4 close differs")); cls["UNEXPLAINED"] += 1
+        if r["swing"] and (r["dir"], r["swing"]) in px_o and px_o[(r["dir"], r["swing"])] != r["swing_px"]:
+            v["UNEXPLAINED"].append(("CTX", r["bar"], "swing price differs")); cls["UNEXPLAINED"] += 1
+    bad = strength_check(old.ctx_rows) + strength_check(new.ctx_rows)
+    bad_ids = {id(r) for r in bad}
+    for r in bad:
+        v["UNEXPLAINED"].append(("CTX", r["bar"], f"str {r['str']} != rule {r['str_rule']}")); cls["UNEXPLAINED"] += 1
 
-    cls = {"suppressed duplicate": 0, "primary re-referenced": 0, "strength renumbered": renumbered,
-           "path changed after a de-dup": 0, "UNEXPLAINED": 0}
-    unexplained = []
-    # same bar, same event, same resulting state, another primary swing: v2.52's primary
-    # had already been processed by v2.53 (so it was a duplicate there), and v2.53 names
-    # the next swing this close breaks for the first time
-    same_event = lambda k: (k[0], k[1], k[2], k[3], k[6])
-    new_by_event = {}
-    for k in sn:
-        new_by_event.setdefault(same_event(k), []).append(k)
-    paired_new = set()
-    for k in so:
-        bar, kind, d, ctx, swing = k[0], k[1], k[2], k[3], k[4]
-        p = processed_new.get((d, swing))
-        dup = bool(swing) and p is not None and p < bar
-        mate = [x for x in new_by_event.get(same_event(k), []) if x not in paired_new]
-        if dup and mate:
-            cls["primary re-referenced"] += 1; paired_new.add(mate[0])
+    # CTX differences, matched on everything but str
+    from collections import defaultdict
+    def nostr(r): return (r["bar"], r["kind"], r["dir"], r["ctx"], r["swing"], round(r["swing_px"], 5), r["messy"], round(r["close"], 5))
+    def event(r): return (r["bar"], r["kind"], r["dir"], r["ctx"], r["messy"], round(r["close"], 5))
+    go, gn = defaultdict(list), defaultdict(list)
+    for r in old.ctx_rows: go[nostr(r)].append(r)
+    for r in new.ctx_rows: gn[nostr(r)].append(r)
+    only_o = [r for k in go for r in go[k][len(gn.get(k, [])):]]
+    only_n = [r for k in gn for r in gn[k][len(go.get(k, [])):]]
+    by_event = defaultdict(list)
+    for r in only_n: by_event[event(r)].append(r)
+    explained_ids, paired = set(), set()
+    for r in only_o:
+        if t_dedup is None or r["bar"] < t_dedup:
+            cls["UNEXPLAINED"] += 1; v["UNEXPLAINED"].append(("CTX", r["bar"], "before the first de-dup")); continue
+        p = proc.get((r["dir"], r["swing"]))
+        dup = bool(r["swing"]) and p is not None and p < r["bar"]
+        mate = next((y for y in by_event[event(r)] if id(y) not in paired), None)
+        if dup and mate is not None and proc.get((mate["dir"], mate["swing"])) == mate["bar"]:
+            paired.add(id(mate)); explained_ids |= {id(r), id(mate)}
+            cls["primary re-referenced"] += 1; v["explained"].append(("CTX", r["bar"], "primary re-referenced"))
         elif dup:
-            cls["suppressed duplicate"] += 1
-        elif t_dedup is not None and bar >= t_dedup:
-            cls["path changed after a de-dup"] += 1
+            explained_ids.add(id(r)); cls["suppressed duplicate"] += 1; v["explained"].append(("CTX", r["bar"], "suppressed duplicate"))
         else:
-            cls["UNEXPLAINED"] += 1; unexplained.append(("v2.52 only", k))
-    for k in sn:
-        if k in paired_new:
-            continue
-        if t_dedup is not None and k[0] >= t_dedup:
-            cls["path changed after a de-dup"] += 1
-        else:
-            cls["UNEXPLAINED"] += 1; unexplained.append(("v2.53 only", k))
+            cls["PENDING_ATTRIBUTION"] += 1; v["PENDING_ATTRIBUTION"].append(("CTX", r["bar"], "no processed swing / pair"))
+    for r in only_n:
+        if id(r) in paired: continue
+        if t_dedup is None or r["bar"] < t_dedup:
+            cls["UNEXPLAINED"] += 1; v["UNEXPLAINED"].append(("CTX", r["bar"], "before the first de-dup")); continue
+        cls["PENDING_ATTRIBUTION"] += 1; v["PENDING_ATTRIBUTION"].append(("CTX", r["bar"], "not paired"))
+    leg_diff = [r for r in only_o + only_n if r["kind"] == "BOS"]
+    for k in go:
+        for o, w in zip(go[k], gn.get(k, [])):
+            if o["str"] == w["str"] or id(o) in bad_ids or id(w) in bad_ids:
+                continue
+            in_leg = [r for r in leg_diff if r["leg"] == o["leg"] and r["bar"] <= o["bar"]]
+            if o["leg"] == w["leg"] and in_leg and all(id(r) in explained_ids for r in in_leg):
+                cls["strength renumbered"] += 1; v["explained"].append(("CTX", o["bar"], "strength renumbered"))
+            else:
+                cls["PENDING_ATTRIBUTION"] += 1; v["PENDING_ATTRIBUTION"].append(("CTX", o["bar"], "strength not covered"))
 
-    # H4 state timeline
+    # H4 state / direction
     div, cur = [], None
     for (t, a), (_, b) in zip(old.state_after, new.state_after):
-        if a != b and cur is None:
-            cur = [t, t, a, b]
-        elif a != b:
-            cur[1] = t
-        elif cur is not None:
-            div.append(cur); cur = None
-    if cur is not None:
-        div.append(cur)
-    t_state = div[0][0] if div else None
+        if a != b and cur is None: cur = [t, t, a, b]
+        elif a != b: cur[1] = t
+        elif cur is not None: div.append(cur); cur = None
+    if cur is not None: div.append(cur)
+    dir_of = lambda c: UP if c == BULL_CTX else (DOWN if c == BEAR_CTX else 0)
+    dir_o = {t: dir_of(c) for t, c in old.state_after}
+    dir_n = {t: dir_of(c) for t, c in new.state_after}
+    t_dir = min([t for t in dir_o if dir_o[t] != dir_n.get(t)], default=None)
 
+    # H4 POI chain: NEW needs the trend in its direction on its own bar; OUT is shifted by
+    # explained POIs made earlier; other events of a POI made in one version only follow it
     po, pn = multiset_diff(old.poi_rows, new.poi_rows)
-    poi_unexpl = [x for x in po + pn if t_state is None or x[3] < t_state]
-    return dict(t_dedup=t_dedup, cls=cls, unexplained=unexplained, div=div, t_state=t_state,
-                poi_old=po, poi_new=pn, poi_unexpl=poi_unexpl)
+    new_o = {(x[1], x[2]) for x in old.poi_rows if x[0] == "NEW"}
+    new_n = {(x[1], x[2]) for x in new.poi_rows if x[0] == "NEW"}
+    explained_poi, explained_new_t = set(), []
+    for x, has_old in sorted([(x, True) for x in po] + [(x, False) for x in pn], key=lambda z: (z[0][3], z[0][0] != "NEW")):
+        kind, origin, d, t = x
+        if t_dir is None or t < t_dir:
+            v["UNEXPLAINED"].append(("POI", t, f"{kind} before the first H4 direction difference")); continue
+        dh, dn = (dir_o, dir_n) if has_old else (dir_n, dir_o)
+        in_both = (origin, d) in new_o and (origin, d) in new_n
+        if kind == "NEW":
+            if dh.get(t) != dn.get(t) and dh.get(t) == d:
+                explained_poi.add((origin, d)); explained_new_t.append(t); v["explained"].append(("POI", t, "direction gates creation"))
+            else:
+                v["PENDING_ATTRIBUTION"].append(("POI", t, "NEW, same direction in both"))
+        elif not in_both:
+            (v["explained"] if (origin, d) in explained_poi else v["PENDING_ATTRIBUTION"]).append(("POI", t, f"{kind} of a one-version POI"))
+        elif kind == "OUT" and any(s <= t for s in explained_new_t):
+            v["explained"].append(("POI", t, "window shifted by an explained POI"))
+        else:
+            v["PENDING_ATTRIBUTION"].append(("POI", t, f"{kind} of a POI in both versions"))
+    return dict(t_dedup=t_dedup, cls=cls, v=v, div=div, t_dir=t_dir, poi_old=po, poi_new=pn)
 
 
 # ---- scenarios ---------------------------------------------------------------
@@ -407,8 +462,8 @@ def scenario(name, rows, expect_new, expect_old_extra):
     extra_old = [e for e in ev_old if (e[0], e[1], e[2]) not in [(x[0], x[1], x[2]) for x in ev_new]]
     if [e[0] for e in extra_old] != expect_old_extra:
         errs.append(f"v2.52-only event bars {[e[0] for e in extra_old]} != {expect_old_extra}")
-    if rep["cls"]["UNEXPLAINED"]:
-        errs.append(f"unexplained differences {rep['unexplained']}")
+    if rep["v"]["UNEXPLAINED"] or rep["v"]["PENDING_ATTRIBUTION"]:
+        errs.append(f"UNEXPLAINED {rep['v']['UNEXPLAINED']} PENDING {rep['v']['PENDING_ATTRIBUTION']}")
     print(f"{'PASS' if not errs else 'FAIL'}  {name}")
     print(f"        v2.53 events (bar, kind, dir, also): {ev_new}")
     print(f"        v2.52 events (bar, kind, dir):       {ev_old}")
@@ -480,18 +535,22 @@ def replay(path):
     print(f"  max strength           {max([r['str'] for r in old.ctx_rows] or [0]):6d}  {max([r['str'] for r in new.ctx_rows] or [0]):6d}")
     print(f"\nfirst de-dup bar: {tstr(rep['t_dedup']) if rep['t_dedup'] else '-'}")
     print("CTX differences (v2.52 vs v2.53), by cause:")
-    for k, v in rep["cls"].items():
-        print(f"  {k:32s} {v}")
+    for k, n in rep["cls"].items():
+        print(f"  {k:32s} {n}")
     print(f"\nH4 state divergence intervals: {len(rep['div'])}")
     for (a, b, so, sn) in rep["div"][:20]:
         print(f"  {tstr(a)} .. {tstr(b)}   v2.52 {so:10s} v2.53 {sn}")
     tot = sum(1 for (t, a), (_, b) in zip(old.state_after, new.state_after) if a != b)
-    print(f"  H4 bars in a different state: {tot} of {len(bars)}")
+    print(f"  H4 bars in a different state: {tot} of {len(bars)}; first H4 direction difference: {tstr(rep['t_dir']) if rep['t_dir'] else 'none'}")
     print(f"\nPOI events only in v2.52: {len(rep['poi_old'])}, only in v2.53: {len(rep['poi_new'])}")
     for x in sorted(rep["poi_old"] + rep["poi_new"], key=lambda x: x[3])[:20]:
         side = "v2.52" if x in rep["poi_old"] else "v2.53"
         print(f"  {side} {x[0]:8s} origin {tstr(x[1])} dir {x[2]:+d} at {tstr(x[3])}")
-    print(f"  POI differences before the first state divergence (unexplained): {len(rep['poi_unexpl'])}")
+    vv = rep["v"]
+    print(f"\nverdicts: explained {len(vv['explained'])}   PENDING_ATTRIBUTION {len(vv['PENDING_ATTRIBUTION'])}   UNEXPLAINED {len(vv['UNEXPLAINED'])}")
+    for what in ("UNEXPLAINED", "PENDING_ATTRIBUTION"):
+        for (kind, t, why) in vv[what][:10]:
+            print(f"  {what:20s} {kind} {tstr(t)}  {why}")
     ok_new, k_new = prefix_stable(bars, True)
     ok_old, k_old = prefix_stable(bars, False)
     print(f"\nprefix stability (cut every 25 bars; no event or POI changes when later bars arrive): "
@@ -499,9 +558,46 @@ def replay(path):
     for ver, dd in (("v2.52", False), ("v2.53", True)):
         b, n = shift_stability(bars, dd)
         print(f"window start moved 1..30 H4 bars (events after 60 bars of settle): {ver} {b} of 30 shifts differ, {n} row(s)")
-    bad = rep["cls"]["UNEXPLAINED"] + len(rep["poi_unexpl"]) + (0 if ok_new else 1)
-    print(f"\n{'ALL DIFFERENCES TRACE TO BOS DE-DUPLICATION' if bad == 0 else 'UNEXPLAINED: ' + str(bad)}")
-    return bad == 0
+    un, pe = len(rep["v"]["UNEXPLAINED"]) + (0 if ok_new else 1), len(rep["v"]["PENDING_ATTRIBUTION"])
+    print("\n" + ("ALL DIFFERENCES TRACED TO BOS DE-DUPLICATION WITH A CONCRETE LINK" if un == 0 and pe == 0 else
+                  f"NOT ALL TRACED: UNEXPLAINED {un}, PENDING_ATTRIBUTION {pe}"))
+    return un == 0 and pe == 0
+
+
+def attribution_guards():
+    """A-57: the verdicts must not be fooled. Each guard tampers with ONE field of a real
+    v2.53 run and checks the attribution refuses to call it explained."""
+    import copy
+    bars = build(PUSH)
+    old, base = run(bars, False), run(bars, True)
+    ok = 0
+    def check(name, mutate, want):
+        nonlocal ok
+        new = copy.deepcopy(base); mutate(new)
+        v = attribute(old, new)["v"]
+        got = "UNEXPLAINED" if v["UNEXPLAINED"] else ("PENDING_ATTRIBUTION" if v["PENDING_ATTRIBUTION"] else "explained")
+        good = got == want
+        ok += good
+        print(f"{'PASS' if good else 'FAIL'}  guard: {name:60s} -> {got} (want {want})")
+    first_bos = lambda e: next(r for r in e.ctx_rows if r["kind"] == "BOS")
+    last_bos = lambda e: [r for r in e.ctx_rows if r["kind"] == "BOS"][-1]
+    check("untouched v2.53 run", lambda e: None, "explained")
+    check("H4 close of an event bar changed", lambda e: last_bos(e).update(close=9.999), "UNEXPLAINED")
+    check("first BOS from RANGE logged with str 9", lambda e: first_bos(e).update(str=9), "UNEXPLAINED")
+    check("swing price of a primary changed", lambda e: last_bos(e).update(swing_px=9.999), "UNEXPLAINED")
+    check("POI made in v2.53 only, H4 direction never differs",
+          lambda e: e.poi_rows.append(("NEW", bars[15][0], UP, bars[15][0] + H4)), "UNEXPLAINED")
+    def extra_event(e):
+        # a BOS on bar 16, where neither version has an event: real close, str kept consistent
+        # with the rule (the later BOS is renumbered to match) - only the pairing is missing
+        i = next(k for k, r in enumerate(e.ctx_rows) if r["bar"] > bars[16][0] + H4)
+        r = dict(e.ctx_rows[i - 1]); r.update(bar=bars[16][0] + H4, swing=bars[15][0], swing_px=1.1048,
+                                              close=bars[16][4], str=e.ctx_rows[i - 1]["str"] + 1, also=0)
+        e.ctx_rows.insert(i, r)
+        for q in e.ctx_rows[i + 1:]:
+            if q["kind"] == "BOS": q["str"] += 1
+    check("v2.53-only BOS after a de-dup, paired with nothing", extra_event, "PENDING_ATTRIBUTION")
+    return ok, 6
 
 
 if __name__ == "__main__":
@@ -514,5 +610,7 @@ if __name__ == "__main__":
     ok += scenario("shadowed: close between an older lower high and the latest high is no event; beyond -> one",
                    SHADOW, [(11, "BOS", UP, 1)], [12])
     ok += scenario("shadowed, bear mirror", mirror(SHADOW), [(11, "BOS", DOWN, 1)], [12])
-    print(f"\n{ok}/4 scenarios as expected")
-    sys.exit(0 if ok == 4 else 1)
+    print(f"\n{ok}/4 scenarios as expected\n")
+    g, gn = attribution_guards()
+    print(f"\n{g}/{gn} attribution guards as expected")
+    sys.exit(0 if ok == 4 and g == gn else 1)
