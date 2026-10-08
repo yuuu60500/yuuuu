@@ -1,0 +1,88 @@
+HMI v2.53 — MT5 same-version reload with a MOVED window: where the MODEL differences come from
+=============================================================================================
+Source:   user's terminal log 20261008.log (8 charts, v2.53, params=461F006E, run=1791304479), 2026-10-08
+Builds:   automatic rebuilds inside one init (prev_calculated == 0 / bar revised, A-32) - the window
+          slides with each one, so the two builds start, and leave warm-up, at different bars.
+Tool:     ReloadTest.ps1 -Source "<sym>,M5"  ->  "window moved: both warm-ups + 24 h settle",
+          MODEL MISMATCH (EURUSD 2, XAUUSD 7); LIQ and CTX IDENTICAL (44/44 + 12/12, 44/44 + 9/9).
+
+Mechanism (both symbols, every differing row traced):
+  1. Warm-up suppresses POI touches (ProcessClosedM5Bar returns before Phase 3 while n < 100).
+     Price is already inside a POI when warm-up ends, so each build starts its first session on
+     its OWN first post-warm-up bar: EURUSD 09.15 12:15 vs 15:45, XAUUSD 09.14 18:45 vs 21:35.
+  2. That session ends by TIMEOUT 288 bars later - again 3.5 h / 2 h 50 min apart.
+  3. In the build whose session lives longer, blocks / ARMED of that session exist that the other
+     build cannot make (its session has already timed out); their cycles then confirm models,
+     and a cycle outlives its session until the next ARMED (Rule 15). The other build keeps its
+     previous cycle open instead (XAUUSD cycle 602: CISD / MSS 09.16 21:55 in build 2 only).
+  4. The differences end at the next ARMED common to both builds: nothing differs afterwards
+     (EURUSD 09.16 16:45, XAUUSD 09.17 04:55; three weeks identical after that).
+  The 24 h settle of the reload check is shorter than "session lifetime (288 bars) + the cycle
+  armed at its end", so these rows fall inside the comparable region.
+
+Not repaint / future leak: each build is causal on identical data; the difference is only where
+processing started. Not new in v2.53 (the warm-up gate is the same in v2.48 / v2.52) and not
+related to the BOS de-dup (H4 CTX identical in both builds).
+Acceptance consequence: a same-version reload is judged on two builds of the SAME window -
+two reloads inside one M5 bar (docs/04 v2.53 item 5); automatically moved windows are not used.
+
+Rows (diagnostic + MODEL, inst/run/init stripped; ids are init-relative):
+
+EURUSD  (reload diff: B-only PA REJECTION 2026.09.16 15:55, PA ENGULFING 16:45, cycle 601)
+  build=1  from=2026.09.15 03:50  warmup_end=2026.09.15 12:10  to=2026.10.08 12:40
+     HMI-SESS,EURUSD,START,id=413,poi=390,dir=-1,bar=2026.09.15 12:15
+     HMI-BLK,EURUSD,NEW,id=602,sess=413,dir=-1,type=OB,counter=0,bar=2026.09.16 11:35
+     HMI-ARM,EURUSD,block=602,sess=413,dir=-1,bar=2026.09.16 11:40
+     HMI-BUILD,EURUSD,MODEL,-1,602,602,OB,CISD,2026.09.16 11:45:00,1.15467,2026.09.16 11:35:00,1.15452
+     HMI-BUILD,EURUSD,MODEL,-1,602,602,OB,MSS,2026.09.16 11:45:00,1.15467,2026.09.16 09:50:00,1.15443
+     HMI-BUILD,EURUSD,MODEL,-1,602,602,OB,PA ENGULFING,2026.09.16 11:45:00,1.15467
+     HMI-BLK,EURUSD,NEW,id=604,sess=413,dir=-1,type=OB,counter=0,bar=2026.09.16 11:50
+     HMI-BUILD,EURUSD,MODEL,-1,602,602,OB,BPR,2026.09.16 11:50:00,1.15433
+     HMI-SESS,EURUSD,END,id=413,poi=390,dir=-1,reason=TIMEOUT,bar=2026.09.16 12:20
+     HMI-BUILD,EURUSD,MODEL,-1,602,602,OB,PA BREAK-RETEST,2026.09.16 13:15:00,1.15385
+
+  build=2  from=2026.09.15 07:20  warmup_end=2026.09.15 15:40  to=2026.10.08 16:10
+     HMI-SESS,EURUSD,START,id=418,poi=375,dir=-1,bar=2026.09.15 15:45
+     HMI-BLK,EURUSD,NEW,id=585,sess=418,dir=-1,type=OB,counter=0,bar=2026.09.16 11:35
+     HMI-ARM,EURUSD,block=585,sess=418,dir=-1,bar=2026.09.16 11:40
+     HMI-BUILD,EURUSD,MODEL,-1,585,585,OB,CISD,2026.09.16 11:45:00,1.15467,2026.09.16 11:35:00,1.15452
+     HMI-BUILD,EURUSD,MODEL,-1,585,585,OB,MSS,2026.09.16 11:45:00,1.15467,2026.09.16 09:50:00,1.15443
+     HMI-BUILD,EURUSD,MODEL,-1,585,585,OB,PA ENGULFING,2026.09.16 11:45:00,1.15467
+     HMI-BLK,EURUSD,NEW,id=587,sess=418,dir=-1,type=OB,counter=0,bar=2026.09.16 11:50
+     HMI-BUILD,EURUSD,MODEL,-1,585,585,OB,BPR,2026.09.16 11:50:00,1.15433
+     HMI-BUILD,EURUSD,MODEL,-1,585,585,OB,PA BREAK-RETEST,2026.09.16 13:15:00,1.15385
+     HMI-BLK,EURUSD,NEW,id=601,sess=418,dir=-1,type=OB,counter=0,bar=2026.09.16 13:30
+     HMI-ARM,EURUSD,block=601,sess=418,dir=-1,bar=2026.09.16 14:00
+     HMI-BUILD,EURUSD,MODEL,-1,601,601,OB,CISD,2026.09.16 14:05:00,1.15385,2026.09.16 13:55:00,1.15354
+     HMI-BUILD,EURUSD,MODEL,-1,601,601,OB,MSS,2026.09.16 14:10:00,1.15356,2026.09.16 13:30:00,1.15343
+     HMI-BUILD,EURUSD,MODEL,-1,601,601,OB,BPR,2026.09.16 14:25:00,1.15356
+     HMI-BUILD,EURUSD,MODEL,-1,601,601,OB,PA BREAK-RETEST,2026.09.16 15:35:00,1.15350
+     HMI-SESS,EURUSD,END,id=418,poi=375,dir=-1,reason=TIMEOUT,bar=2026.09.16 15:50
+     HMI-BUILD,EURUSD,MODEL,-1,601,601,OB,PA REJECTION,2026.09.16 15:55:00,1.15387
+     HMI-BUILD,EURUSD,MODEL,-1,601,601,OB,PA ENGULFING,2026.09.16 16:45:00,1.15387
+
+XAUUSD  (reload diff: B-only cycle 529 models 2026.09.15 22:20 .. 09.17 04:55; A-only cycle 602 CISD / MSS 09.16 21:55)
+  build=2  from=2026.09.14 10:20  warmup_end=2026.09.14 18:40  to=2026.10.08 12:55
+     HMI-SESS,XAUUSD,START,id=452,poi=398,dir=-1,bar=2026.09.14 18:45
+     HMI-BLK,XAUUSD,NEW,id=625,sess=452,dir=-1,type=OB,counter=0,bar=2026.09.15 19:20
+     HMI-SESS,XAUUSD,END,id=452,poi=398,dir=-1,reason=TIMEOUT,bar=2026.09.15 19:50
+     HMI-BUILD,XAUUSD,MODEL,-1,602,602,OB,CISD,2026.09.16 21:55:00,4296.91,2026.09.15 15:25:00,4273.38
+     HMI-BUILD,XAUUSD,MODEL,-1,602,602,OB,MSS,2026.09.16 21:55:00,4296.91,2026.09.15 13:15:00,4270.01
+
+  build=3  from=2026.09.14 13:10  warmup_end=2026.09.14 21:30  to=2026.10.08 15:45
+     HMI-SESS,XAUUSD,START,id=451,poi=398,dir=-1,bar=2026.09.14 21:35
+     HMI-BLK,XAUUSD,NEW,id=604,sess=451,dir=-1,type=OB,counter=0,bar=2026.09.15 19:20
+     HMI-BLK,XAUUSD,NEW,id=613,sess=451,dir=-1,type=OB,counter=0,bar=2026.09.15 20:10
+     HMI-ARM,XAUUSD,block=613,sess=451,dir=-1,bar=2026.09.15 20:15
+     HMI-BUILD,XAUUSD,MODEL,-1,613,613,OB,PA ENGULFING,2026.09.15 20:25:00,4296.46
+     HMI-BUILD,XAUUSD,MODEL,-1,613,613,OB,PA REJECTION,2026.09.15 20:30:00,4295.20
+     HMI-BUILD,XAUUSD,MODEL,-1,613,613,OB,BPR,2026.09.15 20:40:00,4299.08
+     HMI-ARM,XAUUSD,block=529,sess=451,dir=-1,bar=2026.09.15 21:20
+     HMI-BUILD,XAUUSD,MODEL,-1,529,529,OB,PA REJECTION,2026.09.15 21:30:00,4306.56
+     HMI-BUILD,XAUUSD,MODEL,-1,529,529,OB,PA BREAK-RETEST,2026.09.15 22:20:00,4302.28
+     HMI-SESS,XAUUSD,END,id=451,poi=398,dir=-1,reason=TIMEOUT,bar=2026.09.15 22:40
+     HMI-BUILD,XAUUSD,MODEL,-1,529,529,OB,BPR,2026.09.15 22:40:00,4299.95
+     HMI-BUILD,XAUUSD,MODEL,-1,529,529,OB,CISD,2026.09.15 23:30:00,4295.33,2026.09.15 21:00:00,4294.98
+     HMI-BUILD,XAUUSD,MODEL,-1,529,529,OB,MSS,2026.09.15 23:35:00,4296.23,2026.09.15 21:00:00,4292.95
+     HMI-BUILD,XAUUSD,MODEL,-1,529,529,OB,PA ENGULFING,2026.09.17 04:55:00,4311.22
+

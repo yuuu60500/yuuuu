@@ -1745,3 +1745,29 @@ A-58 复核:               MODEL 早于 ARMED -> 5 explained / 1 UNEXPLAINED；�
                          随后 BRI-08、强度评分、质量评分、趋势面板；图形调整留在显示阶段
 Status:                  **工具阶段 PASS**；待运行证据
 ```
+
+
+## Audit Round 18 —— MT5 运行（用户终端，2026-10-08）
+
+### A-59 —— **窗口移动的同版本重载出现 MODEL 差异：来自预热边界会话**（观察，非缺陷）
+
+```
+Observed:                8 个品种挂 v2.53（默认参数，params=461F006E）。XAUUSD、EURUSD 由终端自动重建
+                         （同一 init 内 build 2 / 3），窗口随之移动。ReloadTest -Source：LIQ、CTX IDENTICAL；
+                         MODEL MISMATCH（EURUSD 2，XAUUSD 7），全部集中在比较区间开头，其后三周无差异
+Traced (log rows):       预热期内不处理 POI 触碰（ProcessClosedM5Bar 在 Phase 3 前返回）。价格在预热结束时已在 POI 内，
+                         两次构建各自在「自己的」首根非预热 K 线开始第一个会话（EURUSD 09.15 12:15 / 15:45，
+                         XAUUSD 09.14 18:45 / 21:35），288 根后 TIMEOUT 也相差同样时长。会话活得更久的构建多出
+                         会话末段的块 / ARMED，其周期在会话结束后继续确认模型（Rule 15）；另一构建则保留上一个
+                         周期（XAUUSD 周期 602 的 CISD / MSS 09.16 21:55）。差异止于两边共同的下一个 ARMED
+Conclusion:              窗口起点效应：同一数据、各自因果；不是重绘或未来函数。预热闸门 v2.48 / v2.52 相同，
+                         与 BOS 去重无关（两构建 H4 结构事件完全一致）。重载检查的 24 h 沉淀期短于
+                         「会话寿命 288 根 + 会话末段 ARMED 的周期」，所以这些行落在可比区间内
+Evidence:                docs/evidence/v2.53_reload_window_edge.txt（逐行）
+Action:                  验收用同一窗口的两次构建（同一根 M5 内重载两次，docs/04 v2.53 第 5 项）；
+                         自动重建的结果不作验收证据。工具与指标均不改
+Also seen:               GBPUSD 三周 0 个 MODEL：2 个会话均因 POI 失效在 1.5 h / 5 h 内结束，1 个块，无 ARMED；
+                         USDCHF 0 个会话：19 个 POI 中 11 个失效、7 个过期、7 个移出窗口，均未在有效期内被趋势方向触碰。
+                         属行情与规则所致，记录备查
+Status:                  **观察记录**；同窗口重载结果待补
+```

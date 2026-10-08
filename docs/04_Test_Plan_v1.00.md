@@ -890,7 +890,11 @@ ATR 系数 2.0 定向：v2.46 2/48（PMH BROKEN 仅连续运行有）· v2.47 0/
           一根收盘越过多个旧高后停留只计一次 BOS；空头对称；新摆动结构被有效突破产生新事件
 4  实时 vs 重建：`-LiveVsBuild` → MODEL / LIQ 双向 0 MISMATCH，「+ N H4 structure event(s)」N > 0；
           只因强度编号不同的条目为 PENDING REVIEW（说明见 A-56），事件 / 主参考点 / 状态不同则为 MISMATCH
-5  同版本重载：MODEL / LIQ / CTX 三行均 IDENTICAL
+5  同版本重载：MODEL / LIQ / CTX 三行均 IDENTICAL。两次构建必须是同一窗口：同一根 M5 内连续重载两次
+          （Ctrl+I -> HMI -> 属性 -> 确定，两次），BEGIN 的 from / to / warmup_end 相同。
+          终端自动重建（prev_calculated = 0 / K 线被修订）窗口会移动：预热结束后的第一个会话在各自的
+          首根非预热 K 线开始，其 TIMEOUT 及会话末段的块 / ARMED / 周期随之不同，差异可落在
+          「warm-ups + 24 h」之后（2026-10-08 实测，见 docs/evidence/v2.53_reload_window_edge.txt）——不作验收证据
 6  对比 v2.52（固定窗口，四品种）：v2.52 与 v2.53 两个实例同一根 M5 内挂上，
           `-Source <v2.52 源> -Versus <v2.53 源>` 逐品种（A-57 判据）：
             verdicts 行 UNEXPLAINED = 0
