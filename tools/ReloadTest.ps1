@@ -75,6 +75,9 @@
 #                       (D-4 off): then no model may confirm on its ARMED bar.
 #                       Default: D-4 on, the indicator default - PA ENGULFING /
 #                       REJECTION may confirm on the ARMED bar, nothing else.
+#     -H4SwingRight 2   (A-61, -Ctx) InpH4SwingRight of the builds read; the
+#                       stale-BOS check needs it to know when a swing was confirmed.
+#                       Default 2, the indicator default.
 #
 #     add  -Days 5  to merge the 5 most recent log files. MT5 starts a NEW
 #     log file every day: a live run that spans days leaves its marks in
@@ -87,7 +90,7 @@
 # ============================================================
 param([string]$Source = "", [switch]$LiveVsBuild, [switch]$Rejects, [switch]$Live,
       [switch]$Ctx, [switch]$Quiet, [switch]$Chain, [int]$Days = 1, [string]$LogDir = "", [int]$Warmup = 100,
-      [int]$SettleHours = 24, [string]$Versus = "", [switch]$NoArmedBarPA)
+      [int]$SettleHours = 24, [string]$Versus = "", [switch]$NoArmedBarPA, [int]$H4SwingRight = 2)
 
 # Row layout after the tag is stripped:
 #   0 symbol  1 "MODEL"  2 dir  3 cycle_id  4 block_id  5 anchor  6 model
@@ -569,6 +572,44 @@ if ($Quiet) {
     exit
 }
 
+# A-61: the break margin each chart logs at start-up, in points. ATR mode logs
+# no number (per bar) -> -1. Two different values for one symbol -> -1 too:
+# which one a given build used is then not in the log.
+$margin = @{}
+foreach ($l in $all) {
+    if ($l -match '\(([A-Za-z0-9._#]+),[A-Za-z0-9]+\)\s+HMI: effective break margin = [0-9.]+ price / (\d+) points') {
+        $sy = $Matches[1]; $pt = [int]$Matches[2]
+        if ($margin.ContainsKey($sy) -and $margin[$sy] -ne $pt) { $margin[$sy] = -1 } else { $margin[$sy] = $pt }
+    } elseif ($l -match '\(([A-Za-z0-9._#]+),[A-Za-z0-9]+\)\s+HMI: break margin mode = ATR_FRAC') { $margin[$Matches[1]] = -1 }
+}
+function PxDigits([string]$px) { $i = $px.IndexOf('.'); if ($i -lt 0) { return 0 } return $px.Length - $i - 1 }
+function HasWeekend([datetime]$a, [datetime]$b) {
+    for ($d = $a.Date; $d -le $b.Date; $d = $d.AddDays(1)) { if ($d.DayOfWeek -eq 'Saturday' -or $d.DayOfWeek -eq 'Sunday') { return $true } }
+    return $false
+}
+# Did any earlier close of this leg break e's swing, as the engine judges it?
+function StaleVerdict($e, $legC, [string]$ldir, $mg) {
+    $ts = PT16 $e.Swing
+    if ($ts -eq [datetime]::MinValue) { return [pscustomobject]@{ V = 'PENDING'; Why = 'swing time not logged' } }
+    $earliest = $ts.AddHours(4 * ($H4SwingRight + 1))      # confirmation close, no gap
+    $pt = [Math]::Pow(10, -(PxDigits $e.SwRaw))
+    $pend = $null
+    foreach ($c in $legC) {
+        $tc = PT16 $c.Bar                                    # close time of that event's H4 bar
+        if ($tc -lt $earliest) { continue }                  # swing not confirmed yet: new structure for that close
+        $d = [Math]::Round($(if ($ldir -eq 'UP') { $c.Close - $e.SwPx } else { $e.SwPx - $c.Close }) / $pt)
+        if ($d -le 0) { continue }                            # did not even reach past the raw price
+        if ($mg -eq $null) { $pend = "close $($c.CloseRaw) at $($c.Bar) is $d pt past it, the margin is not in the log"; continue }
+        if ($mg -lt 0)     { $pend = "close $($c.CloseRaw) at $($c.Bar) is $d pt past it, the margin is per bar (ATR)"; continue }
+        if ($d -le $mg)    { continue }                       # within the margin: not an effective break
+        $sure = (-not (HasWeekend $ts $tc)) -or ($tc -ge $earliest.AddHours(72))
+        if ($sure) { return [pscustomobject]@{ V = 'STALE'; Why = "close $($c.CloseRaw) at $($c.Bar) broke it by $d pt > margin $mg after its confirmation" } }
+        $pend = "close $($c.CloseRaw) at $($c.Bar) is $d pt past it, but a weekend lies between swing and close: confirmation time not provable"
+    }
+    if ($pend) { return [pscustomobject]@{ V = 'PENDING'; Why = $pend } }
+    return [pscustomobject]@{ V = 'OK'; Why = '' }
+}
+
 # -Ctx: the Context chain had no auditable output at all until HMI-CTX, so
 # `str N` on the panel could not be checked or put in perspective. This reads
 # those rows, dedupes across rebuilds, and reports where the current strength
@@ -593,7 +634,7 @@ if ($Ctx) {
         $rows += [pscustomobject]@{
             Sym = $c[0]; Kind = $c[1]; Dir = $f['dir']; Live = $f['live']
             Ctx = $f['ctx']; Str = [int]$f['str']; Messy = $f['messy']
-            Bar = $f['bar']; Swing = $f['swing']; SwPx = $swp; Close = $cls
+            Bar = $f['bar']; Swing = $f['swing']; SwPx = $swp; Close = $cls; SwRaw = [string]$f['swing_px']; CloseRaw = [string]$f['close']
             Raw = $Matches[1]
             Key = "$($c[0])|$($c[1])|$($f['bar'])|$($f['swing'])"
         }
@@ -625,28 +666,41 @@ if ($Ctx) {
         $acct = "      transitions  opened {0} = ok {1} + fail {2} + timeout {3} + still open {4}" -f $nCh, $nOk, $nFl, $nTo, $open
         Write-Host $acct -ForegroundColor $(if ($open -eq 0 -or $open -eq 1) { 'Green' } else { 'Red' })
 
-        # A-33 signature. A BOS whose level an EARLIER close in the same leg had
-        # already carried price past is not a new push: it is an old swing that
-        # was left unswept and is only now being counted. Legs restart on
-        # anything that is not a plain continuation BOS. This sees only closes
-        # at logged events, so the count is a LOWER bound.
-        $stale = 0; $bosN = 0; $ext = $null; $ldir = ''
+        # A-33 signature (A-61): a continuation BOS re-counts an old level only
+        # when an EARLIER close in the same leg had already broken that swing,
+        # as the context engine itself judges a break:
+        #   1. the swing was CONFIRMED when that close happened - a swing the
+        #      engine could not see yet is new structure, not an old level;
+        #   2. that close cleared it by MORE than the break margin (strict,
+        #      integer points) - touching or poking past the raw price is no break.
+        # The log has the swing's bar time, not its confirmation time: confirmation
+        # is (H4SwingRight + 1) H4 bars later, or later still across a weekend /
+        # holiday gap. A close before the earliest possible confirmation proves
+        # "not confirmed"; one after it proves "confirmed" only with no Saturday /
+        # Sunday in between (or 72 h of slack). Anything the log cannot settle -
+        # a gap, a per-bar ATR margin, an unknown margin - is PENDING, never a
+        # re-count. Closes are only those of logged events: a LOWER bound.
+        $mg = $(if ($margin.ContainsKey($g.Name)) { $margin[$g.Name] } else { $null })   # points; -1 = per bar (ATR); $null = not logged
+        $stale = 0; $pendS = 0; $bosN = 0; $legC = $null; $ldir = ''; $staleWhy = @()
         foreach ($e in $ev) {
-            if ($e.Kind -eq 'BOS' -and $e.Str -gt 1 -and $ext -ne $null -and $e.Dir -eq $ldir) {
+            if ($e.Kind -eq 'BOS' -and $e.Str -gt 1 -and $legC -ne $null -and $e.Dir -eq $ldir) {
                 $bosN++
-                if (($ldir -eq 'UP'   -and $e.SwPx -le $ext) -or
-                    ($ldir -eq 'DOWN' -and $e.SwPx -ge $ext)) { $stale++ }
-                if ($ldir -eq 'UP')   { $ext = [Math]::Max($ext, $e.Close) }
-                else                  { $ext = [Math]::Min($ext, $e.Close) }
+                $v = StaleVerdict $e $legC $ldir $mg
+                if ($v.V -eq 'STALE') { $stale++; $staleWhy += "STALE    $($e.Bar) swing $($e.Swing) @ $($e.SwRaw): $($v.Why)" }
+                elseif ($v.V -eq 'PENDING') { $pendS++; $staleWhy += "PENDING  $($e.Bar) swing $($e.Swing) @ $($e.SwRaw): $($v.Why)" }
+                [void]$legC.Add($e)
             }
             elseif ($e.Kind -eq 'BOS' -or $e.Kind -eq 'TRANS_OK' -or $e.Kind -eq 'TRANS_FAIL') {
-                $ext = $e.Close; $ldir = $e.Dir       # a leg begins here
+                $legC = New-Object System.Collections.ArrayList; [void]$legC.Add($e); $ldir = $e.Dir   # a leg begins here
             }
-            else { $ext = $null; $ldir = '' }        # CHOCH / SAMELEG / TIMEOUT
+            else { $legC = $null; $ldir = '' }        # CHOCH / SAMELEG / TIMEOUT
         }
         if ($bosN -gt 0) {
-            Write-Host ("      A-33 stale BOS  {0} of {1} continuation BOS ({2}%) re-count a level already crossed" -f `
-                        $stale, $bosN, [int](100.0 * $stale / $bosN)) -ForegroundColor $(if ($stale -gt 0) { 'Yellow' } else { 'Green' })
+            $mgS = $(if ($mg -eq $null) { 'margin not logged' } elseif ($mg -lt 0) { 'margin per bar (ATR)' } else { "margin $mg pt" })
+            Write-Host ("      A-33 stale BOS  {0} re-count(s), {1} pending, of {2} continuation BOS  ({3}, H4SwingRight {4})" -f `
+                        $stale, $pendS, $bosN, $mgS, $H4SwingRight) -ForegroundColor $(if ($stale -gt 0) { 'Red' } elseif ($pendS -gt 0) { 'Yellow' } else { 'Green' })
+            $staleWhy | Select-Object -First 8 | ForEach-Object { Write-Host "        $_" -ForegroundColor $(if ($_ -like 'STALE*') { 'Red' } else { 'Yellow' }) }
+            if ($staleWhy.Count -gt 8) { Write-Host "        ... $($staleWhy.Count - 8) more" -ForegroundColor Yellow }
         }
 
         # Strength is sampled at each BOS: the value that break left behind.

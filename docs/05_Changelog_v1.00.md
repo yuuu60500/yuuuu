@@ -1744,6 +1744,22 @@ tools/logtests         49 组（c05–c08 改为新判据；c06 补完整链；�
 
 ---
 
+## v2.53 工具修订 r4（A-61）—— `-Ctx` stale BOS 只认确认后、越过余量的更早收盘（MQL5 不变）
+
+```
+Date:     2026-10-09
+来源:     验收方「HMI v2.53 MT5 运行复核与 v2.54 开发安排」（2026-10-09）
+MQL5:     不变（与验收方编译的 v2.53 字节相同，HMI_VERSION 仍 2.53）
+
+tools/ReloadTest.ps1   -Ctx 的 A-33 诊断：re-count 需更早收盘在摆动点确认之后、以严格大于余量的整数点越过；
+                       余量取日志的 effective break margin；不能判定（ATR / 未记录余量 / 跨周末）→ pending，逐条列出；
+                       新参数 -H4SwingRight（默认 2）
+tools/logtests         67 组（新增 c26–c32）
+docs/04                v2.53 清单第 2 项判据改为 re-count 0 + pending 逐条核对；记录验收方复核后的结果与限制
+```
+
+---
+
 ## v2.53 工具修订（A-58）—— 链路归因先核对生命周期（MQL5 不变）
 
 ```

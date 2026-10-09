@@ -1795,3 +1795,38 @@ LIQ 389/389，CTX 107/107；GBPUSD / USDCHF 无 MODEL，MODEL 一项为样本不
 实时 MODEL 14、LIQ 5、H4 事件 2；工具留下的 4 条「edge bar」行在随后的构建中逐条存在且相同（覆盖止于 B.to 开盘时间，少算最后一根）。
 连同 10-08 清醒时段（LIQ 7 + H4 事件 1）：实时处理过的 K 线上没有任何事件丢失或多出。
 v2.53 MT5 运行证据齐备，汇总见 docs/evidence/v2.53_mt5_acceptance_summary.md，待验收方复核。
+
+
+## Audit Round 19 —— 验收方 v2.53 MT5 运行复核与 v2.54 开发安排（2026-10-09）
+
+```
+结论:                    可以开始 v2.54（保护点与波段锚点）；v2.53r3 冻结为开发与回退基线；
+                         现有证据支持继续开发，不足以把原清单全部标记为通过
+已核实:                  同窗口重载 MODEL 743/743、LIQ 389/389、CTX 107/107（8 品种，MODEL 有样本 6 个）；
+                         10-09 连续运行 14 MODEL / 5 LIQ / 2 H4 双向一致；10-08 休眠前 7 LIQ / 1 H4 一致；
+                         4 条末根边界行在下一构建中存在；47 个构建完整；每个构建内无同方向摆动点重复消费
+保留的限制:              A-59 移动窗口历史标记差异（后续独立改进，不并入 v2.54）；A-60 跨休眠区间不可验收（覆盖心跳另立）；
+                         第 6 项跨版本 MT5 比较未执行（不填 PASS）；GBPUSD / USDCHF 的 MODEL 样本不足
+日志快照 SHA256:         20261008.log FD9B6D1E05E403E3200E7314BEBCB8DA8078447E87FBDB8F86DFE7772E153899
+                         20261009.log 69F44BC8DAC5F3E4A73DB2113DE06C860AF64517C7A1D2F083D9DD400243F3FF
+```
+
+### A-61 —— **`-Ctx` 的 A-33 stale BOS 诊断误报**（工具，成立）
+
+```
+Observed:                用户日志 -Ctx 报 27 次 stale BOS（8 个品种 4/4/3/8/2/3/1/2），清单要求为 0
+Traced (验收方逐条):     23 条的摆动点在被比较的旧收盘之后才形成；4 条只触及或略越过原始价
+                         （GBPUSD 2 pt、USDCHF 1 pt、USDCAD 1 pt、NZDUSD 0 pt），未达默认余量 3 pt；47 个构建无重复消费
+Root cause:              诊断只比较「摆动点原始价」与同段更早收盘的极值：不核对该点当时是否已确认，也不核对是否越过有效余量
+Fix (工具 r4):           re-count 只在「同段更早的某个事件收盘，在该摆动点确认之后，以严格大于余量的整数点越过它」时成立：
+                         - 确认时间 = 摆动 K 线 + (H4SwingRight + 1) 根 H4（-H4SwingRight，默认 2）；早于此 = 新结构，不计
+                         - 余量取图表启动时日志的 effective break margin（点）；ATR 模式（逐根）或未记录 → pending
+                         - 摆动与收盘之间跨周末（缺口可能推迟确认）且不足 72 h 余裕 → pending
+                         - 输出「re-count / pending / 总数」及逐条理由；pending 不计为重复计数
+Verification:            用户日志：旧诊断 27 → 新诊断 re-count 0、pending 0（8 个品种）
+                         正向对照（Python 模型 EURUSD 1292 根 H4 写成 HMI-CTX 行）：v2.52 事件 旧 112 / 新 102 re-count + 2 pending；
+                         v2.53 事件 旧 7 / 新 0 —— 新诊断仍能识别真正的补计
+                         tools/logtests 新增 c26–c32：后来形成的新结构、未越过余量、确证补计、跨周末 pending、ATR 余量 pending、
+                         未记录余量 pending、空头镜像；r3 脚本在这 7 组全部失败
+Status:                  **FIXED —— 工具修订 r4（MQL5 不变）**
+```

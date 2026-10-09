@@ -808,6 +808,88 @@
    "explained            BLK v2.53 only"
   ]
  },
+ "c26_ctx_new_structure": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "A-33 stale BOS  0 re-count(s), 0 pending, of 1 continuation BOS"
+  ],
+  "forbid": [
+   "1 re-count",
+   "1 pending"
+  ]
+ },
+ "c27_ctx_within_margin": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "A-33 stale BOS  0 re-count(s), 0 pending, of 1 continuation BOS"
+  ],
+  "forbid": [
+   "1 re-count",
+   "1 pending"
+  ]
+ },
+ "c28_ctx_stale_proven": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "A-33 stale BOS  1 re-count(s), 0 pending, of 1 continuation BOS",
+   "broke it by 50 pt > margin 3 after its confirmation"
+  ],
+  "forbid": []
+ },
+ "c29_ctx_stale_weekend": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "A-33 stale BOS  0 re-count(s), 1 pending, of 1 continuation BOS",
+   "a weekend lies between swing and close"
+  ],
+  "forbid": [
+   "1 re-count"
+  ]
+ },
+ "c30_ctx_atr_margin": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "A-33 stale BOS  0 re-count(s), 1 pending, of 1 continuation BOS",
+   "the margin is per bar (ATR)"
+  ],
+  "forbid": [
+   "1 re-count"
+  ]
+ },
+ "c31_ctx_no_margin_line": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "A-33 stale BOS  0 re-count(s), 1 pending, of 1 continuation BOS",
+   "the margin is not in the log"
+  ],
+  "forbid": [
+   "1 re-count"
+  ]
+ },
+ "c32_ctx_bear_mirror": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "A-33 stale BOS  0 re-count(s), 0 pending, of 2 continuation BOS"
+  ],
+  "forbid": [
+   "1 re-count",
+   "1 pending"
+  ]
+ },
  "c09_ctx_strength_only": {
   "args": [
    "-Source",
