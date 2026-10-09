@@ -165,3 +165,54 @@ Tool:     ReloadTest.ps1 r3, byte-identical to tools/ReloadTest.ps1 at 9b8f965 (
    build only [1->2] USDJPY,MODEL,-1,3102,3102,OB,PA BREAK-RETEST,2026.10.09 05:25:00,158.020,1970.01.01 00:00:00,0.000
    build only [1->2] USDJPY,LIQ,1,0,0,PDH,SWEEP,2026.10.09 10:45:00,158.367,2026.10.09 10:40:00,0
    build only [1->2] USDJPY,LIQ,1,0,0,BSL,SWEEP,2026.10.09 10:45:00,158.367,2026.10.09 10:40:00,0
+
+4. Closing reload and final live vs rebuild (10-09, continuous run, no sleep)
+   The user reloaded all 8 charts at 16:31 .. 16:33 local (input change -> re-init, init 9 .. 16, to=10-09 18:25),
+   closing every live stretch of the day. r3 tool unchanged, 20261009.log alone (-LiveVsBuild -Days 1):
+
+   --- AUDUSD,M5 : LIVE vs BUILD ---
+     build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+     nothing comparable yet - no PASS can be given.
+   --- EURUSD,M5 : LIVE vs BUILD ---
+     build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+     nothing comparable yet - no PASS can be given.
+   --- GBPUSD,M5 : LIVE vs BUILD ---
+     build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+     nothing comparable yet - no PASS can be given.
+   --- NZDUSD,M5 : LIVE vs BUILD ---
+     build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+     nothing comparable yet - no PASS can be given.
+   --- USDCAD,M5 : LIVE vs BUILD ---
+     build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+     live events compared: 6 (+ 1 H4 structure event(s))
+     by model: LIQ BSL BROKEN 1  |  LIQ BSL SWEEP 3  |  LIQ PDH BROKEN 1  |  MSS 1
+     AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+   --- USDCHF,M5 : LIVE vs BUILD ---
+     build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+     nothing comparable yet - no PASS can be given.
+   --- USDJPY,M5 : LIVE vs BUILD ---
+     build pairs with a live stretch: 2   comparable: 2   pending review: 0   liquidity pending: 0
+       pending: build 3->4: 1 live row(s) on an edge bar, not provably covered
+       pending: build 4->1: 1 live row(s) on an edge bar, not provably covered
+     live events compared: 12 (+ 0 H4 structure event(s))
+     by model: BPR 3  |  CISD 3  |  PA BREAK-RETEST 1  |  PA ENGULFING 4  |  PA REJECTION 1
+     AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+   --- XAUUSD,M5 : LIVE vs BUILD ---
+     build pairs with a live stretch: 2   comparable: 2   pending review: 0   liquidity pending: 0
+       pending: build 6->7: 2 live row(s) on an edge bar, not provably covered
+     live events compared: 1 (+ 1 H4 structure event(s))
+     by model: PA ENGULFING 1
+     AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+
+   Compared and agreeing both ways: 14 live MODEL (USDJPY 12: BPR 3, CISD 3, PA BREAK-RETEST 1, PA ENGULFING 4,
+   PA REJECTION 1; USDCAD MSS 1; XAUUSD PA ENGULFING 1), 5 live LIQ (USDCAD), 2 live H4 events (USDCAD TRANS_FAIL,
+   XAUUSD TRANS_SAMELEG). 0 MISMATCH. The other five charts produced no live event on 10-09.
+   The 4 "edge bar" rows the tool leaves pending were checked against the build that follows them: the tool's
+   coverage ends at B.to, the OPEN time of B's last bar, while a row carries its bar's CLOSE time, so the last bar
+   of B is excluded. All 4 are in that build, identical (same key as the tool):
+     USDJPY MSS           10-09 12:00   next build to=11:55   present
+     XAUUSD CISD          10-09 15:55   next build to=15:50   present
+     XAUUSD MSS           10-09 15:55   next build to=15:50   present
+     USDJPY PA REJECTION  10-09 18:30   next build to=18:25   present
+   Together with 2b (10-08, awake part: 7 LIQ + 1 H4 event agree): 0 live event lost or added on any bar the live
+   run processed.
