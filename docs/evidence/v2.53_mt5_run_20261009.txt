@@ -1,0 +1,167 @@
+HMI v2.53 — MT5 run on the user's terminal, 2026-10-08 / 10-09: same-version reload and live vs rebuild
+=====================================================================================================
+Logs:     20261008.log (10:49:39 .. 15:44:59 local) + 20261009.log (09:05:46 .. 14:29:59 local), 8 charts,
+          v2.53, params=461F006E (defaults: D-4 on, D-5 off), run=1791304479. Server time = local + 2 h.
+Tool:     ReloadTest.ps1 r3, byte-identical to tools/ReloadTest.ps1 at 9b8f965 (A-58). Nothing in it was changed
+          for this record; the inputs below are the user's logs, cut where stated.
+
+1. Same-version reload (docs/04 v2.53 item 5) — PASS on all 8 charts
+   The user reloaded every chart twice inside one M5 bar (09:05 and 09:07 local, both to=2026.10.09 11:00).
+   The terminal rebuilt every chart once more at 10:00 local (to=11:55, window moved), so "the last two builds"
+   in the full log are not that pair. Log cut right after the second reload (20261009 line 5888, the USDJPY
+   BUILD-END at 09:07:14.747); every chart's last two builds are then the same-window pair:
+
+   --- GBPUSD,M5 : comparing the last two builds ---
+     common region: 2026.09.16 10:30 .. 2026.10.09 11:05  (same window)
+     events inside it: A 0 MODEL + 52 LIQ / B 0 MODEL + 52 LIQ
+       MODEL  INSUFFICIENT SAMPLE - no MODEL row on either side
+       LIQ    IDENTICAL over 52 / 52 row(s)
+       CTX    IDENTICAL over 15 / 15 event(s)
+     IDENTICAL inside the comparable region (0 MODEL + 52 LIQ) - no repaint found there.
+   --- EURUSD,M5 : comparing the last two builds ---
+     common region: 2026.09.16 10:35 .. 2026.10.09 11:05  (same window)
+     events inside it: A 110 MODEL + 49 LIQ / B 110 MODEL + 49 LIQ
+       MODEL  IDENTICAL over 110 / 110 row(s)
+       LIQ    IDENTICAL over 49 / 49 row(s)
+       CTX    IDENTICAL over 13 / 13 event(s)
+     IDENTICAL inside the comparable region (110 MODEL + 49 LIQ) - no repaint found there.
+   --- AUDUSD,M5 : comparing the last two builds ---
+     common region: 2026.09.16 10:30 .. 2026.10.09 11:05  (same window)
+     events inside it: A 42 MODEL + 52 LIQ / B 42 MODEL + 52 LIQ
+       MODEL  IDENTICAL over 42 / 42 row(s)
+       LIQ    IDENTICAL over 52 / 52 row(s)
+       CTX    IDENTICAL over 14 / 14 event(s)
+     IDENTICAL inside the comparable region (42 MODEL + 52 LIQ) - no repaint found there.
+   --- USDCHF,M5 : comparing the last two builds ---
+     common region: 2026.09.16 10:35 .. 2026.10.09 11:05  (same window)
+     events inside it: A 0 MODEL + 48 LIQ / B 0 MODEL + 48 LIQ
+       MODEL  INSUFFICIENT SAMPLE - no MODEL row on either side
+       LIQ    IDENTICAL over 48 / 48 row(s)
+       CTX    IDENTICAL over 14 / 14 event(s)
+     IDENTICAL inside the comparable region (0 MODEL + 48 LIQ) - no repaint found there.
+   --- USDCAD,M5 : comparing the last two builds ---
+     common region: 2026.09.16 10:35 .. 2026.10.09 11:05  (same window)
+     events inside it: A 202 MODEL + 52 LIQ / B 202 MODEL + 52 LIQ
+       MODEL  IDENTICAL over 202 / 202 row(s)
+       LIQ    IDENTICAL over 52 / 52 row(s)
+       CTX    IDENTICAL over 19 / 19 event(s)
+     IDENTICAL inside the comparable region (202 MODEL + 52 LIQ) - no repaint found there.
+   --- XAUUSD,M5 : comparing the last two builds ---
+     common region: 2026.09.15 16:50 .. 2026.10.09 11:05  (same window)
+     events inside it: A 94 MODEL + 47 LIQ / B 94 MODEL + 47 LIQ
+       MODEL  IDENTICAL over 94 / 94 row(s)
+       LIQ    IDENTICAL over 47 / 47 row(s)
+       CTX    IDENTICAL over 10 / 10 event(s)
+     IDENTICAL inside the comparable region (94 MODEL + 47 LIQ) - no repaint found there.
+   --- NZDUSD,M5 : comparing the last two builds ---
+     common region: 2026.09.16 10:35 .. 2026.10.09 11:05  (same window)
+     events inside it: A 123 MODEL + 48 LIQ / B 123 MODEL + 48 LIQ
+       MODEL  IDENTICAL over 123 / 123 row(s)
+       LIQ    IDENTICAL over 48 / 48 row(s)
+       CTX    IDENTICAL over 10 / 10 event(s)
+     IDENTICAL inside the comparable region (123 MODEL + 48 LIQ) - no repaint found there.
+   --- USDJPY,M5 : comparing the last two builds ---
+     common region: 2026.09.16 10:35 .. 2026.10.09 11:05  (same window)
+     events inside it: A 172 MODEL + 41 LIQ / B 172 MODEL + 41 LIQ
+       MODEL  IDENTICAL over 172 / 172 row(s)
+       LIQ    IDENTICAL over 41 / 41 row(s)
+       CTX    IDENTICAL over 12 / 12 event(s)
+     IDENTICAL inside the comparable region (172 MODEL + 41 LIQ) - no repaint found there.
+
+   Total: MODEL 743 / 743 identical (6 charts; GBPUSD and USDCHF have no MODEL in the window - their MODEL is
+   INSUFFICIENT SAMPLE, not a pass), LIQ 389 / 389, CTX 107 / 107.
+
+2. Live vs rebuild (docs/04 v2.53 item 4)
+   2a. The terminal slept from after 15:44:59 local on 10-08 (last line, EURUSD live LIQ on bar 17:45) to
+       09:05:46 local on 10-09 (first line = the user's reload). No bar of that gap was processed live: no
+       live row, no catch-up, no rebuild before the reload. ReloadTest -LiveVsBuild counts every bar between
+       two builds as covered (A.to + 10 min .. B.to), so it lists the gap's events as "build only":
+       34 rows on 8 charts, event times 10-08 20:20 .. 10-09 10:45 - every one inside the gap
+       (10-08 17:45, 10-09 11:00]. They are bars the live run never saw, not events it missed (A-60).
+   2b. The same pairs restricted to the bars the live run provably processed (A.to + 10 min .. 10-08 17:45,
+       the last live row before the gap), same row keys as the tool (cycle / block ids dropped):
+
+       AUDUSD  build 1->2  covered 10.08 12:55..10.08 17:45  live 2 {'LIQ': 2}  build 2  live CTX 1 / build CTX 1  -> AGREE
+       EURUSD  build 2->3  covered 10.08 16:20..10.08 17:45  live 1 {'LIQ': 1}  build 1  live CTX 0 / build CTX 0  -> AGREE
+       GBPUSD  build 2->3  covered 10.08 17:20..10.08 17:45  live 1 {'LIQ': 1}  build 1  live CTX 0 / build CTX 0  -> AGREE
+       NZDUSD  build 1->2  covered 10.08 12:55..10.08 17:45  live 3 {'LIQ': 3}  build 3  live CTX 0 / build CTX 0  -> AGREE
+       USDCAD  build 1->2  covered 10.08 12:55..10.08 17:45  live 0 {}  build 0  live CTX 0 / build CTX 0  -> AGREE
+       USDCHF  build 1->2  covered 10.08 12:55..10.08 17:45  live 0 {}  build 0  live CTX 0 / build CTX 0  -> AGREE
+       USDJPY  build 1->2  covered 10.08 12:55..10.08 17:45  live 0 {}  build 0  live CTX 0 / build CTX 0  -> AGREE
+       XAUUSD  build 3->4  covered 10.08 15:55..10.08 17:45  live 0 {}  build 0  live CTX 0 / build CTX 0  -> AGREE
+       total {'live': 7, 'build': 7, 'ctx': 1, 'bad': 0}
+
+   2c. The continuous 10-09 run (09:05 local onwards, no sleep), r3 tool unchanged on 20261009.log alone
+       (-LiveVsBuild -Days 1, so no pair reaches back across the gap):
+
+       --- AUDUSD,M5 : LIVE vs BUILD ---
+         build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+         nothing comparable yet - no PASS can be given.
+       --- EURUSD,M5 : LIVE vs BUILD ---
+         build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+         nothing comparable yet - no PASS can be given.
+       --- GBPUSD,M5 : LIVE vs BUILD ---
+         build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+         nothing comparable yet - no PASS can be given.
+       --- NZDUSD,M5 : LIVE vs BUILD ---
+         build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+         nothing comparable yet - no PASS can be given.
+       --- USDCAD,M5 : LIVE vs BUILD ---
+         build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+         nothing comparable yet - no PASS can be given.
+       --- USDCHF,M5 : LIVE vs BUILD ---
+         build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+         nothing comparable yet - no PASS can be given.
+       --- USDJPY,M5 : LIVE vs BUILD ---
+         build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+           pending: build 3->4: 1 live row(s) on an edge bar, not provably covered
+         live events compared: 2 (+ 0 H4 structure event(s))
+         by model: BPR 1  |  CISD 1
+         AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+       --- XAUUSD,M5 : LIVE vs BUILD ---
+         build pairs with a live stretch: 2   comparable: 2   pending review: 0   liquidity pending: 0
+           pending: build 6->7: 2 live row(s) on an edge bar, not provably covered
+         live events compared: 1 (+ 1 H4 structure event(s))
+         by model: PA ENGULFING 1
+         AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+
+   Not yet bracketed by a later build at the end of this log (one more reload, before the PC sleeps, compares
+   them): USDJPY MODEL 12:00 (edge) 12:45 14:20 15:30 15:40 16:00 16:30, USDCAD MSS 15:35 + 5 LIQ + CTX
+   TRANS_FAIL 16:00, XAUUSD MODEL 15:55 x2.
+
+3. The "build only" rows of 2a, as the tool printed them (transcript, 10-09):
+
+   build only [2->3] GBPUSD,LIQ,1,0,0,BSL,SWEEP,2026.10.09 08:50:00,1.32486,2026.10.09 08:35:00,0
+   build only [2->3] GBPUSD,LIQ,1,0,0,PDH,SWEEP,2026.10.09 08:50:00,1.32486,2026.10.09 08:35:00,0
+   build only [2->3] CTX 2026.10.09 00:00|BOS|UP|BULLISH|messy=1|str=2|2026.10.08 04:00|1.32224|1.32290
+   build only [2->3] EURUSD,LIQ,1,0,0,BSL,SWEEP,2026.10.09 04:40:00,1.12268,2026.10.09 04:30:00,0
+   build only [2->3] EURUSD,LIQ,1,0,0,PDH,SWEEP,2026.10.09 04:40:00,1.12268,2026.10.09 04:30:00,0
+   build only [2->3] CTX 2026.10.09 08:00|CHOCH|UP|TRANSITION|messy=0|str=0|2026.10.08 16:00|1.12268|1.12297
+   build only [1->2] AUDUSD,LIQ,1,0,0,BSL,BROKEN,2026.10.09 04:50:00,0.69731,2026.10.09 04:30:00,0
+   build only [1->2] AUDUSD,LIQ,1,0,0,PDH,BROKEN,2026.10.09 04:50:00,0.69731,2026.10.09 04:30:00,0
+   build only [1->2] CTX 2026.10.09 08:00|TRANS_FAIL|UP|BULLISH|messy=1|str=1|2026.10.08 16:00|0.69731|0.69782
+   build only [1->2] USDCHF,LIQ,-1,0,0,PDL,SWEEP,2026.10.08 20:30:00,0.83083,2026.10.08 20:25:00,0
+   build only [1->2] USDCHF,LIQ,-1,0,0,SSL,BROKEN,2026.10.08 20:35:00,0.83169,2026.10.08 20:15:00,0
+   build only [1->2] USDCHF,LIQ,-1,0,0,SSL,BROKEN,2026.10.08 20:35:00,0.83169,2026.10.08 20:15:00,0
+   build only [1->2] USDCHF,LIQ,-1,0,0,PDL,SWEEP,2026.10.09 04:20:00,0.83067,2026.10.09 04:15:00,0
+   build only [1->2] CTX 2026.10.09 00:00|CHOCH|DOWN|TRANSITION|messy=0|str=0|2026.10.08 00:00|0.83169|0.83165
+   build only [1->2] USDCAD,LIQ,-1,0,0,PDL,SWEEP,2026.10.09 00:25:00,1.42172,2026.10.09 00:20:00,0
+   build only [3->4] XAUUSD,LIQ,1,0,0,BSL,SWEEP,2026.10.08 20:20:00,4143.25,2026.10.08 20:15:00,0
+   build only [3->4] XAUUSD,LIQ,1,0,0,PDH,SWEEP,2026.10.09 03:10:00,4146.10,2026.10.09 03:00:00,0
+   build only [3->4] XAUUSD,MODEL,-1,2940,2940,OB,PA REJECTION,2026.10.09 07:00:00,4180.24,1970.01.01 00:00:00,0.00
+   build only [3->4] XAUUSD,LIQ,1,0,0,BSL,SWEEP,2026.10.09 07:40:00,4184.50,2026.10.09 07:30:00,0
+   build only [3->4] XAUUSD,MODEL,-1,2940,2940,OB,BPR,2026.10.09 07:55:00,4178.62,1970.01.01 00:00:00,0.00
+   build only [3->4] XAUUSD,MODEL,-1,2940,2940,OB,PA BREAK-RETEST,2026.10.09 09:30:00,4194.61,1970.01.01 00:00:00,0.00
+   build only [3->4] CTX 2026.10.09 08:00|CHOCH|UP|TRANSITION|messy=0|str=0|2026.10.08 04:00|4143.25|4181.94
+   build only [1->2] NZDUSD,LIQ,1,0,0,PDH,SWEEP,2026.10.09 04:30:00,0.56134,2026.10.09 04:25:00,0
+   build only [1->2] NZDUSD,LIQ,1,0,0,BSL,SWEEP,2026.10.09 04:30:00,0.56134,2026.10.09 04:25:00,0
+   build only [1->2] CTX 2026.10.09 08:00|CHOCH|UP|TRANSITION|messy=0|str=0|2026.10.08 16:00|0.56134|0.56206
+   build only [1->2] USDJPY,LIQ,-1,0,0,SSL,SWEEP,2026.10.08 20:35:00,157.585,2026.10.08 20:25:00,0
+   build only [1->2] USDJPY,MODEL,-1,3102,3102,OB,PA REJECTION,2026.10.09 03:00:00,158.080,1970.01.01 00:00:00,0.000
+   build only [1->2] USDJPY,MODEL,-1,3102,3102,OB,CISD,2026.10.09 03:25:00,158.123,2026.10.09 02:50:00,158.051
+   build only [1->2] USDJPY,MODEL,-1,3102,3102,OB,PA ENGULFING,2026.10.09 03:25:00,158.123,1970.01.01 00:00:00,0.000
+   build only [1->2] USDJPY,MODEL,-1,3102,3102,OB,BPR,2026.10.09 04:10:00,158.008,1970.01.01 00:00:00,0.000
+   build only [1->2] USDJPY,MODEL,-1,3102,3102,OB,MSS,2026.10.09 04:30:00,157.867,2026.10.09 01:55:00,157.847
+   build only [1->2] USDJPY,MODEL,-1,3102,3102,OB,PA BREAK-RETEST,2026.10.09 05:25:00,158.020,1970.01.01 00:00:00,0.000
+   build only [1->2] USDJPY,LIQ,1,0,0,PDH,SWEEP,2026.10.09 10:45:00,158.367,2026.10.09 10:40:00,0
+   build only [1->2] USDJPY,LIQ,1,0,0,BSL,SWEEP,2026.10.09 10:45:00,158.367,2026.10.09 10:40:00,0
