@@ -1860,3 +1860,38 @@ Verification:            tools/logtests 74 组（新增 c33–c39，c28 改为 s
                          正向对照（模型 EURUSD 事件）：v2.52 104 suspect / v2.53 0
 Status:                  **FIXED —— 工具修订 r5（MQL5 不变）**
 ```
+
+
+## Audit Round 21 —— 验收方 v2.53r5 复核（2026-10-13）
+
+```
+结论:                    上轮两项 P2 修复成立，可继续 v2.54（保护点与波段锚点）；新加入的 PROVEN 入口有一处 P2，补齐后 r5 诊断工具才标记为完整通过；
+                         不影响指标逻辑与此前核实的 MT5 运行结果
+已确认:                  MQL 23/23 与 r4 相同；74/74；原始日志八品种 47 个构建：重复消费 0、suspect 0、pending 0；
+                         空 / BAD / Infinity 价格保留 pending；精度不同保留 pending；72 h 规则已删除，日历估算之后只标 suspect；
+                         同一完整构建内主参考点重复、去重列表点再次成为主参考点均识别为 PROVEN；跨构建重遇同一点不误判；
+                         独立补测 19 例，15 例符合预期，4 例为下述同一缺口
+```
+
+### A-63 —— **PROVEN 入口绕过已有的构建完整性与价格有效性校验**（工具，P2，成立）
+
+```
+Observed (验收方):       以 c36 为基础分别：第二条 CTX 改为 run=8/init=2；END build=99；删除 END；两条 swing_px 均为 BAD ——
+                         r5 仍输出「swing consumed twice in one build 1」与 PROVEN。同一文件普通构建模式已显示
+                         INCOMPLETE: 1 row(s) carry another run/init than the BEGIN (HMI-CTX)
+Root cause:              调用方只按品种挑选构建，未检查 Status == COMPLETE；DoubleConsumed 只按「方向 | 摆动时间 | 价格字符串」组键，
+                         没有复用 PxOk 等有效性检查
+Fix (工具 r6):           1 PROVEN 只读 COMPLETE 且带 run/init 身份的构建（旧版无身份构建同样不作确证）；被排除的构建逐个列为 pending，
+                           附原因与其中的候选重复数，输出「a of b build(s) COMPLETE and read」
+                         2 CTX 主参考点（TIMEOUT 以外的各类事件）与 DEDUP 列表每条记录须方向为 UP / DOWN、摆动时间与 K 线时间可解析、
+                           摆动价解析成功且为有限数；无效记录不写入确证集合，列为 pending 并注明字段
+                         3 DoubleConsumed 同时返回 Proven 与 Pending，两者用同一套有效性判据；
+                           DEDUP also= 与列表条数不符、CTX also>0 却无列表（已消费集合不完整）也记 pending
+                         4 回归 c40–c47：验收方四个反例（身份错配、END 编号不符、缺 END、价格 BAD）+ DEDUP 条目无效 / 列表缺失 /
+                           条数不符 + v2.48 无身份构建；保留 c36 / c37（完整构建两类正向重复）与 c38（跨构建合法重遇）
+Verification:            tools/logtests 82/82；r5 脚本 68/82（c40–c43、c47 输出 PROVEN）
+                         用户原始日志（20261008 / 20261009，47 个构建）：47/47 COMPLETE，0 proven、0 pending；stale BOS 0 suspect / 0 pending；
+                         真实日志中每条 DEDUP 的条数与 also= 一致
+Not changed:             stale BOS 诊断（suspect / pending）仍读取日志中全部 HMI-CTX 行（含实时行），它只提示人工核对，不给确证结论
+Status:                  **FIXED —— 工具修订 r6（MQL5 不变）**
+```

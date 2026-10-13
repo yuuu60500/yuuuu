@@ -1744,6 +1744,23 @@ tools/logtests         49 组（c05–c08 改为新判据；c06 补完整链；�
 
 ---
 
+## v2.53 工具修订 r6（A-63）—— PROVEN 只认完整构建与有效记录（MQL5 不变）
+
+```
+Date:     2026-10-13
+来源:     验收方「HMI v2.53r5 验收复核报告」（2026-10-13）P2
+MQL5:     不变（与验收方编译的 v2.53 字节相同）
+
+tools/ReloadTest.ps1   「swing consumed twice in one build」只读 COMPLETE 且带 run/init 身份的构建；
+                       其余构建逐个列为 pending（附普通构建模式给出的原因与其中的候选重复数），不再静默跳过；
+                       CTX 主参考点与 DEDUP 列表每条消费记录须有方向、摆动时间、K 线时间和有限价格，无效记录不进确证集合、列为 pending；
+                       DEDUP 列表条数与 also= 不符、CTX also>0 却没有列表 → pending；
+                       输出改为「N proven, M pending  (a of b build(s) COMPLETE and read)」
+tools/logtests         82 组（新增 c40–c47：验收方四个反例 + 去重列表无效条目 / 缺失 / 条数不符 + 旧版无身份构建）
+```
+
+---
+
 ## v2.53 工具修订 r5（A-62）—— `-Ctx` 数据不足时不下结论（MQL5 不变）
 
 ```

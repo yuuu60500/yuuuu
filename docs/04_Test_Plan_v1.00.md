@@ -884,8 +884,10 @@ ATR 系数 2.0 定向：v2.46 2/48（PMH BROKEN 仅连续运行有）· v2.47 0/
 ```
 0  编译 0 errors / 0 warnings
 1  版本：starting on v2.53；BEGIN ver=2.53；默认参数下 params=461F006E（与 v2.52 相同）
-2  去重可见：日志出现 HMI-CTX-DEDUP（also>0）；`-Ctx`（A-61 / A-62）：
-          「swing consumed twice in one build」必须为 0 —— 同一构建内同一摆动点被消费两次，是日志可证明的缺陷；
+2  去重可见：日志出现 HMI-CTX-DEDUP（also>0）；`-Ctx`（A-61 / A-62 / A-63）：
+          「swing consumed twice in one build」必须为 0 proven、0 pending，且全部构建 COMPLETE and read ——
+          同一完整构建内同一摆动点被消费两次，是日志可证明的缺陷；不完整构建、无效消费记录、
+          与 also= 不符的去重列表只列为 pending（附原因），既不作确证，也不能当作 0 通过；
           「A-33 stale BOS」的 suspect（同段更早的收盘在最早可能确认时间之后、以超过余量越过该点 —— 确认时间是日历估算，
           假设中间不缺 H4 K 线）与 pending（价格缺失 / 非数值、精度不一致、余量逐根或未记录）逐条人工核对，
           都不计为已确证的重复计数；InpH4SwingRight 非默认时加 -H4SwingRight <n>），

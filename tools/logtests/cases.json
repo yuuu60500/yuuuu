@@ -814,7 +814,7 @@
   ],
   "expect": [
    "A-33 stale BOS  0 suspect(s), 0 pending, of 1 continuation BOS",
-   "swing consumed twice in one build  0"
+   "swing consumed twice in one build  0 proven, 0 pending"
   ],
   "forbid": [
    "1 suspect",
@@ -827,7 +827,7 @@
   ],
   "expect": [
    "A-33 stale BOS  0 suspect(s), 0 pending, of 1 continuation BOS",
-   "swing consumed twice in one build  0"
+   "swing consumed twice in one build  0 proven, 0 pending"
   ],
   "forbid": [
    "1 suspect",
@@ -842,7 +842,7 @@
    "A-33 stale BOS  1 suspect(s), 0 pending, of 1 continuation BOS",
    "is 50 pt past it (> margin 3) and not before its earliest possible confirmation",
    "confirmed only if no H4 bar is missing in between",
-   "swing consumed twice in one build  0"
+   "swing consumed twice in one build  0 proven, 0 pending"
   ],
   "forbid": [
    "PROVEN",
@@ -955,7 +955,7 @@
    "-Ctx"
   ],
   "expect": [
-   "swing consumed twice in one build  1",
+   "swing consumed twice in one build  1 proven, 0 pending  (1 of 1 build(s) COMPLETE and read)",
    "PROVEN   2026.09.09 12:00 BOS re-uses swing 2026.09.07 12:00 @ 1.23000 (UP), consumed at 2026.09.08 08:00"
   ],
   "forbid": []
@@ -965,7 +965,7 @@
    "-Ctx"
   ],
   "expect": [
-   "swing consumed twice in one build  1",
+   "swing consumed twice in one build  1 proven, 0 pending",
    "re-uses swing 2026.09.06 20:00 @ 1.22950 (UP), consumed at 2026.09.08 08:00"
   ],
   "forbid": []
@@ -975,10 +975,116 @@
    "-Ctx"
   ],
   "expect": [
-   "swing consumed twice in one build  0  (2 build(s) read)"
+   "swing consumed twice in one build  0 proven, 0 pending  (2 of 2 build(s) COMPLETE and read)"
   ],
   "forbid": [
    "PROVEN"
+  ]
+ },
+ "c40_ctx_twice_other_identity": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "swing consumed twice in one build  0 proven, 1 pending  (0 of 1 build(s) COMPLETE and read)",
+   "INCOMPLETE: 1 row(s) carry another run/init than the BEGIN (HMI-CTX) - not read as proof, 1 candidate re-use(s) in it"
+  ],
+  "forbid": [
+   "PROVEN",
+   "1 proven"
+  ]
+ },
+ "c41_ctx_twice_end_build": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "swing consumed twice in one build  0 proven, 1 pending",
+   "INCOMPLETE: END build=99, BEGIN build=1 - not read as proof"
+  ],
+  "forbid": [
+   "PROVEN",
+   "1 proven"
+  ]
+ },
+ "c42_ctx_twice_no_end": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "swing consumed twice in one build  0 proven, 1 pending",
+   "INCOMPLETE: no END (the log ends inside build 1) - not read as proof"
+  ],
+  "forbid": [
+   "PROVEN",
+   "1 proven"
+  ]
+ },
+ "c43_ctx_twice_px_bad": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "swing consumed twice in one build  0 proven, 2 pending  (1 of 1 build(s) COMPLETE and read)",
+   "2026.09.08 08:00 BOS consumption record not valid (swing price 'BAD') - left out of the consumed set",
+   "2026.09.09 12:00 BOS consumption record not valid (swing price 'BAD')"
+  ],
+  "forbid": [
+   "PROVEN",
+   "1 proven"
+  ]
+ },
+ "c44_ctx_dedup_entry_bad": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "swing consumed twice in one build  0 proven, 1 pending",
+   "de-dup entry '2026.09.06 20:00@BAD' not valid (swing price 'BAD')"
+  ],
+  "forbid": [
+   "PROVEN",
+   "1 proven"
+  ]
+ },
+ "c45_ctx_dedup_missing": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "swing consumed twice in one build  0 proven, 1 pending",
+   "2026.09.08 08:00 CTX processed also=1 other swing(s) but the build has no de-dup list for it"
+  ],
+  "forbid": [
+   "PROVEN",
+   "1 proven"
+  ]
+ },
+ "c46_ctx_dedup_count": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "swing consumed twice in one build  0 proven, 2 pending",
+   "de-dup row says also='2' but lists 1 swing(s)",
+   "CTX says also=2, its de-dup list has 1"
+  ],
+  "forbid": [
+   "PROVEN",
+   "1 proven"
+  ]
+ },
+ "c47_ctx_twice_legacy_no_identity": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "swing consumed twice in one build  0 proven, 1 pending",
+   "no run/init identity (v2.48 log) - not read as proof, 1 candidate re-use(s) in it"
+  ],
+  "forbid": [
+   "PROVEN",
+   "1 proven"
   ]
  },
  "c09_ctx_strength_only": {

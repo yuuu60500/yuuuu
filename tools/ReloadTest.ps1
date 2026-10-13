@@ -621,25 +621,60 @@ function StaleVerdict($e, $legC, [string]$ldir, $mg) {
 # A-62: the proof the log can give - the same swing consumed twice inside ONE
 # build (as a primary, or in a de-dup list, then again). Per build, because a
 # rebuild starts over and meets the same swings again legitimately.
+# A-63: a proof needs valid evidence. Only a COMPLETE build with its identity
+# checked is read as proof (the caller); here every consumption record - the
+# CTX primary and each de-dup entry - must carry a direction, a swing time, a
+# bar time and a finite swing price. A record that does not is never put in
+# the consumed set: it is returned as unverifiable, and so is a de-dup list
+# that does not match the also= count it belongs to (the consumed set is then
+# not known in full). Same validity rules for PROVEN and pending.
+function ConsRec([string]$dir, [string]$sw, [string]$px, [string]$bar) {
+    $bad = @()
+    if ($dir -ne 'UP' -and $dir -ne 'DOWN')        { $bad += "dir '$dir'" }
+    if ((PT16 $sw)  -eq [datetime]::MinValue)      { $bad += "swing time '$sw'" }
+    if (-not (PxOk $px))                           { $bad += "swing price '$px'" }
+    if ((PT16 $bar) -eq [datetime]::MinValue)      { $bad += "bar time '$bar'" }
+    return [pscustomobject]@{ Key = "$dir|$($sw.Trim())|$($px.Trim())"; Bad = ($bad -join ', ') }
+}
 function DoubleConsumed($bk) {
-    $seen = @{}; $dup = @()
+    $seen = @{}; $dup = @(); $pend = @(); $need = @{}; $got = @{}
     foreach ($m in $bk.Lines) {
         if ($m -match '^HMI-CTX,') {
-            $f = KV $m; if (-not $f['swing']) { continue }
-            $k = "$($f['dir'])|$($f['swing'])|$($f['swing_px'])"
-            if ($seen.ContainsKey($k)) { $dup += "$($f['bar']) $($m.Split(',')[2]) re-uses swing $($f['swing']) @ $($f['swing_px']) ($($f['dir'])), consumed at $($seen[$k])" }
-            else { $seen[$k] = $f['bar'] }
+            $f = KV $m; $kind = $m.Split(',')[2]
+            if ($kind -eq 'TIMEOUT') { continue }                # the one CTX kind that breaks no swing
+            $bar = [string]$f['bar']
+            if ($f.ContainsKey('also')) {                        # v2.53: how many others this close processed
+                if ($f['also'] -match '^\d+$') { if ([int]$f['also'] -gt 0) { $need["$($f['dir'])|$bar"] = [int]$f['also'] } }
+                else { $pend += "$bar $kind also='$($f['also'])' is not a count - its de-dup list cannot be checked" }
+            }
+            $r = ConsRec ([string]$f['dir']) ([string]$f['swing']) ([string]$f['swing_px']) $bar
+            if ($r.Bad) { $pend += "$bar $kind consumption record not valid ($($r.Bad)) - left out of the consumed set"; continue }
+            if ($seen.ContainsKey($r.Key)) { $dup += "$bar $kind re-uses swing $($f['swing']) @ $($f['swing_px']) ($($f['dir'])), consumed at $($seen[$r.Key])" }
+            else { $seen[$r.Key] = $bar }
         } elseif ($m -match '^HMI-CTX-DEDUP,') {
-            $f = KV $m
-            foreach ($sw in ([string]$f['swings'] -split '\|')) {
-                if (-not $sw) { continue }
-                $pp = $sw -split '@', 2; $k = "$($f['dir'])|$($pp[0])|$($pp[1])"
-                if ($seen.ContainsKey($k)) { $dup += "$($f['bar']) de-dup re-uses swing $($pp[0]) @ $($pp[1]) ($($f['dir'])), consumed at $($seen[$k])" }
-                else { $seen[$k] = $f['bar'] }
+            $f = KV $m; $bar = [string]$f['bar']
+            $list = @(([string]$f['swings'] -split '\|') | Where-Object { $_ })
+            $got["$($f['dir'])|$bar"] = $list.Count
+            if (-not ($f['also'] -match '^\d+$') -or [int]$f['also'] -ne $list.Count) {
+                $pend += "$bar de-dup row says also='$($f['also'])' but lists $($list.Count) swing(s)"
+            }
+            foreach ($sw in $list) {
+                $pp = $sw -split '@', 2
+                $r = ConsRec ([string]$f['dir']) $pp[0] $(if ($pp.Count -gt 1) { $pp[1] } else { '' }) $bar
+                if ($r.Bad) { $pend += "$bar de-dup entry '$sw' not valid ($($r.Bad)) - left out of the consumed set"; continue }
+                if ($seen.ContainsKey($r.Key)) { $dup += "$bar de-dup re-uses swing $($pp[0]) @ $($pp[1]) ($($f['dir'])), consumed at $($seen[$r.Key])" }
+                else { $seen[$r.Key] = $bar }
             }
         }
     }
-    return ,$dup
+    foreach ($k in $need.Keys) {
+        if (-not $got.ContainsKey($k)) { $pend += "$(($k -split '\|')[1]) CTX processed also=$($need[$k]) other swing(s) but the build has no de-dup list for it" }
+    }
+    foreach ($k in $got.Keys) {
+        if (-not $need.ContainsKey($k)) { $pend += "$(($k -split '\|')[1]) de-dup list without a CTX row of that bar and direction saying also>0" }
+        elseif ($need[$k] -ne $got[$k]) { $pend += "$(($k -split '\|')[1]) CTX says also=$($need[$k]), its de-dup list has $($got[$k])" }
+    }
+    return [pscustomobject]@{ Proven = $dup; Pending = $pend }
 }
 
 # -Ctx: the Context chain had no auditable output at all until HMI-CTX, so
@@ -700,20 +735,40 @@ if ($Ctx) {
         Write-Host $acct -ForegroundColor $(if ($open -eq 0 -or $open -eq 1) { 'Green' } else { 'Red' })
 
         # A-33 / A-61 / A-62. Two questions, two kinds of answer:
-        #   proven   the log shows one build consuming the same swing twice
-        #            (CTX primary or de-dup list, then again) - an engine defect;
+        #   proven   the log shows one COMPLETE build consuming the same swing
+        #            twice (CTX primary or de-dup list, then again), from valid
+        #            records only - an engine defect;
         #   suspect  a continuation BOS whose swing an EARLIER close of the leg
         #            cleared by more than the margin, after the swing's earliest
         #            possible confirmation. The log has no H4 bar series, so that
         #            confirmation is a calendar estimate: a suspect is for manual
         #            review, never a proven re-count.
         #   pending  what the log cannot judge: a price missing or not a number,
-        #            precision that differs, a margin per bar (ATR) or not logged.
+        #            precision that differs, a margin per bar (ATR) or not logged;
+        #            for the re-use check, a build that is not COMPLETE and a
+        #            consumption record or de-dup list that is not valid (A-63).
         # Closes are only those of logged events: suspects are a LOWER bound.
-        $dupAll = @(); $nb = 0
-        foreach ($bk in @($blocks | Where-Object { $_.Src -match ('^' + [regex]::Escape($g.Name) + '(#[0-9A-F]{4})?,') })) { $nb++; $dupAll += DoubleConsumed $bk }
-        Write-Host ("      swing consumed twice in one build  {0}  ({1} build(s) read)" -f $dupAll.Count, $nb) -ForegroundColor $(if ($dupAll.Count) { 'Red' } else { 'Green' })
+        # A-63: only a COMPLETE build whose rows all carry its own identity is
+        # read as proof; any other is listed as pending with its reasons, so a
+        # damaged log can neither prove a re-use nor pass as zero.
+        $dupAll = @(); $pendC = @(); $nb = 0; $nAll = 0
+        foreach ($bk in @($blocks | Where-Object { $_.Src -match ('^' + [regex]::Escape($g.Name) + '(#[0-9A-F]{4})?,') })) {
+            $nAll++
+            $r = DoubleConsumed $bk
+            if ($bk.Status -ne 'COMPLETE' -or -not $bk.Strict -or -not $bk.Id) {
+                $why = $(if ($bk.Status -ne 'COMPLETE') { 'INCOMPLETE: ' + ($bk.Why -join '; ') } else { "no run/init identity (v$($bk.Ver) log)" })
+                $cand = @($r.Proven).Count
+                $pendC += "build $($bk.Build) $($bk.Src) from=$($bk.FromS) to=$($bk.ToS) $why - not read as proof" + $(if ($cand) { ", $cand candidate re-use(s) in it" } else { '' })
+                continue
+            }
+            $nb++; $dupAll += @($r.Proven); $pendC += @($r.Pending)
+        }
+        Write-Host ("      swing consumed twice in one build  {0} proven, {1} pending  ({2} of {3} build(s) COMPLETE and read)" -f $dupAll.Count, $pendC.Count, $nb, $nAll) `
+                   -ForegroundColor $(if ($dupAll.Count) { 'Red' } elseif ($pendC.Count) { 'Yellow' } else { 'Green' })
         $dupAll | Select-Object -First 5 | ForEach-Object { Write-Host "        PROVEN   $_" -ForegroundColor Red }
+        if ($dupAll.Count -gt 5) { Write-Host "        ... $($dupAll.Count - 5) more" -ForegroundColor Red }
+        $pendC  | Select-Object -First 5 | ForEach-Object { Write-Host "        PENDING  $_" -ForegroundColor Yellow }
+        if ($pendC.Count -gt 5) { Write-Host "        ... $($pendC.Count - 5) more" -ForegroundColor Yellow }
         $mg = $(if ($margin.ContainsKey($g.Name)) { $margin[$g.Name] } else { $null })   # points; -1 = per bar (ATR); $null = not logged
         $susp = 0; $pendS = 0; $bosN = 0; $legC = $null; $ldir = ''; $staleWhy = @()
         foreach ($e in $ev) {

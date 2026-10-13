@@ -132,8 +132,8 @@ def ctx(kind, d, cx, st, bar, sw, px, close, inst="0001", run=7, init=1, live=0,
     s = f"HMI-CTX,USDJPY,{kind},dir={d},live={live},ctx={cx},str={st},messy={messy},bar={bar},swing={sw},swing_px={px},close={close}"
     if also is not None: s += f",also={also}"
     return L(src, s + tail(inst, run, init))
-def dedup(kind, d, bar, prim, swings, inst="0001", run=7, init=1, src=SRC):
-    return L(src, f"HMI-CTX-DEDUP,USDJPY,{kind},dir={d},bar={bar},primary={prim},also={len(swings)},swings={'|'.join(swings)}" + tail(inst, run, init))
+def dedup(kind, d, bar, prim, swings, inst="0001", run=7, init=1, src=SRC, also=None):
+    return L(src, f"HMI-CTX-DEDUP,USDJPY,{kind},dir={d},bar={bar},primary={prim},also={len(swings) if also is None else also},swings={'|'.join(swings)}" + tail(inst, run, init))
 
 E1 = ("BOS", "UP", "BULLISH", 1, "2026.09.08 08:00", "2026.09.07 20:00", "1.23000", "1.23100")
 E2s = ("BOS", "UP", "BULLISH", 2, "2026.09.08 12:00", "2026.09.06 12:00", "1.22900", "1.23050")   # stale in v2.52
@@ -294,7 +294,7 @@ def stale_case(name, e2, head, expect, forbid=()):
 CTX_ONE = "of 1 continuation BOS"
 NOPROOF = ["PROVEN", "1 re-count"]
 def ok0(n=1): return f"A-33 stale BOS  0 suspect(s), 0 pending, of {n} continuation BOS"
-CONS0 = "swing consumed twice in one build  0"
+CONS0 = "swing consumed twice in one build  0 proven, 0 pending"
 stale_case("c26_ctx_new_structure", ("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00", "2026.09.08 16:00", "1.23050", "1.23200"), [margin()],
            [ok0(), CONS0], ["1 suspect", "1 pending"])        # swing formed after the old close
 stale_case("c27_ctx_within_margin", ("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00", "2026.09.07 16:00", "1.23098", "1.23200"), [margin()],
@@ -330,12 +330,40 @@ case("c35_ctx_close_nan", [start(), margin()] + blk(1, extra_rows=ctx_rows([LEGN
 # A-62: the proof the log can give - one build consuming the same swing twice
 SW_S = ("2026.09.07 12:00", "1.23000")
 case("c36_ctx_consumed_twice", [start(), margin()] + blk(1, extra_rows=ctx_rows([LEG0, ("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00") + SW_S + ("1.23200",)], also=0)),
-     ["-Ctx"], ["swing consumed twice in one build  1", "PROVEN   2026.09.09 12:00 BOS re-uses swing 2026.09.07 12:00 @ 1.23000 (UP), consumed at 2026.09.08 08:00"])
+     ["-Ctx"], ["swing consumed twice in one build  1 proven, 0 pending  (1 of 1 build(s) COMPLETE and read)", "PROVEN   2026.09.09 12:00 BOS re-uses swing 2026.09.07 12:00 @ 1.23000 (UP), consumed at 2026.09.08 08:00"])
 case("c37_ctx_dedup_then_primary", [start(), margin()] + blk(1, extra_rows=[ctx(*LEG0, also=1), dedup("BOS", "UP", LEG0[4], "2026.09.07 12:00@1.23000", ["2026.09.06 20:00@1.22950"]),
                                                                             ctx("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00", "2026.09.06 20:00", "1.22950", "1.23200", also=0)]),
-     ["-Ctx"], ["swing consumed twice in one build  1", "re-uses swing 2026.09.06 20:00 @ 1.22950 (UP), consumed at 2026.09.08 08:00"])
+     ["-Ctx"], ["swing consumed twice in one build  1 proven, 0 pending", "re-uses swing 2026.09.06 20:00 @ 1.22950 (UP), consumed at 2026.09.08 08:00"])
 case("c38_ctx_same_swing_two_builds", [start()] + blk(1, extra_rows=ctx_rows([LEG0], also=0)) + blk(2, extra_rows=ctx_rows([LEG0], also=0)),
-     ["-Ctx"], ["swing consumed twice in one build  0  (2 build(s) read)"], ["PROVEN"])
+     ["-Ctx"], ["swing consumed twice in one build  0 proven, 0 pending  (2 of 2 build(s) COMPLETE and read)"], ["PROVEN"])
+
+# A-63: PROVEN only from a COMPLETE build and valid records; anything else is pending with its reason
+E2T = ("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00") + SW_S + ("1.23200",)       # re-uses LEG0's swing
+NOT_PROVEN = ["PROVEN", "1 proven"]
+def twice(**kw): return [start(), margin()] + blk(1, **kw)
+case("c40_ctx_twice_other_identity", twice(extra_rows=[ctx(*LEG0, also=0), ctx(*E2T, also=0, run=8, init=2)]), ["-Ctx"],
+     ["swing consumed twice in one build  0 proven, 1 pending  (0 of 1 build(s) COMPLETE and read)",
+      "INCOMPLETE: 1 row(s) carry another run/init than the BEGIN (HMI-CTX) - not read as proof, 1 candidate re-use(s) in it"], NOT_PROVEN)
+case("c41_ctx_twice_end_build", twice(extra_rows=ctx_rows([LEG0, E2T], also=0), end_kw={"b": 99}), ["-Ctx"],
+     ["swing consumed twice in one build  0 proven, 1 pending", "INCOMPLETE: END build=99, BEGIN build=1 - not read as proof"], NOT_PROVEN)
+case("c42_ctx_twice_no_end", twice(extra_rows=ctx_rows([LEG0, E2T], also=0), with_end=False), ["-Ctx"],
+     ["swing consumed twice in one build  0 proven, 1 pending", "INCOMPLETE: no END (the log ends inside build 1) - not read as proof"], NOT_PROVEN)
+case("c43_ctx_twice_px_bad", twice(extra_rows=ctx_rows([LEG0[:6] + ("BAD",) + LEG0[7:], E2T[:6] + ("BAD",) + E2T[7:]], also=0)), ["-Ctx"],
+     ["swing consumed twice in one build  0 proven, 2 pending  (1 of 1 build(s) COMPLETE and read)",
+      "2026.09.08 08:00 BOS consumption record not valid (swing price 'BAD') - left out of the consumed set",
+      "2026.09.09 12:00 BOS consumption record not valid (swing price 'BAD')"], NOT_PROVEN)
+E2D = ("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00", "2026.09.06 20:00", "1.22950", "1.23200")   # re-uses the de-dup swing of c37
+case("c44_ctx_dedup_entry_bad", twice(extra_rows=[ctx(*LEG0, also=1), dedup("BOS", "UP", LEG0[4], "2026.09.07 12:00@1.23000", ["2026.09.06 20:00@BAD"]),
+                                                   ctx(*E2D, also=0)]), ["-Ctx"],
+     ["swing consumed twice in one build  0 proven, 1 pending", "de-dup entry '2026.09.06 20:00@BAD' not valid (swing price 'BAD')"], NOT_PROVEN)
+case("c45_ctx_dedup_missing", twice(extra_rows=[ctx(*LEG0, also=1), ctx(*E2D, also=0)]), ["-Ctx"],
+     ["swing consumed twice in one build  0 proven, 1 pending", "2026.09.08 08:00 CTX processed also=1 other swing(s) but the build has no de-dup list for it"], NOT_PROVEN)
+case("c46_ctx_dedup_count", twice(extra_rows=[ctx(*LEG0, also=2), dedup("BOS", "UP", LEG0[4], "2026.09.07 12:00@1.23000", ["2026.09.06 20:00@1.22950"], also=2)]), ["-Ctx"],
+     ["swing consumed twice in one build  0 proven, 2 pending", "de-dup row says also='2' but lists 1 swing(s)", "CTX says also=2, its de-dup list has 1"], NOT_PROVEN)
+LEGACY_END = {"drop": ("liq", "liqev", "unknown", "liqwait")}
+case("c47_ctx_twice_legacy_no_identity", [start("2.48", run=None), margin()] + blk(1, ver="2.48", run=None, init=None, end_kw=LEGACY_END,
+                                                                                 extra_rows=ctx_rows([LEG0, E2T], also=0, run=None, init=None)), ["-Ctx"],
+     ["swing consumed twice in one build  0 proven, 1 pending", "no run/init identity (v2.48 log) - not read as proof, 1 candidate re-use(s) in it"], NOT_PROVEN)
 
 # strength number only: same event, same swing, same state, str counted from another H4 start
 same_s = ctx_rows([E1, E3[:3] + (5,) + E3[4:]], also=0)
