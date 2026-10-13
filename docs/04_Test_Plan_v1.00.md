@@ -952,8 +952,9 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           每个趋势段（leg=）的第一行为 SET 或 INVALID；段以 BREAK 或 FALLBACK 结束，同根有 ANCHOR RESET
           每条 CHOCH（HMI-CTX）同根有 HMI-PROT BREAK 或 FALLBACK；BREAK 的 level = 该 CHOCH 的 swing_px
           ADVANCE：多头 level > prev、空头 level < prev；KEEP_WORSE：cand 不优于 level
-          `-Ctx`：transitions 平衡；swing consumed twice 0 proven / 0 pending（HMI-CTX-INTERNAL 计入）
-3  离线：python3 tools/h4_protect_sim.py → 32/32；--replay 逐根截断无重绘（docs/evidence/v2.54_protect_offline.txt）
+          `-Ctx`：transitions 平衡；swing consumed twice 0 proven / 0 pending（HMI-CTX-INTERNAL 计入）；
+          level installed already broken 0 proven（A-65；ATR 余量下为 pending，逐条核对）
+3  离线：python3 tools/h4_protect_sim.py → 38/38；--replay 逐根截断无重绘、P1 两种余量 fixed 0（docs/evidence/v2.54_protect_offline.txt）
 4  实时 vs 重建、同窗口重载：方法同 v2.53 第 4、5 项（不中断区间；同一根 M5 内连续重载两次）
 5  跨版本 v2.53 vs v2.54：差异逐条连到 P-4 / P-5 / P-6b 的具体日志证据 —— ReloadTest 归因扩展未完成，完成前不作结论
 ```

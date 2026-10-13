@@ -696,6 +696,41 @@ function DoubleConsumed($bk) {
     return [pscustomobject]@{ Proven = $dup; Pending = $pend }
 }
 
+# v2.54r2 (BRI-12, reviewer P1 2026-10-13): a protected level / leg anchor is
+# never installed when the very close that installs it has broken it. The
+# log proves this one bar: the BOS / TRANS_OK / TRANS_FAIL row of the same
+# bar carries that close. Earlier closes are not all in the log - not checked.
+function ProtInstalledBroken($bk, $mg) {
+    $close = @{}; $bad = @(); $pend = @(); $n = 0
+    foreach ($m in $bk.Lines) {
+        if ($m -match '^HMI-CTX,') {
+            $k = $m.Split(',')[2]
+            if ($k -eq 'BOS' -or $k -eq 'TRANS_OK' -or $k -eq 'TRANS_FAIL') { $f = KV $m; $close[[string]$f['bar']] = [string]$f['close'] }
+        }
+    }
+    foreach ($m in $bk.Lines) {
+        if ($m -notmatch '^(HMI-PROT|HMI-ANCHOR),') { continue }
+        $tag = $Matches[1]; $ev = $m.Split(',')[2]
+        if (-not (($tag -eq 'HMI-PROT' -and ($ev -eq 'SET' -or $ev -eq 'ADVANCE')) -or ($tag -eq 'HMI-ANCHOR' -and ($ev -eq 'SET' -or $ev -eq 'MOVE')))) { continue }
+        $n++
+        $f = KV $m; $bar = [string]$f['bar']; $lv = [string]$f['level']; $d = [string]$f['dir']
+        $what = "$bar $tag $ev level $lv ($d leg)"
+        if (-not $close.ContainsKey($bar)) { $pend += "$what - no BOS / TRANS_OK / TRANS_FAIL row of that bar in the build"; continue }
+        $c = $close[$bar]
+        if (-not (PxOk $lv) -or -not (PxOk $c)) { $pend += "$what - level or close '$c' is missing or not a number"; continue }
+        if ($d -ne 'UP' -and $d -ne 'DOWN') { $pend += "$what - dir '$d'"; continue }
+        if ((PxDigits $lv) -ne (PxDigits $c)) { $pend += "$what - close '$c' has another precision"; continue }
+        $pt = [Math]::Pow(10, -(PxDigits $lv)); $ic = [Globalization.CultureInfo]::InvariantCulture
+        $x = [Math]::Round(([double]::Parse($lv, $ic) - [double]::Parse($c, $ic)) / $pt)     # points the close is beyond a LOW
+        if ($d -eq 'DOWN') { $x = -$x }                                                       # the level is a HIGH
+        if ($x -le 0) { continue }
+        if ($mg -eq $null) { $pend += "$what - close $c is $x pt past it, the margin is not in the log"; continue }
+        if ($mg -lt 0)     { $pend += "$what - close $c is $x pt past it, the margin is per bar (ATR)"; continue }
+        if ($x -gt $mg)    { $bad += "$what - the close $c of that bar is $x pt past it (> margin $mg): installed already broken" }
+    }
+    return [pscustomobject]@{ Proven = $bad; Pending = $pend; N = $n }
+}
+
 # -Ctx: the Context chain had no auditable output at all until HMI-CTX, so
 # `str N` on the panel could not be checked or put in perspective. This reads
 # those rows, dedupes across rebuilds, and reports where the current strength
@@ -789,6 +824,17 @@ if ($Ctx) {
         $pendC  | Select-Object -First 5 | ForEach-Object { Write-Host "        PENDING  $_" -ForegroundColor Yellow }
         if ($pendC.Count -gt 5) { Write-Host "        ... $($pendC.Count - 5) more" -ForegroundColor Yellow }
         $mg = $(if ($margin.ContainsKey($g.Name)) { $margin[$g.Name] } else { $null })   # points; -1 = per bar (ATR); $null = not logged
+        # v2.54r2: levels installed by the close that already broke them (COMPLETE builds only, as above)
+        $ibP = @(); $ibQ = @(); $ibN = 0
+        foreach ($bk in @($blocks | Where-Object { $_.Src -match ('^' + [regex]::Escape($g.Name) + '(#[0-9A-F]{4})?,') -and $_.Status -eq 'COMPLETE' -and $_.Strict -and $_.Id })) {
+            $r = ProtInstalledBroken $bk $mg; $ibN += $r.N; $ibP += @($r.Proven); $ibQ += @($r.Pending)
+        }
+        if ($ibN -gt 0) {
+            Write-Host ("      level installed already broken  {0} proven, {1} pending  ({2} SET / ADVANCE / MOVE row(s))" -f $ibP.Count, $ibQ.Count, $ibN) `
+                       -ForegroundColor $(if ($ibP.Count) { 'Red' } elseif ($ibQ.Count) { 'Yellow' } else { 'Green' })
+            $ibP | Select-Object -First 5 | ForEach-Object { Write-Host "        PROVEN   $_" -ForegroundColor Red }
+            $ibQ | Select-Object -First 5 | ForEach-Object { Write-Host "        PENDING  $_" -ForegroundColor Yellow }
+        }
         $susp = 0; $pendS = 0; $bosN = 0; $legC = $null; $ldir = ''; $staleWhy = @()
         foreach ($e in $ev) {
             if ($e.Kind -eq 'BOS' -and $e.Str -gt 1 -and $legC -ne $null -and $e.Dir -eq $ldir) {

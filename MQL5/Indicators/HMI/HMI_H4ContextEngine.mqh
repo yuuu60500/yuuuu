@@ -115,7 +115,7 @@ void ProtOnBos(const int d, const int primary, const int h, const datetime t, co
   {
    HProtLevel cand, nolv, prev;
    ProtClear(nolv);
-   ProtFromSwing(H4ProtCandidate(d, primary, t), t, cand);
+   ProtFromSwing(H4ProtCandidate(d, primary, h, t), t, cand);
    if(leg_start)
      {
       g_leg_seq++;
@@ -178,10 +178,22 @@ void InternalLog(const string dir, const int h, const int idx, const int also, c
                also, also_list, ProtPx(g_prot), g_inst, g_run_id, g_init_seq);
   }
 
+// P-4: the swings opposite to trend direction d that this close broke
+// without breaking the protected level - processed, one diagnostic row,
+// no state event. On a BOS bar this runs BEFORE the level is chosen
+// (v2.54r2, P1), so a swing this very close broke can never become it.
+void H4InternalOnBar(const int h, const int d, const datetime t)
+  {
+   string list = "";
+   int    also = 0;
+   int    ii   = H4ConsumeAllBroken(h, -d, t, list, also);
+   if(ii >= 0) InternalLog((d == DIR_BULL ? "DOWN" : "UP"), h, ii, also, list);
+  }
+
 // One closed H4 bar while BULLISH / BEARISH (P-7): failure first, judged
 // against the protected level as it stood BEFORE this bar; then the
-// continuation BOS (which may move the level for the NEXT bar); then the
-// internal swings.
+// continuation BOS; then the internal swings this close broke; and only
+// then, on a BOS bar, the level for the NEXT bar.
 CtxEventType H4TrendOnBar(const int h, const datetime t)
   {
    int    d  = CtxDirection();
@@ -235,18 +247,13 @@ CtxEventType H4TrendOnBar(const int h, const datetime t)
       g_ctx_strength++;
       CtxLog("BOS", vd, h, bi, also);
       CtxDedupLog("BOS", vd, t, SwT(bi), SwP(bi), also, also_list);
+      H4InternalOnBar(h, d, t);
       ProtOnBos(d, bi, h, t, false);
       return(d == DIR_BULL ? EV_BOS_UP : EV_BOS_DOWN);
      }
 
-   //--- P-4: an internal swing - processed, the trend stands
-   int ii = H4DetectBreakDir(h, -d);
-   if(ii >= 0)
-     {
-      H4ConsumeSwing(ii, t);
-      also = H4ConsumeSameDirBroken(h, -d, ii, t, also_list);
-      InternalLog(od, h, ii, also, also_list);
-     }
+   //--- P-4: internal swings - processed, the trend stands
+   H4InternalOnBar(h, d, t);
    return(EV_NONE);
   }
 
@@ -332,7 +339,10 @@ CtxEventType H4ContextOnBar(const int h)
    CtxLog(kind, vdir, h, broken, also);
    CtxDedupLog(kind, vdir, t, SwT(broken), SwP(broken), also, also_list);
    if(kind == "BOS" || kind == "TRANS_OK" || kind == "TRANS_FAIL")
+     {
+      H4InternalOnBar(h, brk, t);                 // P1: what this close broke, before the level is chosen
       ProtOnBos(brk, broken, h, t, true);         // a new leg begins on this bar
+     }
    return(ev);
   }
 

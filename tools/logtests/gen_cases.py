@@ -385,6 +385,28 @@ case("c51_ctx_internal_list_reused", twice54([ctx(*LEG0, also=0), internal("DOWN
 case("c52_ctx_internal_ok", twice54([ctx(*LEG0, also=0), internal("DOWN", "2026.09.09 08:00", *I_SW, "1.23010", swings=["2026.09.08 04:00@1.23040"])]), ["-Ctx"],
      ["swing consumed twice in one build  0 proven, 0 pending  (1 of 1 build(s) COMPLETE and read)"], NOT_PROVEN)
 
+# v2.54r2 (reviewer P1): a level installed by the very close that broke it is a log-provable defect
+def prot(tag, ev, d, bar, level, inst="0001", run=7, init=1, src=SRC):
+    return L(src, f"{tag},USDJPY,{ev},dir={d},live=0,leg=1,bar={bar},level={level},swing=2026.09.09 08:00,confirm=2026.09.10 00:00,"
+                  f"bos={bar},age=3,prev=NA,cand={level}" + tail(inst, run, init))
+PB = "2026.09.10 08:00"
+def installed(d, close, level, head):
+    sw = ("2026.09.08 12:00", "1.00140") if d == "UP" else ("2026.09.08 12:00", "1.19860")
+    rows = [ctx("BOS", d, "BULLISH" if d == "UP" else "BEARISH", 2, PB, *sw, close, also=0),
+            prot("HMI-PROT", "ADVANCE", d, PB, level), prot("HMI-ANCHOR", "MOVE", d, PB, level)]
+    return [start("2.54")] + head + blk(1, ver="2.54", extra_rows=rows)
+case("c53_prot_installed_broken", installed("UP", "1.00143", "1.00146", [margin(1)]), ["-Ctx"],
+     ["level installed already broken  2 proven, 0 pending  (2 SET / ADVANCE / MOVE row(s))",
+      "2026.09.10 08:00 HMI-PROT ADVANCE level 1.00146 (UP leg) - the close 1.00143 of that bar is 3 pt past it (> margin 1): installed already broken"])
+case("c54_prot_installed_broken_bear", installed("DOWN", "1.19857", "1.19854", [margin(1)]), ["-Ctx"],
+     ["level installed already broken  2 proven, 0 pending", "HMI-ANCHOR MOVE level 1.19854 (DOWN leg) - the close 1.19857 of that bar is 3 pt past it"])
+case("c55_prot_installed_within_margin", installed("UP", "1.00143", "1.00146", [margin(3)]), ["-Ctx"],
+     ["level installed already broken  0 proven, 0 pending  (2 SET / ADVANCE / MOVE row(s))"], ["installed already broken  1", "installed already broken  2"])
+case("c56_prot_installed_atr", installed("UP", "1.00143", "1.00146", [ATR]), ["-Ctx"],
+     ["level installed already broken  0 proven, 2 pending", "close 1.00143 is 3 pt past it, the margin is per bar (ATR)"], ["installed already broken  1", "installed already broken  2"])
+case("c57_prot_installed_ok", installed("UP", "1.00143", "1.00045", [margin(1)]), ["-Ctx"],
+     ["level installed already broken  0 proven, 0 pending"], ["PROVEN"])
+
 # strength number only: same event, same swing, same state, str counted from another H4 start
 same_s = ctx_rows([E1, E3[:3] + (5,) + E3[4:]], also=0)
 case("c09_ctx_strength_only", [start()] + blk(1, extra_rows=same) + blk(2, extra_rows=same_s), R,

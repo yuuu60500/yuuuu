@@ -1145,6 +1145,62 @@
    "1 proven"
   ]
  },
+ "c53_prot_installed_broken": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "level installed already broken  2 proven, 0 pending  (2 SET / ADVANCE / MOVE row(s))",
+   "2026.09.10 08:00 HMI-PROT ADVANCE level 1.00146 (UP leg) - the close 1.00143 of that bar is 3 pt past it (> margin 1): installed already broken"
+  ],
+  "forbid": []
+ },
+ "c54_prot_installed_broken_bear": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "level installed already broken  2 proven, 0 pending",
+   "HMI-ANCHOR MOVE level 1.19854 (DOWN leg) - the close 1.19857 of that bar is 3 pt past it"
+  ],
+  "forbid": []
+ },
+ "c55_prot_installed_within_margin": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "level installed already broken  0 proven, 0 pending  (2 SET / ADVANCE / MOVE row(s))"
+  ],
+  "forbid": [
+   "installed already broken  1",
+   "installed already broken  2"
+  ]
+ },
+ "c56_prot_installed_atr": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "level installed already broken  0 proven, 2 pending",
+   "close 1.00143 is 3 pt past it, the margin is per bar (ATR)"
+  ],
+  "forbid": [
+   "installed already broken  1",
+   "installed already broken  2"
+  ]
+ },
+ "c57_prot_installed_ok": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "level installed already broken  0 proven, 0 pending"
+  ],
+  "forbid": [
+   "PROVEN"
+  ]
+ },
  "c09_ctx_strength_only": {
   "args": [
    "-Source",

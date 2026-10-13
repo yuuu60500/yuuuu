@@ -22,6 +22,7 @@ changes only what BRI-12 changes, so a v2.53 vs v2.54 difference here is a BRI-1
 
 It models the rules, not MQL5: a pass here does not replace compiling and running the indicator.
 """
+import math
 import os
 import sys
 
@@ -31,14 +32,36 @@ from h4_dedup_sim import (UP, DOWN, RANGE, BULL_CTX, BEAR_CTX, TRANS, H4, MARGIN
                           break_up, break_down, pts, tstr)
 
 
-def brk(d, close, level):
-    return break_up(close, level, MARGIN_PTS) if d == UP else break_down(close, level, MARGIN_PTS)
+def brk(d, close, level, mp=MARGIN_PTS):
+    return break_up(close, level, mp) if d == UP else break_down(close, level, mp)
+
+
+def atr_margins(bars, frac, point=B.POINT, fallback=MARGIN_PTS):
+    """MarginH4Pts in ATR_FRAC mode, as HMI_Series.mqh computes it: simple ATR(14) over bars
+    <= i (0 for i < 14 -> the pips fallback), round(frac * atr / point)."""
+    out = []
+    for i in range(len(bars)):
+        if i < 14:
+            out.append(fallback); continue
+        tr = 0.0
+        for k in range(i - 13, i + 1):
+            pc = bars[k - 1][4]
+            tr += max(bars[k][2] - bars[k][3], abs(bars[k][2] - pc), abs(bars[k][3] - pc))
+        a = tr / 14.0
+        out.append(fallback if a <= 0 else int(math.floor(frac * a / point + 0.5)))
+    return out
 
 
 class Engine254(B.Engine):
-    def __init__(self, fallback=True):
+    """margins: None = the fixed default margin; else a list, points per H4 bar (ATR mode).
+    legacy_p1: the v2.54 development build - the candidate checked only the processed flag and
+    internal swings were processed only on bars without a BOS (the reviewer's P1, 2026-10-13)."""
+    def __init__(self, fallback=True, margins=None, legacy_p1=False):
         super().__init__(dedup=True)
         self.fallback = fallback
+        self.margins = margins
+        self.legacy = legacy_p1
+        self.tidx = None
         self.leg = 0
         self.prot = None          # dict(price, bar_time, confirm, bos, set_at) or None (INVALID / no trend)
         self.anchor = None
@@ -47,16 +70,68 @@ class Engine254(B.Engine):
         self.trend_bars = 0
 
     # --- P-1 ------------------------------------------------------------------
-    def candidate(self, d, primary, t):
+    def mp(self, h):
+        return MARGIN_PTS if self.margins is None else self.margins[h]
+
+    # the v2.53 detection, with the margin of the bar (ATR mode varies per bar)
+    def detect_break(self, r, h):
+        vis = r[h][0] + H4
+        ih = self.last_unswept(UP, vis)
+        if ih >= 0 and brk(UP, r[h][4], self.sw[ih]["price"], self.mp(h)):
+            return UP, ih
+        il = self.last_unswept(DOWN, vis)
+        if il >= 0 and brk(DOWN, r[h][4], self.sw[il]["price"], self.mp(h)):
+            return DOWN, il
+        return 0, -1
+
+    def consume_same_dir(self, r, h, d, primary):
+        vis = r[h][0] + H4
+        extra = []
+        for i, s in enumerate(self.sw):
+            if i == primary or s["dir"] != d or s["swept"] or s["confirm"] > vis:
+                continue
+            if brk(d, r[h][4], s["price"], self.mp(h)):
+                s["swept"] = True
+                extra.append((d, s["bar_time"], s["price"]))
+        return extra
+
+    def broken_since(self, s, r, h):
+        """has any close after the swing's confirmation, up to bar h, effectively broken it?"""
+        k = self.tidx[s["bar_time"]] + 1
+        while k <= h:
+            if r[k][0] + H4 > s["confirm"] and brk(s["dir"], r[k][4], s["price"], self.mp(k)):
+                return True
+            k += 1
+        return False
+
+    def candidate(self, d, primary, r, h, t):
         """d = direction of the BOS; the candidate is an opposite swing formed after the
-        primary, confirmed by this close, still unprocessed. Latest formed wins."""
+        primary, confirmed by this close, still unprocessed and (P1 fix) never effectively
+        broken by a close since its confirmation. Latest formed wins."""
         best = None
         for s in self.sw:
             if s["dir"] != -d or s["swept"] or s["confirm"] > t or s["bar_time"] <= primary["bar_time"]:
                 continue
+            if not self.legacy and self.broken_since(s, r, h):
+                continue
             if best is None or s["bar_time"] > best["bar_time"]:
                 best = s
         return best
+
+    def internal(self, r, h, d):
+        """P-4: every confirmed, unprocessed swing of direction d (opposite to the trend) that
+        this close effectively breaks is processed; one row, primary = the latest of them."""
+        t = r[h][0] + H4
+        last = -1
+        for i, s in enumerate(self.sw):
+            if s["dir"] == d and not s["swept"] and s["confirm"] <= t and brk(d, r[h][4], s["price"], self.mp(h)):
+                last = i
+        if last < 0:
+            return
+        sw = self.sw[last]; sw["swept"] = True
+        extra = self.consume_same_dir(r, h, d, last)
+        self.internal_rows.append(dict(bar=t, dir=d, swing=sw["bar_time"], swing_px=sw["price"], close=r[h][4],
+                                       also=len(extra), prot=(self.prot["price"] if self.prot else None), extra=extra))
 
     def plog(self, rows, ev, d, t, lvl, prev=None):
         rows.append(dict(ev=ev, dir=d, leg=self.leg, bar=t,
@@ -64,8 +139,8 @@ class Engine254(B.Engine):
                          confirm=(lvl["confirm"] if lvl else 0), bos=(lvl["bos"] if lvl else 0),
                          prev=(prev["price"] if prev else None)))
 
-    def on_bos(self, d, primary, t, leg_start):
-        c = self.candidate(d, primary, t)
+    def on_bos(self, d, primary, r, h, t, leg_start):
+        c = self.candidate(d, primary, r, h, t)
         cand = dict(price=c["price"], bar_time=c["bar_time"], confirm=c["confirm"], bos=t) if c else None
         if leg_start:
             self.leg += 1
@@ -104,6 +179,9 @@ class Engine254(B.Engine):
         self.ctx_bars += 1
         t = r[h][0] + H4
         cl = r[h][4]
+        mp = self.mp(h)
+        if self.tidx is None or len(self.tidx) < len(r):
+            self.tidx = {b[0]: k for k, b in enumerate(r)}
         if self.ctx == TRANS and self.ctx_bars > TRANS_MAX:
             self.enter(RANGE, 0, t)
             self.log("TIMEOUT", 0, t, None, cl, 0)
@@ -114,7 +192,7 @@ class Engine254(B.Engine):
             if self.prot is None:
                 self.invalid_bars += 1
             # P-4 / P-6: failure first, judged with the protected level as it was BEFORE this bar
-            if self.prot is not None and brk(-d, cl, self.prot["price"]):
+            if self.prot is not None and brk(-d, cl, self.prot["price"], mp):
                 i = self.find(-d, self.prot)
                 sw = self.sw[i] if i >= 0 else dict(bar_time=self.prot["bar_time"], price=self.prot["price"], confirm=self.prot["confirm"], swept=True, dir=-d)
                 sw["swept"] = True
@@ -126,7 +204,7 @@ class Engine254(B.Engine):
                 return
             if self.prot is None and self.fallback:
                 i = self.last_unswept(-d, t)
-                if i >= 0 and brk(-d, cl, self.sw[i]["price"]):
+                if i >= 0 and brk(-d, cl, self.sw[i]["price"], mp):
                     sw = self.sw[i]; sw["swept"] = True
                     extra = self.consume_same_dir(r, h, -d, i)
                     self.leave_trend("FALLBACK", d, t)
@@ -135,20 +213,25 @@ class Engine254(B.Engine):
                     if extra: self.dedup_rows.append(dict(bar=t, kind="CHOCH", dir=-d, primary=(sw["bar_time"], sw["price"]), extra=extra))
                     return
             i = self.last_unswept(d, t)
-            if i >= 0 and brk(d, cl, self.sw[i]["price"]):
+            if i >= 0 and brk(d, cl, self.sw[i]["price"], mp):
                 sw = self.sw[i]; sw["swept"] = True
                 extra = self.consume_same_dir(r, h, d, i)
                 self.strength += 1
                 self.log("BOS", d, t, sw, cl, len(extra))
                 if extra: self.dedup_rows.append(dict(bar=t, kind="BOS", dir=d, primary=(sw["bar_time"], sw["price"]), extra=extra))
-                self.on_bos(d, sw, t, False)
+                if not self.legacy:
+                    self.internal(r, h, -d)          # P1 fix: what this close broke is processed BEFORE the level is chosen
+                self.on_bos(d, sw, r, h, t, False)
                 return
-            i = self.last_unswept(-d, t)
-            if i >= 0 and brk(-d, cl, self.sw[i]["price"]):       # an internal swing: processed, no state change
-                sw = self.sw[i]; sw["swept"] = True
-                extra = self.consume_same_dir(r, h, -d, i)
-                self.internal_rows.append(dict(bar=t, dir=-d, swing=sw["bar_time"], swing_px=sw["price"], close=cl,
-                                               also=len(extra), prot=(self.prot["price"] if self.prot else None), extra=extra))
+            if self.legacy:
+                i = self.last_unswept(-d, t)
+                if i >= 0 and brk(-d, cl, self.sw[i]["price"], mp):
+                    sw = self.sw[i]; sw["swept"] = True
+                    extra = self.consume_same_dir(r, h, -d, i)
+                    self.internal_rows.append(dict(bar=t, dir=-d, swing=sw["bar_time"], swing_px=sw["price"], close=cl,
+                                                   also=len(extra), prot=(self.prot["price"] if self.prot else None), extra=extra))
+            else:
+                self.internal(r, h, -d)
             return
         # RANGE / TRANSITION: the v2.53 break detection, with P-5 freshness in TRANSITION
         d, bi = self.detect_break(r, h)
@@ -171,11 +254,13 @@ class Engine254(B.Engine):
         if extra:
             self.dedup_rows.append(dict(bar=t, kind=kind, dir=d, primary=(sw["bar_time"], sw["price"]), extra=extra))
         if kind in ("BOS", "TRANS_OK", "TRANS_FAIL"):
-            self.on_bos(d, sw, t, True)
+            if not self.legacy:
+                self.internal(r, h, -d)              # P1 fix, the first BOS of a leg too
+            self.on_bos(d, sw, r, h, t, True)
 
 
-def run254(bars, fallback=True):
-    e = Engine254(fallback)
+def run254(bars, fallback=True, margins=None, legacy_p1=False):
+    e = Engine254(fallback, margins, legacy_p1)
     for h in range(len(bars)):
         e.process(bars, h)
     return e
@@ -242,6 +327,25 @@ def both(name, bars, fn):
 def px(bars, d, v):
     """price v of the bull case, as seen in the case of direction d"""
     return v if d == UP else round(2.2 - v, 5)
+
+
+def installed_broken(e, bars, margins=None):
+    """every SET / ADVANCE (protected) and SET / MOVE (anchor): was the level already broken by a
+    close after its confirmation, up to and including the bar that installed it?"""
+    bad = []
+    idx = {b[0] + H4: k for k, b in enumerate(bars)}
+    for rows, evs in ((e.prot_rows, ("SET", "ADVANCE")), (e.anchor_rows, ("SET", "MOVE"))):
+        for r in rows:
+            if r["ev"] not in evs or r["level"] is None:
+                continue
+            h = idx[r["bar"]]
+            for k in range(h + 1):
+                if bars[k][0] + H4 <= r["confirm"]:
+                    continue
+                mpk = MARGIN_PTS if margins is None else margins[k]
+                if brk(-r["dir"], bars[k][4], r["level"], mpk):
+                    bad.append((r["ev"], tstr(r["bar"]), r["level"], tstr(bars[k][0] + H4))); break
+    return bad
 
 
 def scenarios():
@@ -421,6 +525,76 @@ def scenarios():
               len(legs) >= 2 and after and after[0]["ev"] in ("SET", "INVALID") and after[0]["bar"] > choch_t(e), f"{e.prot_rows}")
     both("new leg", newlow, s_reset)
 
+    # ---- reviewer P1 (2026-10-13): ATR margin shrinks; one close breaks the primary high AND the
+    # higher pullback low formed after it. That low must not become protected / anchor.
+    # Points over 1.00000: protected B 45 (bar 7), primary P 140 (bar 11), pullback low L 146 (bar 17,
+    # above P - earlier closes 148..152 stayed within the 15-point margin); bar 20 (margin 1) closes 143.
+    ROWS = [(60, 40, 50), (55, 30, 35), (45, 20, 30), (60, 28, 55), (80, 50, 75), (100, 70, 90), (95, 60, 65),
+            (75, 45, 50), (90, 48, 85), (125, 80, 120), (135, 110, 130), (140, 120, 125), (138, 124, 132),
+            (139, 131, 135), (150, 134, 148), (153, 147, 150), (152, 147, 148), (154, 146, 149), (155, 147, 152),
+            (156, 147, 150), (151, 140, 143), (146, 143, 144), (147, 143, 146), (148, 145, 147)]
+    t0 = int(B.dt.datetime(2026, 9, 7, 0, 0, tzinfo=B.dt.timezone.utc).timestamp())
+    atrb, prev = [], 1.0 + ROWS[0][2] * 1e-5
+    for i, (hi, lo, cl) in enumerate(ROWS):
+        atrb.append([t0 + i * H4, round(prev, 5), round(1.0 + hi * 1e-5, 5), round(1.0 + lo * 1e-5, 5), round(1.0 + cl * 1e-5, 5)])
+        prev = 1.0 + cl * 1e-5
+    MG = [15] * 20 + [1] * (len(ROWS) - 20)
+
+    def lv(bars, d, p_):
+        return px(bars, d, round(1.0 + p_ * 1e-5, 5))
+
+    def s_atr(name, bars, d):
+        old = run254(bars, margins=MG, legacy_p1=True); new = run254(bars, margins=MG)
+        t20, t21 = at(bars, 20), at(bars, 21)
+        o = [(r["ev"], r["level"]) for r in old.prot_rows if r["bar"] == t20]
+        n = [(r["ev"], r["level"]) for r in new.prot_rows if r["bar"] == t20]
+        na = [(r["ev"], r["level"]) for r in new.anchor_rows if r["bar"] == t20]
+        it = [x for x in new.internal_rows if x["bar"] == t20]
+        ch_o = [x for x in ev(old) if x[0] == "CHOCH" and x[2] == t21]
+        ch_n = [x for x in ev(new) if x[0] == "CHOCH"]
+        bos = [x for x in ev(new) if x[2] == t20]
+        ok = (o == [("ADVANCE", lv(bars, d, 146))] and ch_o                       # the development build: defect reproduced
+              and bos == [("BOS", d, t20)] and n == [("KEEP_NONE", lv(bars, d, 45))] and na == [("KEEP_NONE", lv(bars, d, 45))]
+              and len(it) == 1 and it[0]["swing_px"] == lv(bars, d, 146) and not ch_n)
+        check(name + " P1: a close that breaks the primary and a higher pullback low -> BOS, the low processed (INTERNAL),"
+                     " protected / anchor kept; no CHOCH next bar (dev build: installs it, CHOCH)",
+              ok, f"dev {o} choch {ch_o} | fixed bos {bos} prot {n} anchor {na} internal {it} choch {ch_n}")
+    both("ATR margin shrinks, leg running", atrb, s_atr)
+
+    def s_atr_first(name, bars, d):
+        mg = MG[9:]
+        old = run254(bars, margins=mg, legacy_p1=True); new = run254(bars, margins=mg)
+        t = at(bars, 11)
+        o = [(r["ev"], r["level"]) for r in old.prot_rows if r["bar"] == t]
+        n = [(r["ev"], r["level"]) for r in new.prot_rows if r["bar"] == t]
+        it = [x for x in new.internal_rows if x["bar"] == t]
+        k = [x for x in ev(new) if x[0] == "BOS"]
+        check(name + " P1: the first BOS of a leg on such a close -> INVALID, not the broken low (dev build: SET it)",
+              o == [("SET", lv(bars, d, 146))] and k and k[0][2] == t and n == [("INVALID", None)] and len(it) == 1
+              and not [x for x in ev(new) if x[0] == "CHOCH"],
+              f"dev {o} | fixed bos {k} prot {n} internal {it} events {ev(new)}")
+    s_atr_first("ATR margin shrinks, first BOS of a leg [bull]", [tuple(b) for b in atrb[9:]], UP)
+
+    def s_atr_first_bear(name, bars, d):
+        # Mirror image: the same close breaks the primary LOW down and the pullback HIGH up. RANGE / TRANSITION
+        # detection is v2.53's, up first - the high wins, so this is a BOS UP of that high (a bull leg), and the
+        # bear-side defect cannot arise on a leg's first BOS. Nothing broken is installed either way.
+        new = run254(bars, margins=MG[9:])
+        k = [x for x in ev(new) if x[0] == "BOS"]
+        n = [(r["ev"], r["level"]) for r in new.prot_rows][:1]
+        check(name + " P1 mirror: a close breaking both ways in RANGE is a BOS UP (v2.53 order); INVALID, nothing broken installed",
+              k and k[0][1] == UP and n == [("INVALID", None)] and not installed_broken(new, bars, MG[9:]), f"{k} {n}")
+    s_atr_first_bear("ATR margin shrinks, first BOS of a leg [bear]", [tuple(b) for b in mirror_bars(atrb[9:])], DOWN)
+
+    def s_invariant(name, bars, d):
+        for mg, tag in ((None, "fixed margin"), (MG, "per-bar margin")):
+            e = run254(bars, margins=mg)
+            bad = installed_broken(e, bars, mg)
+            if bad:
+                check(f"{name} invariant ({tag})", False, f"{bad}"); return
+        check(name + " invariant: no level is installed (SET / ADVANCE / MOVE) once a close since its confirmation broke it", True)
+    both("installed levels", atrb, s_invariant)
+
     def s_prefix(name, bars, d):
         full = run254(bars)
         for k in range(8, len(bars) + 1):
@@ -469,8 +643,22 @@ def replay(path_csv):
     po, pn = B.multiset_diff(v53.poi_rows, v54.poi_rows)
     print(f"POI events only in v2.53: {len(po)}, only in v2.54: {len(pn)}  (NEW only v2.53 {sum(1 for x in po if x[0]=='NEW')}, only v2.54 {sum(1 for x in pn if x[0]=='NEW')})")
     print(f"max strength v2.53 {max(r['str'] for r in v53.ctx_rows)}, v2.54 {max(r['str'] for r in v54.ctx_rows)}")
+    # reviewer P1 (2026-10-13): the development build vs the fix, fixed margin and ATR margin
+    print("\nP1 - a level installed although a close since its confirmation had broken it:")
+    for tag, mg in (("fixed margin (default 3 points)", None), ("ATR_FRAC 0.20", atr_margins(bars, 0.20))):
+        dev = run254(bars, margins=mg, legacy_p1=True); fix = run254(bars, margins=mg)
+        bd, bf = installed_broken(dev, bars, mg), installed_broken(fix, bars, mg)
+        cd = sum(1 for r in dev.ctx_rows if r["kind"] == "CHOCH"); cf = sum(1 for r in fix.ctx_rows if r["kind"] == "CHOCH")
+        sd = sum(1 for (_, a), (_, b) in zip(dev.state_after, fix.state_after) if a != b)
+        print(f"  {tag:32s} dev build {len(bd):3d}, fixed {len(bf):3d};  CHOCH dev {cd} / fixed {cf};"
+              f"  INTERNAL dev {len(dev.internal_rows)} / fixed {len(fix.internal_rows)};  H4 bars in another state {sd}")
+        for x in bd[:3]:
+            print(f"      dev: {x[0]} at {x[1]} level {x[2]} - broken by the close of {x[3]}")
+        ok_p1 = not bf
+        if not ok_p1:
+            print("      !! the fixed engine installed a broken level")
     # no repaint
-    ok = True
+    ok = ok_p1
     for k in range(40, len(bars) + 1, 25):
         part = run254(bars[:k]); cut = bars[k - 1][0] + H4
         if [B.ctx_key(r) for r in part.ctx_rows] != [B.ctx_key(r) for r in v54.ctx_rows if r["bar"] <= cut] or \

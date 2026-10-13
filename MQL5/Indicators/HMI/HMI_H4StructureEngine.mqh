@@ -96,12 +96,30 @@ int H4DetectBreakDir(const int h, const int dir)
    return(-1);
   }
 
-// P-1: the candidate a BOS of direction dir leaves behind. Bounded by the
-// swing this BOS broke (primary): an opposite swing FORMED after it, already
-// confirmed at this close, not processed. Of those, the latest formed. A
-// swing formed before the primary belongs to an earlier move and is never a
-// candidate; one that confirms after this close is not known yet.
-int H4ProtCandidate(const int dir, const int primary, const datetime vis)
+// Has any H4 close after the swing's confirmation, up to and including bar
+// h, effectively broken it (each bar with its own margin)? "Not processed"
+// is not the same thing: a swing is processed only when the state machine
+// looks at it, and a close can break a swing it does not look at.
+bool H4SwingBrokenSince(const int idx, const int h)
+  {
+   if(!SafeIdx(idx, g_h4sw_n)) return(true);
+   int from = MathMax(g_h4sw[idx].bar_index + 1, 0);
+   for(int k = from; k <= h && k < g_h4_n; k++)
+     {
+      if(CloseTimeOf(g_h4[k].time, PERIOD_H4) <= g_h4sw[idx].confirm_time) continue;
+      if(H4CloseBreaks(k, g_h4sw[idx].dir, g_h4sw[idx].price)) return(true);
+     }
+   return(false);
+  }
+
+// P-1: the candidate a BOS of direction dir on bar h leaves behind. Bounded
+// by the swing this BOS broke (primary): an opposite swing FORMED after it,
+// already confirmed at this close, not processed and not effectively broken
+// by any close since its confirmation - this close included (v2.54r2, P1).
+// Of those, the latest formed. A swing formed before the primary belongs to
+// an earlier move and is never a candidate; one that confirms after this
+// close is not known yet; a broken one is not a legal level, ever.
+int H4ProtCandidate(const int dir, const int primary, const int h, const datetime vis)
   {
    if(!SafeIdx(primary, g_h4sw_n)) return(-1);
    datetime after = g_h4sw[primary].bar_time;
@@ -110,9 +128,33 @@ int H4ProtCandidate(const int dir, const int primary, const datetime vis)
      {
       if(g_h4sw[i].dir != -dir || g_h4sw[i].swept) continue;
       if(g_h4sw[i].confirm_time > vis || g_h4sw[i].bar_time <= after) continue;
-      if(best < 0 || g_h4sw[i].bar_time > g_h4sw[best].bar_time) best = i;
+      if(best >= 0 && g_h4sw[i].bar_time <= g_h4sw[best].bar_time) continue;
+      if(H4SwingBrokenSince(i, h)) continue;
+      best = i;
      }
    return(best);
+  }
+
+// P-4: every confirmed, unprocessed swing of direction dir that bar h's
+// close effectively breaks is processed - not only the latest one, which a
+// newer, unbroken swing can shadow. Returns the latest of them (the
+// diagnostic row's primary) or -1; `also` / `list` name the others.
+int H4ConsumeAllBroken(const int h, const int dir, const datetime t, string &list, int &also)
+  {
+   list = "";
+   also = 0;
+   if(!SafeIdx(h, g_h4_n)) return(-1);
+   datetime vis = CloseTimeOf(g_h4[h].time, PERIOD_H4);
+   int last = -1;
+   for(int i = 0; i < g_h4sw_n; i++)
+     {
+      if(g_h4sw[i].dir != dir || g_h4sw[i].swept || g_h4sw[i].confirm_time > vis) continue;
+      if(H4CloseBreaks(h, dir, g_h4sw[i].price)) last = i;
+     }
+   if(last < 0) return(-1);
+   H4ConsumeSwing(last, t);
+   also = H4ConsumeSameDirBroken(h, dir, last, t, list);
+   return(last);
   }
 
 // P-5: structure that can resolve a TRANSITION. t_choch is the close time

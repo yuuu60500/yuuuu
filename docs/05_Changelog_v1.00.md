@@ -1839,3 +1839,29 @@ tools/ReloadTest.ps1       -Ctx：HMI-CTX-INTERNAL 计为消费记录（主点 +
 tools/logtests             87 组（新增 c48–c52）
 ```
 
+---
+
+## v2.54r2 —— A-65：保护点 / 锚点只取合法候选点（BOS 当根先处理已越过的反向点）—— 开发版，待重编译
+
+```
+Date:     2026-10-13
+来源:     验收方「HMI v2.54 开发版审核报告」（2026-10-13）P1
+基线:     v2.54 开发版（f2ffe71；验收方编译 0/0）
+
+Changed Functions:
+  HMI_H4StructureEngine.mqh H4SwingBrokenSince（新）—— 确认之后到本根，任一收盘以当根余量越过该点即失效
+                            H4ProtCandidate —— 多一个参数 h；跳过已失效的点（不只看「未处理」标志）
+                            H4ConsumeAllBroken（新）—— 本根收盘越过的全部已确认未处理反向点都处理，返回最近的一个
+  HMI_H4ContextEngine.mqh   H4InternalOnBar（新）—— 内部点处理，同向 BOS 当根也执行，并在选保护点之前；
+                            新段第一次 BOS 同样先处理再选点；无 BOS 的趋势 K 线改用它（被较新未破坏点遮住的旧破坏点也处理）
+State events:              不变 —— 同一根至多一次 BOS / CHOCH；内部处理只写 HMI-CTX-INTERNAL
+Params / log formats:      不变（461F006E；HMI-PROT / HMI-ANCHOR / HMI-CTX-INTERNAL 格式不变）
+
+tools/h4_protect_sim.py    逐根余量（固定 / ATR_FRAC，按 HMI_Series.mqh 的简单 ATR(14)）；legacy_p1 复现开发版；
+                           场景 38/38（新增 A-65 多空续段、多头首段、空头首段说明、不变量）；
+                           回放：开发版与修复版在固定余量与 ATR 0.20 下都没有装入已越过的点，H4 状态相同
+tools/ReloadTest.ps1       -Ctx 新增「level installed already broken」：SET / ADVANCE / MOVE 行与同根 BOS 收盘比较，
+                           超过日志余量 = PROVEN；ATR / 未记录余量 = pending
+tools/logtests             92 组（新增 c53–c57）
+```
+

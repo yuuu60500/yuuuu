@@ -1,4 +1,4 @@
-# v2.54 BRI-12 offline evidence (tools/h4_protect_sim.py), 2026-10-13
+# v2.54r2 BRI-12 offline evidence (tools/h4_protect_sim.py), 2026-10-13
 # data: backtesting.py 0.6.6 backtesting/test/EURUSD.csv, sha256 81e977905a006cc8fbc034ebdb83c999a8ed6ba00191dc7ea5ef5b386fb74a82 (same file as v2.53_h4_dedup_offline.txt)
 
 ## python3 tools/h4_protect_sim.py
@@ -32,10 +32,16 @@ PASS  fallback [bull] P-6b: protected INVALID, latest opposite swing broken -> C
 PASS  fallback [bear] P-6b: protected INVALID, latest opposite swing broken -> CHOCH (FALLBACK); without P-6b no CHOCH
 PASS  new leg [bull] P-2/P-5: a new leg after TRANS_OK starts its own protected (SET / INVALID), not the old leg's
 PASS  new leg [bear] P-2/P-5: a new leg after TRANS_OK starts its own protected (SET / INVALID), not the old leg's
+PASS  ATR margin shrinks, leg running [bull] P1: a close that breaks the primary and a higher pullback low -> BOS, the low processed (INTERNAL), protected / anchor kept; no CHOCH next bar (dev build: installs it, CHOCH)
+PASS  ATR margin shrinks, leg running [bear] P1: a close that breaks the primary and a higher pullback low -> BOS, the low processed (INTERNAL), protected / anchor kept; no CHOCH next bar (dev build: installs it, CHOCH)
+PASS  ATR margin shrinks, first BOS of a leg [bull] P1: the first BOS of a leg on such a close -> INVALID, not the broken low (dev build: SET it)
+PASS  ATR margin shrinks, first BOS of a leg [bear] P1 mirror: a close breaking both ways in RANGE is a BOS UP (v2.53 order); INVALID, nothing broken installed
+PASS  installed levels [bull] invariant: no level is installed (SET / ADVANCE / MOVE) once a close since its confirmation broke it
+PASS  installed levels [bear] invariant: no level is installed (SET / ADVANCE / MOVE) once a close since its confirmation broke it
 PASS  prefix [bull] no repaint: a run cut at any bar holds exactly the events and protected rows the full run had
 PASS  prefix [bear] no repaint: a run cut at any bar holds exactly the events and protected rows the full run had
 
-32/32 checks as expected
+38/38 checks as expected
 
 ## python3 tools/h4_protect_sim.py --replay EURUSD_H1.csv
 replay EURUSD_H1.csv: 1292 H4 bars 2017.04.19 08:00 .. 2018.02.07 12:00
@@ -47,7 +53,7 @@ structure events          v2.53   v2.54   v2.54 without P-6b
   TRANS_FAIL                 19       8       3
   TRANS_SAMELEG               8      13       5
   TIMEOUT                     1       6       5
-  INTERNAL (no state change)    -      32      51
+  INTERNAL (no state change)    -      38      59
 
 v2.54 protected events: SET 18, ADVANCE 27, KEEP_WORSE 10, KEEP_NONE 25, INVALID 12, BREAK 17, FALLBACK 7
   legs 25, starting INVALID 12; trend bars 958, of them with protected INVALID 125 (13%)
@@ -63,4 +69,8 @@ v2.54 without P-6b protected events: SET 15, ADVANCE 27, KEEP_WORSE 10, KEEP_NON
 H4 bars in a different state v2.53 vs v2.54: 407 of 1292 (407 where at least one side is trending)
 POI events only in v2.53: 70, only in v2.54: 58  (NEW only v2.53 13, only v2.54 9)
 max strength v2.53 7, v2.54 17
+
+P1 - a level installed although a close since its confirmation had broken it:
+  fixed margin (default 3 points)  dev build   0, fixed   0;  CHOCH dev 24 / fixed 24;  INTERNAL dev 32 / fixed 38;  H4 bars in another state 0
+  ATR_FRAC 0.20                    dev build   0, fixed   0;  CHOCH dev 25 / fixed 25;  INTERNAL dev 23 / fixed 33;  H4 bars in another state 0
 prefix stability (cut every 25 bars): OK
