@@ -1895,3 +1895,29 @@ Verification:            tools/logtests 82/82；r5 脚本 68/82（c40–c43、c4
 Not changed:             stale BOS 诊断（suspect / pending）仍读取日志中全部 HMI-CTX 行（含实时行），它只提示人工核对，不给确证结论
 Status:                  **FIXED —— 工具修订 r6（MQL5 不变）**
 ```
+
+
+## Audit Round 22 —— 验收方 v2.53r6 复核与 v2.54 交接（2026-10-13）
+
+```
+结论:                    r6 工具修补验收通过，无新增必须修改项；v2.53 工具修补阶段结束。指标源码沿用 v2.53r3 基线，日志验收工具采用 r6
+已确认:                  MQL 23/23 与 r5 相同；82/82；独立复测 19/19（含上轮四个反例与合法正向对照）；
+                         原始日志 47/47 构建完整、0 proven / 0 pending、stale BOS 0 suspect / 0 pending；去重列表与计数一致
+保留的限制:              A-59 移动窗口历史标记变化；A-60 跨休眠缺少连续覆盖证据；GBPUSD / USDCHF 的 MODEL 样本不足；
+                         四品种 v2.52 → v2.53 原生 MT5 比较未执行。本轮工具通过不等于这些历史验收项完成
+BRI-12 修订意见:         P-1 漏了「在被突破主参考点之后形成」；P-5 不能沿用 v2.53；P-6 的降级须单列为边界规则 —— 见 A-64 与 docs/02 修订稿 2
+```
+
+### A-64 —— **TRANSITION 的恢复不要求新结构；反转只查确认时间**（规则缺口，v2.54 修正）
+
+```
+Observed (验收方):       v2.53 源码中 TRANS_OK 只检查摆动点确认时间晚于 CHOCH；TRANS_FAIL 分支没有新结构约束，
+                         CHOCH 之前的旧高点被收盘越过即恢复原趋势。既定需求：反转与恢复都需要 CHOCH 之后形成并确认的新结构
+Effect:                  形成于 CHOCH 那根（或之前）、之后才确认的点可确认反转；任何旧点都可以让趋势恢复
+Fix (v2.54, BRI-12 P-5): H4FreshAfter：bar_time >= CHOCH 收盘 且 confirm_time > CHOCH 收盘；TRANS_OK 与 TRANS_FAIL 都要求，
+                         否则 TRANS_SAMELEG（点被处理，状态不变）。CHOCH 后第一根的开盘时间等于 CHOCH 收盘，按新结构计
+Verification:            h4_protect_sim.py 场景：CHOCH 那根的低点之后确认 → 不反转；新低点 → TRANS_OK；CHOCH 前的旧高点 → 不恢复
+                         （v2.53 模型在同一数据上给出 TRANS_FAIL）；新高点 → TRANS_FAIL；CHOCH 后第一根形成的点 → 新结构。多空各一
+Status:                  **v2.54 开发版已实现，未编译**
+```
+
