@@ -1807,3 +1807,35 @@ tools/ReloadTest.ps1   SESS / BLK / ARM / MODEL 每一行先按本构建的父�
 tools/logtests         60 组：新增 c15–c25（验收方两个反例 + 合法边界 / 越界成对用例）；
                        Run-LogTests.ps1 同时读取 attribution_*.txt（运行前删除旧文件）
 ```
+
+---
+
+## v2.54 —— 保护点与波段锚点（BRI-12 修订稿 2）—— 开发版，未编译
+
+```
+Date:     2026-10-13
+来源:     验收方「HMI v2.53r6 验收复核与 v2.54 交接」（2026-10-13）；docs/02 BRI-12 修订稿 2
+基线:     指标源码 v2.53r3（冻结）；验收工具 r6
+状态:     未编译（待 MetaEditor 0 errors / 0 warnings）；P-6b 边界规则与 P-1 的两点读法待签字
+
+Changed Functions:
+  HMI_H4ContextEngine.mqh   H4ContextOnBar —— 趋势中交给 H4TrendOnBar；RANGE / TRANSITION 沿用 v2.53 检测；
+                            TRANSITION 中 TRANS_OK 与 TRANS_FAIL 都要求 H4FreshAfter（P-5），否则 TRANS_SAMELEG
+                            H4TrendOnBar（新）—— 保护点被有效收盘破坏 → 当根 CHOCH（P-4）；INVALID 段按 P-6b；
+                            同向 BOS 后按 P-1/P-2/P-3 更新；无 BOS 时内部点被越过 → 处理 + HMI-CTX-INTERNAL
+                            ProtOnBos / ProtLeave / ProtLog / ProtClear / ProtFromSwing / InternalLog（新）；
+                            CtxLogAt / CtxDedupLog（由 CtxLog 与原 DEDUP 打印拆出，行格式不变）
+  HMI_H4StructureEngine.mqh H4CloseBreaks / H4DetectBreakDir / H4ProtCandidate（P-1）/ H4FreshAfter（P-5）/ H4SwingById（新）
+  HMI_Defs.mqh              HMI_VERSION 2.54；struct HProtLevel；g_prot / g_anchor / g_leg_seq
+  H4M5_Identification.mq5   #property version 2.54；ResetEngine 清空保护点、锚点与段序号
+
+Changed States:            g_prot、g_anchor（值拷贝，不引用摆动点下标 —— 摆动点数组是滑动窗口）、g_leg_seq
+Logs:                      新增 HMI-PROT / HMI-ANCHOR / HMI-CTX-INTERNAL；HMI-CTX / HMI-CTX-DEDUP 格式不变
+Params:                    无新输入，参数摘要不变（461F006E）；全局余量语义不变
+Expected signal change:    是 —— H4 状态（CHOCH 减少、趋势段变长、强度更高），传到 H4 POI / Session / MODEL
+
+tools/h4_protect_sim.py    新：BRI-12 离线模型，场景 32/32（多空各 16），EURUSD 回放（docs/evidence/v2.54_protect_offline.txt）
+tools/ReloadTest.ps1       -Ctx：HMI-CTX-INTERNAL 计为消费记录（主点 + swings 列表，同一套有效性判据）
+tools/logtests             87 组（新增 c48–c52）
+```
+

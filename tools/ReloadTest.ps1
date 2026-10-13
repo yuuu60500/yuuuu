@@ -628,6 +628,8 @@ function StaleVerdict($e, $legC, [string]$ldir, $mg) {
 # the consumed set: it is returned as unverifiable, and so is a de-dup list
 # that does not match the also= count it belongs to (the consumed set is then
 # not known in full). Same validity rules for PROVEN and pending.
+# v2.54: HMI-CTX-INTERNAL rows (an internal swing processed, BRI-12 P-4) are
+# consumption records too - the swing they name and their swings= list.
 function ConsRec([string]$dir, [string]$sw, [string]$px, [string]$bar) {
     $bad = @()
     if ($dir -ne 'UP' -and $dir -ne 'DOWN')        { $bad += "dir '$dir'" }
@@ -651,6 +653,23 @@ function DoubleConsumed($bk) {
             if ($r.Bad) { $pend += "$bar $kind consumption record not valid ($($r.Bad)) - left out of the consumed set"; continue }
             if ($seen.ContainsKey($r.Key)) { $dup += "$bar $kind re-uses swing $($f['swing']) @ $($f['swing_px']) ($($f['dir'])), consumed at $($seen[$r.Key])" }
             else { $seen[$r.Key] = $bar }
+        } elseif ($m -match '^HMI-CTX-INTERNAL,') {
+            # v2.54 (BRI-12 P-4): a swing inside the leg broken without breaking the
+            # protected level - processed, no state change. A consumption like any other.
+            $f = KV $m; $bar = [string]$f['bar']
+            $list = @(([string]$f['swings'] -split '\|') | Where-Object { $_ })
+            if (-not ($f['also'] -match '^\d+$') -or [int]$f['also'] -ne $list.Count) {
+                $pend += "$bar internal row says also='$($f['also'])' but lists $($list.Count) swing(s)"
+            }
+            $recs = New-Object System.Collections.ArrayList
+            [void]$recs.Add(@([string]$f['swing'], [string]$f['swing_px']))
+            foreach ($sw in $list) { $pp = $sw -split '@', 2; [void]$recs.Add(@($pp[0], $(if ($pp.Count -gt 1) { $pp[1] } else { '' }))) }
+            foreach ($rc in $recs) {
+                $r = ConsRec ([string]$f['dir']) $rc[0] $rc[1] $bar
+                if ($r.Bad) { $pend += "$bar internal record '$($rc[0])@$($rc[1])' not valid ($($r.Bad)) - left out of the consumed set"; continue }
+                if ($seen.ContainsKey($r.Key)) { $dup += "$bar internal re-uses swing $($rc[0]) @ $($rc[1]) ($($f['dir'])), consumed at $($seen[$r.Key])" }
+                else { $seen[$r.Key] = $bar }
+            }
         } elseif ($m -match '^HMI-CTX-DEDUP,') {
             $f = KV $m; $bar = [string]$f['bar']
             $list = @(([string]$f['swings'] -split '\|') | Where-Object { $_ })

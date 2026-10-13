@@ -1087,6 +1087,64 @@
    "1 proven"
   ]
  },
+ "c48_ctx_internal_then_choch": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "swing consumed twice in one build  1 proven, 0 pending",
+   "PROVEN   2026.09.10 12:00 CHOCH re-uses swing 2026.09.08 16:00 @ 1.23020 (DOWN), consumed at 2026.09.09 08:00"
+  ],
+  "forbid": []
+ },
+ "c49_ctx_internal_px_bad": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "swing consumed twice in one build  0 proven, 1 pending",
+   "internal record '2026.09.08 16:00@BAD' not valid (swing price 'BAD')"
+  ],
+  "forbid": [
+   "PROVEN",
+   "1 proven"
+  ]
+ },
+ "c50_ctx_internal_count": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "swing consumed twice in one build  0 proven, 1 pending",
+   "internal row says also='2' but lists 1 swing(s)"
+  ],
+  "forbid": [
+   "PROVEN",
+   "1 proven"
+  ]
+ },
+ "c51_ctx_internal_list_reused": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "swing consumed twice in one build  1 proven, 0 pending",
+   "re-uses swing 2026.09.08 04:00 @ 1.23040 (DOWN), consumed at 2026.09.09 08:00"
+  ],
+  "forbid": []
+ },
+ "c52_ctx_internal_ok": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "swing consumed twice in one build  0 proven, 0 pending  (1 of 1 build(s) COMPLETE and read)"
+  ],
+  "forbid": [
+   "PROVEN",
+   "1 proven"
+  ]
+ },
  "c09_ctx_strength_only": {
   "args": [
    "-Source",

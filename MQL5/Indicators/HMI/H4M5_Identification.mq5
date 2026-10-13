@@ -9,7 +9,7 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "2.53"          // keep equal to HMI_VERSION (HMI_Defs.mqh)
+#property version   "2.54"          // keep equal to HMI_VERSION (HMI_Defs.mqh)
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window
@@ -204,6 +204,7 @@ void ResetEngine()
    g_h4_cursor = 0;
    g_ctx = CTX_RANGE;  g_ctx_pending = DIR_NONE;
    g_ctx_strength = 0; g_ctx_messy = false; g_ctx_time = 0; g_ctx_bars = 0;
+   ProtClear(g_prot);  ProtClear(g_anchor);  g_leg_seq = 0;      // BRI-12
    g_diag_poi_rejected_gap = 0;  g_diag_blk_rejected_gap = 0;
    g_alertq_n = 0;
    g_sess.active = false;  g_sess.id = 0;  g_sess.poi_id = 0;

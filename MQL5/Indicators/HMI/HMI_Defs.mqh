@@ -6,7 +6,7 @@
 #ifndef HMI_DEFS_MQH
 #define HMI_DEFS_MQH
 
-#define HMI_VERSION      "2.53"
+#define HMI_VERSION      "2.54"
 #define HMI_PREFIX       "HMI"
 
 //--- direction ------------------------------------------------------
@@ -110,6 +110,21 @@ struct HSwing
    double            price;
    bool              swept;
    datetime          swept_time;
+  };
+
+// BRI-12 (v2.54): one structure level of the current H4 trend leg - the
+// protected_level (decides CHOCH) or the leg_anchor (log only this version).
+// Values are copied out of the swing, never referenced by index: the swing
+// store is a sliding window and an old protected swing may leave it.
+struct HProtLevel
+  {
+   bool              valid;
+   double            price;
+   long              swing_id;
+   int               bar_index;      // H4 index of the swing bar (age), runtime only
+   datetime          swing_time;     // formation: open time of the swing bar
+   datetime          confirm_time;   // close of the bar that confirmed the swing
+   datetime          bos_time;       // close of the BOS that took it
   };
 
 struct HFvg
@@ -288,6 +303,9 @@ bool     g_ctx_messy     = false;
 datetime g_ctx_time      = 0;          // when current state was entered
 int      g_ctx_bars      = 0;          // H4 bars spent in current state
 int      g_h4_cursor     = 0;          // next H4 bar index to consume
+HProtLevel g_prot;                     // BRI-12 protected_level of the current trend leg
+HProtLevel g_anchor;                   // BRI-12 leg_anchor of the current trend leg (log only)
+int      g_leg_seq       = 0;          // trend legs begun in this build (log key)
 
 //--- M5 ---
 HSwing   g_m5sw[MAX_M5_SWINGS];  int g_m5sw_n = 0;

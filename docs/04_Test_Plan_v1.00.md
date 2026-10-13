@@ -942,3 +942,19 @@ c15–c25 为 A-58 生命周期用例，其中 c17 / c20 / c22 / c24 是合法�
 用户决定（2026-10-08）：不做第 6 项 MT5 跨版本比较。v2.53 与 v2.52 的差异以离线证据为准
 （`docs/evidence/v2.53_h4_dedup_offline.txt`：EURUSD 回放 156 条差异全部 explained，PENDING 0，UNEXPLAINED 0）；
 MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载），8 个品种，默认参数（D-4 开、D-5 关）。
+
+### v2.54 验收清单（保护点与波段锚点，BRI-12 修订稿 2；基线 v2.53r3）
+
+```
+0  编译 0 errors / 0 warnings
+1  版本：starting on v2.54；BEGIN ver=2.54；默认参数下 params=461F006E（无新输入）
+2  新日志行（InpLogSignals = true）：HMI-PROT / HMI-ANCHOR / HMI-CTX-INTERNAL，均带 inst / run / init
+          每个趋势段（leg=）的第一行为 SET 或 INVALID；段以 BREAK 或 FALLBACK 结束，同根有 ANCHOR RESET
+          每条 CHOCH（HMI-CTX）同根有 HMI-PROT BREAK 或 FALLBACK；BREAK 的 level = 该 CHOCH 的 swing_px
+          ADVANCE：多头 level > prev、空头 level < prev；KEEP_WORSE：cand 不优于 level
+          `-Ctx`：transitions 平衡；swing consumed twice 0 proven / 0 pending（HMI-CTX-INTERNAL 计入）
+3  离线：python3 tools/h4_protect_sim.py → 32/32；--replay 逐根截断无重绘（docs/evidence/v2.54_protect_offline.txt）
+4  实时 vs 重建、同窗口重载：方法同 v2.53 第 4、5 项（不中断区间；同一根 M5 内连续重载两次）
+5  跨版本 v2.53 vs v2.54：差异逐条连到 P-4 / P-5 / P-6b 的具体日志证据 —— ReloadTest 归因扩展未完成，完成前不作结论
+```
+

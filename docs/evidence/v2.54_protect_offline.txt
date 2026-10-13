@@ -1,0 +1,66 @@
+# v2.54 BRI-12 offline evidence (tools/h4_protect_sim.py), 2026-10-13
+# data: backtesting.py 0.6.6 backtesting/test/EURUSD.csv, sha256 81e977905a006cc8fbc034ebdb83c999a8ed6ba00191dc7ea5ef5b386fb74a82 (same file as v2.53_h4_dedup_offline.txt)
+
+## python3 tools/h4_protect_sim.py
+PASS  legal new point [bull] P-1/P-2: first BOS sets protected at L1, next BOS advances to the higher L2
+PASS  legal new point [bear] P-1/P-2: first BOS sets protected at L1, next BOS advances to the higher L2
+PASS  worse candidate [bull] P-2/P-3: worse candidate keeps protected, anchor takes it; close within margin no CHOCH
+PASS  worse candidate [bear] P-2/P-3: worse candidate keeps protected, anchor takes it; close within margin no CHOCH
+PASS  wick [bull] P-4: wick through protected, close back inside -> no CHOCH
+PASS  wick [bear] P-4: wick through protected, close back inside -> no CHOCH
+PASS  effective break [bull] P-4: close beyond protected by more than the margin -> CHOCH and TRANSITION on that bar
+PASS  effective break [bear] P-4: close beyond protected by more than the margin -> CHOCH and TRANSITION on that bar
+PASS  internal low [bull] P-4: internal swing above protected broken -> processed, INTERNAL row, no CHOCH (v2.53: CHOCH)
+PASS  internal low [bear] P-4: internal swing above protected broken -> processed, INTERNAL row, no CHOCH (v2.53: CHOCH)
+PASS  missing point [bull] P-1/P-6: no pullback swing between the broken high and the BOS -> INVALID; the older swing is not used
+PASS  missing point [bear] P-1/P-6: no pullback swing between the broken high and the BOS -> INVALID; the older swing is not used
+PASS  future-confirmed [bull] P-1: at a later BOS, a pullback swing confirmed only after that BOS close is not a candidate (KEEP_NONE)
+PASS  future-confirmed [bear] P-1: at a later BOS, a pullback swing confirmed only after that BOS close is not a candidate (KEEP_NONE)
+PASS  confirmed on the BOS bar [bull] P-7: a pullback swing confirmed at the BOS close itself is a candidate
+PASS  confirmed on the BOS bar [bear] P-7: a pullback swing confirmed at the BOS close itself is a candidate
+PASS  old low after CHOCH [bull] P-5: the CHOCH bar's own low, confirmed after the CHOCH, broken -> TRANS_SAMELEG, not TRANS_OK
+PASS  old low after CHOCH [bear] P-5: the CHOCH bar's own low, confirmed after the CHOCH, broken -> TRANS_SAMELEG, not TRANS_OK
+PASS  new low after CHOCH [bull] P-5: a low formed and confirmed after the CHOCH, effectively broken -> TRANS_OK
+PASS  new low after CHOCH [bear] P-5: a low formed and confirmed after the CHOCH, effectively broken -> TRANS_OK
+PASS  old high after CHOCH [bull] P-5: a pre-CHOCH high broken back -> TRANS_SAMELEG, not TRANS_FAIL (v2.53: TRANS_FAIL)
+PASS  old high after CHOCH [bear] P-5: a pre-CHOCH high broken back -> TRANS_SAMELEG, not TRANS_FAIL (v2.53: TRANS_FAIL)
+PASS  new high after CHOCH [bull] P-5: a high formed and confirmed after the CHOCH, effectively broken -> TRANS_FAIL
+PASS  new high after CHOCH [bear] P-5: a high formed and confirmed after the CHOCH, effectively broken -> TRANS_FAIL
+PASS  first bar after CHOCH [bull] P-5: a swing on the first bar after the CHOCH (opens at the CHOCH close) counts as new
+PASS  first bar after CHOCH [bear] P-5: a swing on the first bar after the CHOCH (opens at the CHOCH close) counts as new
+PASS  fallback [bull] P-6b: protected INVALID, latest opposite swing broken -> CHOCH (FALLBACK); without P-6b no CHOCH
+PASS  fallback [bear] P-6b: protected INVALID, latest opposite swing broken -> CHOCH (FALLBACK); without P-6b no CHOCH
+PASS  new leg [bull] P-2/P-5: a new leg after TRANS_OK starts its own protected (SET / INVALID), not the old leg's
+PASS  new leg [bear] P-2/P-5: a new leg after TRANS_OK starts its own protected (SET / INVALID), not the old leg's
+PASS  prefix [bull] no repaint: a run cut at any bar holds exactly the events and protected rows the full run had
+PASS  prefix [bear] no repaint: a run cut at any bar holds exactly the events and protected rows the full run had
+
+32/32 checks as expected
+
+## python3 tools/h4_protect_sim.py --replay EURUSD_H1.csv
+replay EURUSD_H1.csv: 1292 H4 bars 2017.04.19 08:00 .. 2018.02.07 12:00
+
+structure events          v2.53   v2.54   v2.54 without P-6b
+  BOS                        63      74      81
+  CHOCH                      45      24      14
+  TRANS_OK                   25      10       6
+  TRANS_FAIL                 19       8       3
+  TRANS_SAMELEG               8      13       5
+  TIMEOUT                     1       6       5
+  INTERNAL (no state change)    -      32      51
+
+v2.54 protected events: SET 18, ADVANCE 27, KEEP_WORSE 10, KEEP_NONE 25, INVALID 12, BREAK 17, FALLBACK 7
+  legs 25, starting INVALID 12; trend bars 958, of them with protected INVALID 125 (13%)
+  legs ended by BREAK 17, by FALLBACK 7
+
+v2.54 without P-6b protected events: SET 15, ADVANCE 27, KEEP_WORSE 10, KEEP_NONE 31, INVALID 7, BREAK 14, FALLBACK 0
+  legs 15, starting INVALID 7; trend bars 1074, of them with protected INVALID 291 (27%)
+  legs ended by BREAK 14, by FALLBACK 0
+  v2.53           H4 bars  BULLISH 589  BEARISH 336  TRANSITION 352  RANGE 15
+  v2.54           H4 bars  BULLISH 696  BEARISH 263  TRANSITION 288  RANGE 45
+  v2.54 w/o P-6b  H4 bars  BULLISH 532  BEARISH 543  TRANSITION 191  RANGE 26
+
+H4 bars in a different state v2.53 vs v2.54: 407 of 1292 (407 where at least one side is trending)
+POI events only in v2.53: 70, only in v2.54: 58  (NEW only v2.53 13, only v2.54 9)
+max strength v2.53 7, v2.54 17
+prefix stability (cut every 25 bars): OK

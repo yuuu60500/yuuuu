@@ -72,4 +72,65 @@ int H4ConsumeSameDirBroken(const int h, const int dir, const int primary, const 
    return(n);
   }
 
+//====================== BRI-12 (v2.54) ==============================
+// Effective close break of a level by H4 bar h in direction dir: the same
+// strict integer-point margin as every other H4 break (global semantics
+// unchanged).
+bool H4CloseBreaks(const int h, const int dir, const double level)
+  {
+   if(!SafeIdx(h, g_h4_n)) return(false);
+   int mp = MarginH4Pts(h);
+   return(dir == DIR_BULL ? BreakUp(g_h4[h].close, level, mp)
+                          : BreakDown(g_h4[h].close, level, mp));
+  }
+
+// The latest confirmed, unprocessed swing of one direction, when bar h's
+// close breaks it; -1 otherwise. One direction of H4DetectBreak: a trend
+// judges failure, continuation and internal swings separately (P-7).
+int H4DetectBreakDir(const int h, const int dir)
+  {
+   if(!SafeIdx(h, g_h4_n)) return(-1);
+   datetime vis = CloseTimeOf(g_h4[h].time, PERIOD_H4);
+   int i = SwingLastUnswept(g_h4sw, g_h4sw_n, dir, vis);
+   if(i >= 0 && H4CloseBreaks(h, dir, g_h4sw[i].price)) return(i);
+   return(-1);
+  }
+
+// P-1: the candidate a BOS of direction dir leaves behind. Bounded by the
+// swing this BOS broke (primary): an opposite swing FORMED after it, already
+// confirmed at this close, not processed. Of those, the latest formed. A
+// swing formed before the primary belongs to an earlier move and is never a
+// candidate; one that confirms after this close is not known yet.
+int H4ProtCandidate(const int dir, const int primary, const datetime vis)
+  {
+   if(!SafeIdx(primary, g_h4sw_n)) return(-1);
+   datetime after = g_h4sw[primary].bar_time;
+   int best = -1;
+   for(int i = 0; i < g_h4sw_n; i++)
+     {
+      if(g_h4sw[i].dir != -dir || g_h4sw[i].swept) continue;
+      if(g_h4sw[i].confirm_time > vis || g_h4sw[i].bar_time <= after) continue;
+      if(best < 0 || g_h4sw[i].bar_time > g_h4sw[best].bar_time) best = i;
+     }
+   return(best);
+  }
+
+// P-5: structure that can resolve a TRANSITION. t_choch is the close time
+// of the CHOCH bar. The first bar after it OPENS at t_choch, so formation is
+// bar_time >= t_choch (the CHOCH bar itself opened earlier and is old), and
+// the swing must also be confirmed after the CHOCH close.
+bool H4FreshAfter(const int idx, const datetime t_choch)
+  {
+   if(!SafeIdx(idx, g_h4sw_n)) return(false);
+   return(g_h4sw[idx].bar_time >= t_choch && g_h4sw[idx].confirm_time > t_choch);
+  }
+
+// The stored swing a level was taken from; -1 once it left the window.
+int H4SwingById(const long id)
+  {
+   for(int i = g_h4sw_n - 1; i >= 0; i--)
+      if(g_h4sw[i].id == id) return(i);
+   return(-1);
+  }
+
 #endif // HMI_H4STRUCT_MQH

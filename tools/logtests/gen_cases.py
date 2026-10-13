@@ -365,6 +365,26 @@ case("c47_ctx_twice_legacy_no_identity", [start("2.48", run=None), margin()] + b
                                                                                  extra_rows=ctx_rows([LEG0, E2T], also=0, run=None, init=None)), ["-Ctx"],
      ["swing consumed twice in one build  0 proven, 1 pending", "no run/init identity (v2.48 log) - not read as proof, 1 candidate re-use(s) in it"], NOT_PROVEN)
 
+# v2.54 (BRI-12 P-4): HMI-CTX-INTERNAL rows consume swings too - a later re-use is a proof, an invalid one pending
+def internal(d, bar, sw, px, close, swings=(), also=None, prot="1.22950", inst="0001", run=7, init=1, src=SRC):
+    return L(src, f"HMI-CTX-INTERNAL,USDJPY,dir={d},live=0,ctx=BULLISH,bar={bar},swing={sw},swing_px={px},close={close},"
+                  f"also={len(swings) if also is None else also},swings={'|'.join(swings)},prot={prot}" + tail(inst, run, init))
+I_SW = ("2026.09.08 16:00", "1.23020")
+CH_I = ("CHOCH", "DOWN", "TRANSITION", 0, "2026.09.10 12:00") + I_SW + ("1.22900",)
+def twice54(rows): return [start("2.54"), margin()] + blk(1, ver="2.54", extra_rows=rows)
+case("c48_ctx_internal_then_choch", twice54([ctx(*LEG0, also=0), internal("DOWN", "2026.09.09 08:00", *I_SW, "1.23010"), ctx(*CH_I, also=0)]), ["-Ctx"],
+     ["swing consumed twice in one build  1 proven, 0 pending",
+      "PROVEN   2026.09.10 12:00 CHOCH re-uses swing 2026.09.08 16:00 @ 1.23020 (DOWN), consumed at 2026.09.09 08:00"])
+case("c49_ctx_internal_px_bad", twice54([ctx(*LEG0, also=0), internal("DOWN", "2026.09.09 08:00", I_SW[0], "BAD", "1.23010"), ctx(*CH_I, also=0)]), ["-Ctx"],
+     ["swing consumed twice in one build  0 proven, 1 pending", "internal record '2026.09.08 16:00@BAD' not valid (swing price 'BAD')"], NOT_PROVEN)
+case("c50_ctx_internal_count", twice54([ctx(*LEG0, also=0), internal("DOWN", "2026.09.09 08:00", *I_SW, "1.23010", swings=["2026.09.08 04:00@1.23040"], also=2)]), ["-Ctx"],
+     ["swing consumed twice in one build  0 proven, 1 pending", "internal row says also='2' but lists 1 swing(s)"], NOT_PROVEN)
+case("c51_ctx_internal_list_reused", twice54([ctx(*LEG0, also=0), internal("DOWN", "2026.09.09 08:00", *I_SW, "1.23010", swings=["2026.09.08 04:00@1.23040"]),
+                                               ctx("CHOCH", "DOWN", "TRANSITION", 0, "2026.09.10 12:00", "2026.09.08 04:00", "1.23040", "1.22900", also=0)]), ["-Ctx"],
+     ["swing consumed twice in one build  1 proven, 0 pending", "re-uses swing 2026.09.08 04:00 @ 1.23040 (DOWN), consumed at 2026.09.09 08:00"])
+case("c52_ctx_internal_ok", twice54([ctx(*LEG0, also=0), internal("DOWN", "2026.09.09 08:00", *I_SW, "1.23010", swings=["2026.09.08 04:00@1.23040"])]), ["-Ctx"],
+     ["swing consumed twice in one build  0 proven, 0 pending  (1 of 1 build(s) COMPLETE and read)"], NOT_PROVEN)
+
 # strength number only: same event, same swing, same state, str counted from another H4 start
 same_s = ctx_rows([E1, E3[:3] + (5,) + E3[4:]], also=0)
 case("c09_ctx_strength_only", [start()] + blk(1, extra_rows=same) + blk(2, extra_rows=same_s), R,
