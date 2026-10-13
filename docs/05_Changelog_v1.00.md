@@ -1744,6 +1744,22 @@ tools/logtests         49 组（c05–c08 改为新判据；c06 补完整链；�
 
 ---
 
+## v2.53 工具修订 r5（A-62）—— `-Ctx` 数据不足时不下结论（MQL5 不变）
+
+```
+Date:     2026-10-13
+来源:     验收方「HMI v2.53r4 验收复核报告」（2026-10-13）两项 P2
+MQL5:     不变（与验收方编译的 v2.53 字节相同）
+
+tools/ReloadTest.ps1   价格须解析成功且为有限数，否则 PENDING（注明字段）；精度不一致 PENDING；
+                       日历估算只作安全排除，其后的越过记 SUSPECT（不再称已确证）；删除 72 h 规则；
+                       新增「swing consumed twice in one build」—— 同一构建内同一摆动点被消费两次 = PROVEN
+tools/logtests         74 组（新增 c33–c39）；Run-LogTests.ps1 把输出中的 PowerShell 错误判为失败
+docs                   A-59 / A-60 与证据摘要的表述按验收方统一；docs/04 第 2 项判据
+```
+
+---
+
 ## v2.53 工具修订 r4（A-61）—— `-Ctx` stale BOS 只认确认后、越过余量的更早收盘（MQL5 不变）
 
 ```

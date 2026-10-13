@@ -292,25 +292,50 @@ LEG0 = ("BOS", "UP", "BULLISH", 1, "2026.09.08 08:00", "2026.09.07 12:00", "1.23
 def stale_case(name, e2, head, expect, forbid=()):
     case(name, [start()] + head + blk(1, extra_rows=ctx_rows([LEG0, e2], also=0)), ["-Ctx"], expect, forbid)
 CTX_ONE = "of 1 continuation BOS"
+NOPROOF = ["PROVEN", "1 re-count"]
+def ok0(n=1): return f"A-33 stale BOS  0 suspect(s), 0 pending, of {n} continuation BOS"
+CONS0 = "swing consumed twice in one build  0"
 stale_case("c26_ctx_new_structure", ("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00", "2026.09.08 16:00", "1.23050", "1.23200"), [margin()],
-           ["A-33 stale BOS  0 re-count(s), 0 pending, " + CTX_ONE], ["1 re-count", "1 pending"])        # swing formed after the old close
+           [ok0(), CONS0], ["1 suspect", "1 pending"])        # swing formed after the old close
 stale_case("c27_ctx_within_margin", ("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00", "2026.09.07 16:00", "1.23098", "1.23200"), [margin()],
-           ["A-33 stale BOS  0 re-count(s), 0 pending, " + CTX_ONE], ["1 re-count", "1 pending"])        # old close only 2 pt past, margin 3
-stale_case("c28_ctx_stale_proven",  ("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00", "2026.09.07 16:00", "1.23050", "1.23200"), [margin()],
-           ["A-33 stale BOS  1 re-count(s), 0 pending, " + CTX_ONE, "broke it by 50 pt > margin 3 after its confirmation"])
+           [ok0(), CONS0], ["1 suspect", "1 pending"])        # old close only 2 pt past, margin 3
+# A-62: a break after the calendar estimate is a SUSPECT - the log has no H4 bar series to prove the confirmation
+stale_case("c28_ctx_stale_suspect", ("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00", "2026.09.07 16:00", "1.23050", "1.23200"), [margin()],
+           ["A-33 stale BOS  1 suspect(s), 0 pending, " + CTX_ONE, "is 50 pt past it (> margin 3) and not before its earliest possible confirmation",
+            "confirmed only if no H4 bar is missing in between", CONS0], NOPROOF)
 LEGW = ("BOS", "UP", "BULLISH", 1, "2026.09.07 08:00", "2026.09.04 08:00", "1.23000", "1.23100")   # Monday close, weekend before it
 case("c29_ctx_stale_weekend", [start(), margin()] + blk(1, extra_rows=ctx_rows([LEGW, ("BOS", "UP", "BULLISH", 2, "2026.09.08 12:00", "2026.09.04 16:00", "1.23050", "1.23200")], also=0)),
-     ["-Ctx"], ["A-33 stale BOS  0 re-count(s), 1 pending, " + CTX_ONE, "a weekend lies between swing and close"], ["1 re-count"])
+     ["-Ctx"], ["A-33 stale BOS  1 suspect(s), 0 pending, " + CTX_ONE], NOPROOF)
+LEGW3 = ("BOS", "UP", "BULLISH", 1, "2026.09.09 08:00", "2026.09.04 08:00", "1.23000", "1.23100")   # Wednesday close, > 72 h after the estimate
+case("c39_ctx_weekend_over_72h", [start(), margin()] + blk(1, extra_rows=ctx_rows([LEGW3, ("BOS", "UP", "BULLISH", 2, "2026.09.10 12:00", "2026.09.04 16:00", "1.23050", "1.23200")], also=0)),
+     ["-Ctx"], ["A-33 stale BOS  1 suspect(s), 0 pending, " + CTX_ONE], NOPROOF)
 stale_case("c30_ctx_atr_margin",    ("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00", "2026.09.07 16:00", "1.23050", "1.23200"), [ATR],
-           ["A-33 stale BOS  0 re-count(s), 1 pending, " + CTX_ONE, "the margin is per bar (ATR)"], ["1 re-count"])
+           ["A-33 stale BOS  0 suspect(s), 1 pending, " + CTX_ONE, "the margin is per bar (ATR)"], NOPROOF)
 stale_case("c31_ctx_no_margin_line", ("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00", "2026.09.07 16:00", "1.23050", "1.23200"), [],
-           ["A-33 stale BOS  0 re-count(s), 1 pending, " + CTX_ONE, "the margin is not in the log"], ["1 re-count"])
+           ["A-33 stale BOS  0 suspect(s), 1 pending, " + CTX_ONE, "the margin is not in the log"], NOPROOF)
 # bear side of the two false-positive shapes (mirror): the 2nd BOS's swing formed after the leg's first close;
 # the 3rd BOS's swing was confirmed before the 2nd close, which reached only 2 pt past it (margin 3)
 LEGD = ("BOS", "DOWN", "BEARISH", 1, "2026.09.08 08:00", "2026.09.07 12:00", "1.23000", "1.22900")
 case("c32_ctx_bear_mirror", [start(), margin()] + blk(1, extra_rows=ctx_rows([LEGD, ("BOS", "DOWN", "BEARISH", 2, "2026.09.09 12:00", "2026.09.08 16:00", "1.22950", "1.22800"),
                                                                                 ("BOS", "DOWN", "BEARISH", 3, "2026.09.10 12:00", "2026.09.08 20:00", "1.22802", "1.22700")], also=0)),
-     ["-Ctx"], ["A-33 stale BOS  0 re-count(s), 0 pending, of 2 continuation BOS"], ["1 re-count", "1 pending"])
+     ["-Ctx"], [ok0(2)], ["1 suspect", "1 pending"])
+# A-62: a price the log does not carry as a finite number is unknown - pending, never read as 0
+stale_case("c33_ctx_swing_px_empty", ("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00", "2026.09.07 16:00", "", "1.23200"), [margin()],
+           ["A-33 stale BOS  0 suspect(s), 1 pending, " + CTX_ONE, "swing_px '' is missing or not a number"], NOPROOF)
+stale_case("c34_ctx_swing_px_bad", ("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00", "2026.09.07 16:00", "BAD", "1.23200"), [margin()],
+           ["A-33 stale BOS  0 suspect(s), 1 pending, " + CTX_ONE, "swing_px 'BAD' is missing or not a number"], NOPROOF)
+LEGN = LEG0[:7] + ("NaN",)
+case("c35_ctx_close_nan", [start(), margin()] + blk(1, extra_rows=ctx_rows([LEGN, ("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00", "2026.09.07 16:00", "1.23050", "1.23200")], also=0)),
+     ["-Ctx"], ["A-33 stale BOS  0 suspect(s), 1 pending, " + CTX_ONE, "close 'NaN' at 2026.09.08 08:00 is missing or not a number"], NOPROOF)
+# A-62: the proof the log can give - one build consuming the same swing twice
+SW_S = ("2026.09.07 12:00", "1.23000")
+case("c36_ctx_consumed_twice", [start(), margin()] + blk(1, extra_rows=ctx_rows([LEG0, ("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00") + SW_S + ("1.23200",)], also=0)),
+     ["-Ctx"], ["swing consumed twice in one build  1", "PROVEN   2026.09.09 12:00 BOS re-uses swing 2026.09.07 12:00 @ 1.23000 (UP), consumed at 2026.09.08 08:00"])
+case("c37_ctx_dedup_then_primary", [start(), margin()] + blk(1, extra_rows=[ctx(*LEG0, also=1), dedup("BOS", "UP", LEG0[4], "2026.09.07 12:00@1.23000", ["2026.09.06 20:00@1.22950"]),
+                                                                            ctx("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00", "2026.09.06 20:00", "1.22950", "1.23200", also=0)]),
+     ["-Ctx"], ["swing consumed twice in one build  1", "re-uses swing 2026.09.06 20:00 @ 1.22950 (UP), consumed at 2026.09.08 08:00"])
+case("c38_ctx_same_swing_two_builds", [start()] + blk(1, extra_rows=ctx_rows([LEG0], also=0)) + blk(2, extra_rows=ctx_rows([LEG0], also=0)),
+     ["-Ctx"], ["swing consumed twice in one build  0  (2 build(s) read)"], ["PROVEN"])
 
 # strength number only: same event, same swing, same state, str counted from another H4 start
 same_s = ctx_rows([E1, E3[:3] + (5,) + E3[4:]], also=0)

@@ -20,8 +20,8 @@ Mechanism (both symbols, every differing row traced):
   The 24 h settle of the reload check is shorter than "session lifetime (288 bars) + the cycle
   armed at its end", so these rows fall inside the comparable region.
 
-Not repaint / future leak: each build is causal on identical data; the difference is only where
-processing started. Not new in v2.53 (the warm-up gate is the same in v2.48 / v2.52) and not
+Reading (reviewer's wording, 2026-10-13): same-window reloads agree; with a moved window, historical
+marks change in the way traced above - the difference comes from where processing started. Not new in v2.53 (the warm-up gate is the same in v2.48 / v2.52) and not
 related to the BOS de-dup (H4 CTX identical in both builds).
 Acceptance consequence: a same-version reload is judged on two builds of the SAME window -
 two reloads inside one M5 bar (docs/04 v2.53 item 5); automatically moved windows are not used.

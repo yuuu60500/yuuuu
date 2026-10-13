@@ -77,7 +77,8 @@ Tool:     ReloadTest.ps1 r3, byte-identical to tools/ReloadTest.ps1 at 9b8f965 (
        live row, no catch-up, no rebuild before the reload. ReloadTest -LiveVsBuild counts every bar between
        two builds as covered (A.to + 10 min .. B.to), so it lists the gap's events as "build only":
        34 rows on 8 charts, event times 10-08 20:20 .. 10-09 10:45 - every one inside the gap
-       (10-08 17:45, 10-09 11:00]. They are bars the live run never saw, not events it missed (A-60).
+       (10-08 17:45, 10-09 11:00]. The log holds no live row in that gap and has no per-bar processing heartbeat:
+       without continuous live coverage evidence the gap is not part of the live-consistency check (A-60).
    2b. The same pairs restricted to the bars the live run provably processed (A.to + 10 min .. 10-08 17:45,
        the last live row before the gap), same row keys as the tool (cycle / block ids dropped):
 

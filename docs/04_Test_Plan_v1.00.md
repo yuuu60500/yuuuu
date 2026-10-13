@@ -884,9 +884,11 @@ ATR 系数 2.0 定向：v2.46 2/48（PMH BROKEN 仅连续运行有）· v2.47 0/
 ```
 0  编译 0 errors / 0 warnings
 1  版本：starting on v2.53；BEGIN ver=2.53；默认参数下 params=461F006E（与 v2.52 相同）
-2  去重可见：日志出现 HMI-CTX-DEDUP（also>0）；`-Ctx` 的「A-33 stale BOS」re-count 应为 0（A-61：只计
-          「摆动点确认之后、同段更早的收盘以超过余量的幅度越过」；日志无法判定的为 pending，逐条人工核对，
-          不计为重复计数；在 InpH4SwingRight 非默认的构建上加 -H4SwingRight <n>），
+2  去重可见：日志出现 HMI-CTX-DEDUP（also>0）；`-Ctx`（A-61 / A-62）：
+          「swing consumed twice in one build」必须为 0 —— 同一构建内同一摆动点被消费两次，是日志可证明的缺陷；
+          「A-33 stale BOS」的 suspect（同段更早的收盘在最早可能确认时间之后、以超过余量越过该点 —— 确认时间是日历估算，
+          假设中间不缺 H4 K 线）与 pending（价格缺失 / 非数值、精度不一致、余量逐根或未记录）逐条人工核对，
+          都不计为已确证的重复计数；InpH4SwingRight 非默认时加 -H4SwingRight <n>），
           强度分布明显低于 v2.52（离线样本最大强度 17 → 7）
 3  必验场景（离线，python3 tools/h4_dedup_sim.py 4/4）：
           一根收盘越过多个旧高后停留只计一次 BOS；空头对称；新摆动结构被有效突破产生新事件

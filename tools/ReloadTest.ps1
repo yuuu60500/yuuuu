@@ -583,31 +583,63 @@ foreach ($l in $all) {
     } elseif ($l -match '\(([A-Za-z0-9._#]+),[A-Za-z0-9]+\)\s+HMI: break margin mode = ATR_FRAC') { $margin[$Matches[1]] = -1 }
 }
 function PxDigits([string]$px) { $i = $px.IndexOf('.'); if ($i -lt 0) { return 0 } return $px.Length - $i - 1 }
-function HasWeekend([datetime]$a, [datetime]$b) {
-    for ($d = $a.Date; $d -le $b.Date; $d = $d.AddDays(1)) { if ($d.DayOfWeek -eq 'Saturday' -or $d.DayOfWeek -eq 'Sunday') { return $true } }
-    return $false
+# A-62: a price the log does not carry as a finite number is unknown - never 0.
+function PxOk([string]$raw) {
+    $v = 0.0
+    if (-not [double]::TryParse($raw, [Globalization.NumberStyles]::Float, [Globalization.CultureInfo]::InvariantCulture, [ref]$v)) { return $false }
+    return -not ([double]::IsNaN($v) -or [double]::IsInfinity($v))
 }
-# Did any earlier close of this leg break e's swing, as the engine judges it?
+# Did an earlier close of this leg break e's swing, as the engine judges it?
+# The log proves only one direction of the confirmation question: a close
+# before (swing bar + H4SwingRight + 1 bars) cannot have seen the swing. A
+# close after that estimate saw it only if no H4 bar is missing in between,
+# which the log cannot show (A-62) - so such a break is SUSPECT, never proven.
 function StaleVerdict($e, $legC, [string]$ldir, $mg) {
     $ts = PT16 $e.Swing
     if ($ts -eq [datetime]::MinValue) { return [pscustomobject]@{ V = 'PENDING'; Why = 'swing time not logged' } }
-    $earliest = $ts.AddHours(4 * ($H4SwingRight + 1))      # confirmation close, no gap
-    $pt = [Math]::Pow(10, -(PxDigits $e.SwRaw))
+    if (-not $e.SwOk) { return [pscustomobject]@{ V = 'PENDING'; Why = "swing_px '$($e.SwRaw)' is missing or not a number" } }
+    $dg = PxDigits $e.SwRaw
+    $pt = [Math]::Pow(10, -$dg)
+    $earliest = $ts.AddHours(4 * ($H4SwingRight + 1))      # confirmation close if no H4 bar is missing
     $pend = $null
     foreach ($c in $legC) {
         $tc = PT16 $c.Bar                                    # close time of that event's H4 bar
-        if ($tc -lt $earliest) { continue }                  # swing not confirmed yet: new structure for that close
+        if ($tc -eq [datetime]::MinValue) { $pend = "an earlier event of the leg carries no bar time"; continue }
+        if ($tc -lt $earliest) { continue }                  # provably before confirmation: new structure for that close
+        if (-not $c.CloseOk) { $pend = "close '$($c.CloseRaw)' at $($c.Bar) is missing or not a number"; continue }
+        if ((PxDigits $c.CloseRaw) -ne $dg) { $pend = "close '$($c.CloseRaw)' at $($c.Bar) and swing_px '$($e.SwRaw)' have different precision"; continue }
         $d = [Math]::Round($(if ($ldir -eq 'UP') { $c.Close - $e.SwPx } else { $e.SwPx - $c.Close }) / $pt)
         if ($d -le 0) { continue }                            # did not even reach past the raw price
         if ($mg -eq $null) { $pend = "close $($c.CloseRaw) at $($c.Bar) is $d pt past it, the margin is not in the log"; continue }
         if ($mg -lt 0)     { $pend = "close $($c.CloseRaw) at $($c.Bar) is $d pt past it, the margin is per bar (ATR)"; continue }
         if ($d -le $mg)    { continue }                       # within the margin: not an effective break
-        $sure = (-not (HasWeekend $ts $tc)) -or ($tc -ge $earliest.AddHours(72))
-        if ($sure) { return [pscustomobject]@{ V = 'STALE'; Why = "close $($c.CloseRaw) at $($c.Bar) broke it by $d pt > margin $mg after its confirmation" } }
-        $pend = "close $($c.CloseRaw) at $($c.Bar) is $d pt past it, but a weekend lies between swing and close: confirmation time not provable"
+        return [pscustomobject]@{ V = 'SUSPECT'; Why = "close $($c.CloseRaw) at $($c.Bar) is $d pt past it (> margin $mg) and not before its earliest possible confirmation $($earliest.ToString('yyyy.MM.dd HH:mm')) - confirmed only if no H4 bar is missing in between" }
     }
     if ($pend) { return [pscustomobject]@{ V = 'PENDING'; Why = $pend } }
     return [pscustomobject]@{ V = 'OK'; Why = '' }
+}
+# A-62: the proof the log can give - the same swing consumed twice inside ONE
+# build (as a primary, or in a de-dup list, then again). Per build, because a
+# rebuild starts over and meets the same swings again legitimately.
+function DoubleConsumed($bk) {
+    $seen = @{}; $dup = @()
+    foreach ($m in $bk.Lines) {
+        if ($m -match '^HMI-CTX,') {
+            $f = KV $m; if (-not $f['swing']) { continue }
+            $k = "$($f['dir'])|$($f['swing'])|$($f['swing_px'])"
+            if ($seen.ContainsKey($k)) { $dup += "$($f['bar']) $($m.Split(',')[2]) re-uses swing $($f['swing']) @ $($f['swing_px']) ($($f['dir'])), consumed at $($seen[$k])" }
+            else { $seen[$k] = $f['bar'] }
+        } elseif ($m -match '^HMI-CTX-DEDUP,') {
+            $f = KV $m
+            foreach ($sw in ([string]$f['swings'] -split '\|')) {
+                if (-not $sw) { continue }
+                $pp = $sw -split '@', 2; $k = "$($f['dir'])|$($pp[0])|$($pp[1])"
+                if ($seen.ContainsKey($k)) { $dup += "$($f['bar']) de-dup re-uses swing $($pp[0]) @ $($pp[1]) ($($f['dir'])), consumed at $($seen[$k])" }
+                else { $seen[$k] = $f['bar'] }
+            }
+        }
+    }
+    return ,$dup
 }
 
 # -Ctx: the Context chain had no auditable output at all until HMI-CTX, so
@@ -629,12 +661,13 @@ if ($Ctx) {
         # be silently wrong.
         $ic = [Globalization.CultureInfo]::InvariantCulture
         $swp = 0.0; $cls = 0.0
-        [void][double]::TryParse([string]$f['swing_px'], [Globalization.NumberStyles]::Float, $ic, [ref]$swp)
-        [void][double]::TryParse([string]$f['close'],    [Globalization.NumberStyles]::Float, $ic, [ref]$cls)
+        $swOk = PxOk ([string]$f['swing_px']); $clOk = PxOk ([string]$f['close'])     # A-62: unknown stays unknown
+        if ($swOk) { [void][double]::TryParse([string]$f['swing_px'], [Globalization.NumberStyles]::Float, $ic, [ref]$swp) }
+        if ($clOk) { [void][double]::TryParse([string]$f['close'],    [Globalization.NumberStyles]::Float, $ic, [ref]$cls) }
         $rows += [pscustomobject]@{
             Sym = $c[0]; Kind = $c[1]; Dir = $f['dir']; Live = $f['live']
             Ctx = $f['ctx']; Str = [int]$f['str']; Messy = $f['messy']
-            Bar = $f['bar']; Swing = $f['swing']; SwPx = $swp; Close = $cls; SwRaw = [string]$f['swing_px']; CloseRaw = [string]$f['close']
+            Bar = $f['bar']; Swing = $f['swing']; SwPx = $swp; Close = $cls; SwRaw = [string]$f['swing_px']; CloseRaw = [string]$f['close']; SwOk = $swOk; CloseOk = $clOk
             Raw = $Matches[1]
             Key = "$($c[0])|$($c[1])|$($f['bar'])|$($f['swing'])"
         }
@@ -666,27 +699,28 @@ if ($Ctx) {
         $acct = "      transitions  opened {0} = ok {1} + fail {2} + timeout {3} + still open {4}" -f $nCh, $nOk, $nFl, $nTo, $open
         Write-Host $acct -ForegroundColor $(if ($open -eq 0 -or $open -eq 1) { 'Green' } else { 'Red' })
 
-        # A-33 signature (A-61): a continuation BOS re-counts an old level only
-        # when an EARLIER close in the same leg had already broken that swing,
-        # as the context engine itself judges a break:
-        #   1. the swing was CONFIRMED when that close happened - a swing the
-        #      engine could not see yet is new structure, not an old level;
-        #   2. that close cleared it by MORE than the break margin (strict,
-        #      integer points) - touching or poking past the raw price is no break.
-        # The log has the swing's bar time, not its confirmation time: confirmation
-        # is (H4SwingRight + 1) H4 bars later, or later still across a weekend /
-        # holiday gap. A close before the earliest possible confirmation proves
-        # "not confirmed"; one after it proves "confirmed" only with no Saturday /
-        # Sunday in between (or 72 h of slack). Anything the log cannot settle -
-        # a gap, a per-bar ATR margin, an unknown margin - is PENDING, never a
-        # re-count. Closes are only those of logged events: a LOWER bound.
+        # A-33 / A-61 / A-62. Two questions, two kinds of answer:
+        #   proven   the log shows one build consuming the same swing twice
+        #            (CTX primary or de-dup list, then again) - an engine defect;
+        #   suspect  a continuation BOS whose swing an EARLIER close of the leg
+        #            cleared by more than the margin, after the swing's earliest
+        #            possible confirmation. The log has no H4 bar series, so that
+        #            confirmation is a calendar estimate: a suspect is for manual
+        #            review, never a proven re-count.
+        #   pending  what the log cannot judge: a price missing or not a number,
+        #            precision that differs, a margin per bar (ATR) or not logged.
+        # Closes are only those of logged events: suspects are a LOWER bound.
+        $dupAll = @(); $nb = 0
+        foreach ($bk in @($blocks | Where-Object { $_.Src -match ('^' + [regex]::Escape($g.Name) + '(#[0-9A-F]{4})?,') })) { $nb++; $dupAll += DoubleConsumed $bk }
+        Write-Host ("      swing consumed twice in one build  {0}  ({1} build(s) read)" -f $dupAll.Count, $nb) -ForegroundColor $(if ($dupAll.Count) { 'Red' } else { 'Green' })
+        $dupAll | Select-Object -First 5 | ForEach-Object { Write-Host "        PROVEN   $_" -ForegroundColor Red }
         $mg = $(if ($margin.ContainsKey($g.Name)) { $margin[$g.Name] } else { $null })   # points; -1 = per bar (ATR); $null = not logged
-        $stale = 0; $pendS = 0; $bosN = 0; $legC = $null; $ldir = ''; $staleWhy = @()
+        $susp = 0; $pendS = 0; $bosN = 0; $legC = $null; $ldir = ''; $staleWhy = @()
         foreach ($e in $ev) {
             if ($e.Kind -eq 'BOS' -and $e.Str -gt 1 -and $legC -ne $null -and $e.Dir -eq $ldir) {
                 $bosN++
                 $v = StaleVerdict $e $legC $ldir $mg
-                if ($v.V -eq 'STALE') { $stale++; $staleWhy += "STALE    $($e.Bar) swing $($e.Swing) @ $($e.SwRaw): $($v.Why)" }
+                if ($v.V -eq 'SUSPECT') { $susp++; $staleWhy += "SUSPECT  $($e.Bar) swing $($e.Swing) @ $($e.SwRaw): $($v.Why)" }
                 elseif ($v.V -eq 'PENDING') { $pendS++; $staleWhy += "PENDING  $($e.Bar) swing $($e.Swing) @ $($e.SwRaw): $($v.Why)" }
                 [void]$legC.Add($e)
             }
@@ -697,9 +731,9 @@ if ($Ctx) {
         }
         if ($bosN -gt 0) {
             $mgS = $(if ($mg -eq $null) { 'margin not logged' } elseif ($mg -lt 0) { 'margin per bar (ATR)' } else { "margin $mg pt" })
-            Write-Host ("      A-33 stale BOS  {0} re-count(s), {1} pending, of {2} continuation BOS  ({3}, H4SwingRight {4})" -f `
-                        $stale, $pendS, $bosN, $mgS, $H4SwingRight) -ForegroundColor $(if ($stale -gt 0) { 'Red' } elseif ($pendS -gt 0) { 'Yellow' } else { 'Green' })
-            $staleWhy | Select-Object -First 8 | ForEach-Object { Write-Host "        $_" -ForegroundColor $(if ($_ -like 'STALE*') { 'Red' } else { 'Yellow' }) }
+            Write-Host ("      A-33 stale BOS  {0} suspect(s), {1} pending, of {2} continuation BOS  ({3}, H4SwingRight {4})" -f `
+                        $susp, $pendS, $bosN, $mgS, $H4SwingRight) -ForegroundColor $(if ($susp -gt 0 -or $pendS -gt 0) { 'Yellow' } else { 'Green' })
+            $staleWhy | Select-Object -First 8 | ForEach-Object { Write-Host "        $_" -ForegroundColor Yellow }
             if ($staleWhy.Count -gt 8) { Write-Host "        ... $($staleWhy.Count - 8) more" -ForegroundColor Yellow }
         }
 

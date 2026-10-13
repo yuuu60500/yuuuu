@@ -27,6 +27,8 @@ foreach ($p in $cases.PSObject.Properties) {
     foreach ($f in @(Get-ChildItem 'attribution_*.txt' -ErrorAction SilentlyContinue)) { $out += "`n" + (Get-Content $f.FullName -Raw) }
     Pop-Location
     $miss = @($c.expect | Where-Object { -not $out.Contains($_) })
+    # (A-62) a script error is a failure even when every expected line printed
+    if ($out -match '(?m)^\s*(At line:\d|Line \|)') { $miss += 'no PowerShell error in the output' }
     $hit  = @($c.forbid | Where-Object { $out.Contains($_) })
     if ($miss.Count -eq 0 -and $hit.Count -eq 0) { $ok++; Write-Host ("PASS  {0}" -f $p.Name) -ForegroundColor Green }
     else { Write-Host ("FAIL  {0}" -f $p.Name) -ForegroundColor Red; $bad += [pscustomobject]@{ Name = $p.Name; Miss = $miss; Hit = $hit } }

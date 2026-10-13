@@ -813,10 +813,11 @@
    "-Ctx"
   ],
   "expect": [
-   "A-33 stale BOS  0 re-count(s), 0 pending, of 1 continuation BOS"
+   "A-33 stale BOS  0 suspect(s), 0 pending, of 1 continuation BOS",
+   "swing consumed twice in one build  0"
   ],
   "forbid": [
-   "1 re-count",
+   "1 suspect",
    "1 pending"
   ]
  },
@@ -825,32 +826,50 @@
    "-Ctx"
   ],
   "expect": [
-   "A-33 stale BOS  0 re-count(s), 0 pending, of 1 continuation BOS"
+   "A-33 stale BOS  0 suspect(s), 0 pending, of 1 continuation BOS",
+   "swing consumed twice in one build  0"
   ],
   "forbid": [
-   "1 re-count",
+   "1 suspect",
    "1 pending"
   ]
  },
- "c28_ctx_stale_proven": {
+ "c28_ctx_stale_suspect": {
   "args": [
    "-Ctx"
   ],
   "expect": [
-   "A-33 stale BOS  1 re-count(s), 0 pending, of 1 continuation BOS",
-   "broke it by 50 pt > margin 3 after its confirmation"
+   "A-33 stale BOS  1 suspect(s), 0 pending, of 1 continuation BOS",
+   "is 50 pt past it (> margin 3) and not before its earliest possible confirmation",
+   "confirmed only if no H4 bar is missing in between",
+   "swing consumed twice in one build  0"
   ],
-  "forbid": []
+  "forbid": [
+   "PROVEN",
+   "1 re-count"
+  ]
  },
  "c29_ctx_stale_weekend": {
   "args": [
    "-Ctx"
   ],
   "expect": [
-   "A-33 stale BOS  0 re-count(s), 1 pending, of 1 continuation BOS",
-   "a weekend lies between swing and close"
+   "A-33 stale BOS  1 suspect(s), 0 pending, of 1 continuation BOS"
   ],
   "forbid": [
+   "PROVEN",
+   "1 re-count"
+  ]
+ },
+ "c39_ctx_weekend_over_72h": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "A-33 stale BOS  1 suspect(s), 0 pending, of 1 continuation BOS"
+  ],
+  "forbid": [
+   "PROVEN",
    "1 re-count"
   ]
  },
@@ -859,10 +878,11 @@
    "-Ctx"
   ],
   "expect": [
-   "A-33 stale BOS  0 re-count(s), 1 pending, of 1 continuation BOS",
+   "A-33 stale BOS  0 suspect(s), 1 pending, of 1 continuation BOS",
    "the margin is per bar (ATR)"
   ],
   "forbid": [
+   "PROVEN",
    "1 re-count"
   ]
  },
@@ -871,10 +891,11 @@
    "-Ctx"
   ],
   "expect": [
-   "A-33 stale BOS  0 re-count(s), 1 pending, of 1 continuation BOS",
+   "A-33 stale BOS  0 suspect(s), 1 pending, of 1 continuation BOS",
    "the margin is not in the log"
   ],
   "forbid": [
+   "PROVEN",
    "1 re-count"
   ]
  },
@@ -883,11 +904,81 @@
    "-Ctx"
   ],
   "expect": [
-   "A-33 stale BOS  0 re-count(s), 0 pending, of 2 continuation BOS"
+   "A-33 stale BOS  0 suspect(s), 0 pending, of 2 continuation BOS"
   ],
   "forbid": [
-   "1 re-count",
+   "1 suspect",
    "1 pending"
+  ]
+ },
+ "c33_ctx_swing_px_empty": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "A-33 stale BOS  0 suspect(s), 1 pending, of 1 continuation BOS",
+   "swing_px '' is missing or not a number"
+  ],
+  "forbid": [
+   "PROVEN",
+   "1 re-count"
+  ]
+ },
+ "c34_ctx_swing_px_bad": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "A-33 stale BOS  0 suspect(s), 1 pending, of 1 continuation BOS",
+   "swing_px 'BAD' is missing or not a number"
+  ],
+  "forbid": [
+   "PROVEN",
+   "1 re-count"
+  ]
+ },
+ "c35_ctx_close_nan": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "A-33 stale BOS  0 suspect(s), 1 pending, of 1 continuation BOS",
+   "close 'NaN' at 2026.09.08 08:00 is missing or not a number"
+  ],
+  "forbid": [
+   "PROVEN",
+   "1 re-count"
+  ]
+ },
+ "c36_ctx_consumed_twice": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "swing consumed twice in one build  1",
+   "PROVEN   2026.09.09 12:00 BOS re-uses swing 2026.09.07 12:00 @ 1.23000 (UP), consumed at 2026.09.08 08:00"
+  ],
+  "forbid": []
+ },
+ "c37_ctx_dedup_then_primary": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "swing consumed twice in one build  1",
+   "re-uses swing 2026.09.06 20:00 @ 1.22950 (UP), consumed at 2026.09.08 08:00"
+  ],
+  "forbid": []
+ },
+ "c38_ctx_same_swing_two_builds": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "swing consumed twice in one build  0  (2 build(s) read)"
+  ],
+  "forbid": [
+   "PROVEN"
   ]
  },
  "c09_ctx_strength_only": {
