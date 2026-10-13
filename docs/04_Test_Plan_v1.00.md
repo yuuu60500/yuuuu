@@ -946,7 +946,7 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
 ### v2.54 验收清单（保护点与波段锚点，BRI-12 修订稿 2；基线 v2.53r3）
 
 ```
-0  编译 0 errors / 0 warnings
+0  编译 0 errors / 0 warnings（v2.54 开发版、r2：验收方 2026-10-13 MetaEditor 5.0.0.6230 X64 均 0/0）
 1  版本：starting on v2.54；BEGIN ver=2.54；默认参数下 params=461F006E（无新输入）
 2  新日志行（InpLogSignals = true）：HMI-PROT / HMI-ANCHOR / HMI-CTX-INTERNAL，均带 inst / run / init
           每个趋势段（leg=）的第一行为 SET 或 INVALID；段以 BREAK 或 FALLBACK 结束，同根有 ANCHOR RESET
@@ -954,8 +954,13 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           ADVANCE：多头 level > prev、空头 level < prev；KEEP_WORSE：cand 不优于 level
           `-Ctx`：transitions 平衡；swing consumed twice 0 proven / 0 pending（HMI-CTX-INTERNAL 计入）；
           level installed already broken 0 proven（A-65；ATR 余量下为 pending，逐条核对）
-3  离线：python3 tools/h4_protect_sim.py → 38/38；--replay 逐根截断无重绘、P1 两种余量 fixed 0（docs/evidence/v2.54_protect_offline.txt）
-4  实时 vs 重建、同窗口重载：方法同 v2.53 第 4、5 项（不中断区间；同一根 M5 内连续重载两次）
+3  离线：python3 tools/h4_protect_sim.py → 45/45（含 A-66 判定注入）；--replay 退出码 0：前缀无重绘、
+          P1 不变量在固定余量与 ATR 0.20 两种模式都为 0（docs/evidence/v2.54_protect_offline.txt）
+4  实时 vs 重建、同窗口重载：方法同 v2.53 第 4、5 项（不中断区间；同一根 M5 内连续重载两次）。
+          r3 起 PROT 行（HMI-PROT / HMI-ANCHOR / HMI-CTX-INTERNAL）是独立判定类别：重载须「PROT IDENTICAL」，
+          实时 vs 重建的 protected-level rows 双向一致；只差 leg 序号为 PENDING REVIEW。
+          默认固定余量与 ATR_FRAC 各保留一份日志；ATR 下「level installed already broken」的 pending
+          须用逐根余量 / 图表数据核对，不能按 0 proven 直接通过
 5  跨版本 v2.53 vs v2.54：差异逐条连到 P-4 / P-5 / P-6b 的具体日志证据 —— ReloadTest 归因扩展未完成，完成前不作结论
 ```
 

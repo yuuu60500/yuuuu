@@ -561,6 +561,27 @@ def scenarios():
               ok, f"dev {o} choch {ch_o} | fixed bos {bos} prot {n} anchor {na} internal {it} choch {ch_n}")
     both("ATR margin shrinks, leg running", atrb, s_atr)
 
+    # same, plus a LEGAL pullback low after the primary (bar 13, wick to 40 under protected 45, never closed
+    # through): the broken low 146 is processed, the candidate is 40 - protected keeps 45 (worse candidate),
+    # the anchor moves to 40. The two fields are kept apart; "both keep their value" is not the rule.
+    ROWS2 = list(ROWS); ROWS2[13] = (139, 40, 135)
+    atrb2, prev = [], 1.0 + ROWS2[0][2] * 1e-5
+    for i, (hi, lo, cl) in enumerate(ROWS2):
+        atrb2.append([t0 + i * H4, round(prev, 5), round(1.0 + hi * 1e-5, 5), round(1.0 + lo * 1e-5, 5), round(1.0 + cl * 1e-5, 5)])
+        prev = 1.0 + cl * 1e-5
+
+    def s_atr_legal(name, bars, d):
+        new = run254(bars, margins=MG)
+        t20 = at(bars, 20)
+        n = [(r["ev"], r["level"]) for r in new.prot_rows if r["bar"] == t20]
+        na = [(r["ev"], r["level"]) for r in new.anchor_rows if r["bar"] == t20]
+        it = [x["swing_px"] for x in new.internal_rows if x["bar"] == t20]
+        ok = (n == [("KEEP_WORSE", lv(bars, d, 45))] and na == [("MOVE", lv(bars, d, 40))] and it == [lv(bars, d, 146)]
+              and not [x for x in ev(new) if x[0] == "CHOCH"] and not installed_broken(new, bars, MG))
+        check(name + " P1: the broken low processed, the next legal candidate taken: protected keeps (worse), anchor moves to it",
+              ok, f"prot {n} anchor {na} internal {it} events {ev(new)}")
+    both("ATR margin shrinks, another legal candidate", atrb2, s_atr_legal)
+
     def s_atr_first(name, bars, d):
         mg = MG[9:]
         old = run254(bars, margins=mg, legacy_p1=True); new = run254(bars, margins=mg)
@@ -595,6 +616,35 @@ def scenarios():
         check(name + " invariant: no level is installed (SET / ADVANCE / MOVE) once a close since its confirmation broke it", True)
     both("installed levels", atrb, s_invariant)
 
+    # ---- the replay verdict itself (reviewer P2, 2026-10-13): a failure in ANY margin mode, or in the
+    # prefix check, must fail the run - injected, because the real data produces none
+    import contextlib
+    import io
+
+    def verdict(**kw):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            res = replay_bars([tuple(b) for b in inter], prefix_from=10, prefix_step=5, **kw)
+        return res, out.getvalue()
+    FAKE = [("SET", "injected", 1.0, "injected")]
+    def fail_in(mode):                  # mode None = fixed margin; "atr" = the ATR run; only the fixed engine
+        return lambda e, bars, mg: FAKE if (not e.legacy and ((mode is None) == (mg is None))) else installed_broken(e, bars, mg)
+    def bad_prefix(b):
+        e = run254(b)
+        if len(b) == 20 and e.prot_rows:
+            e.prot_rows[-1] = dict(e.prot_rows[-1], level=9.99999)
+        return e
+    for name, kw, want in (("nothing injected", {}, (True, True, True)),
+                           ("fixed-margin invariant fails, ATR passes", dict(checker=fail_in(None)), (False, True, False)),
+                           ("ATR invariant fails, fixed passes", dict(checker=fail_in("atr")), (False, True, False)),
+                           ("both invariants fail", dict(checker=lambda e, b, m: FAKE if not e.legacy else []), (False, True, False)),
+                           ("invariants pass, prefix check fails", dict(runner=bad_prefix), (True, False, False))):
+        res, txt = verdict(**kw)
+        got = (res["p1_ok"], res["prefix_ok"], res["ok"])
+        label_ok = ("prefix stability (cut every 5 bars): " + ("OK" if want[1] else "BROKEN")) in txt
+        check(f"replay verdict: {name} -> p1 {want[0]}, prefix {want[1]}, overall {want[2]}; prefix label matches its own check",
+              got == want and label_ok, f"got {got}, prefix label correct {label_ok}")
+
     def s_prefix(name, bars, d):
         full = run254(bars)
         for k in range(8, len(bars) + 1):
@@ -611,6 +661,15 @@ def scenarios():
 def replay(path_csv):
     bars = B.load_h1(path_csv)
     print(f"replay {path_csv}: {len(bars)} H4 bars {tstr(bars[0][0])} .. {tstr(bars[-1][0])}")
+    return replay_bars(bars)["ok"]
+
+
+def replay_bars(bars, checker=None, prefix_step=25, prefix_from=40, runner=None):
+    """checker(engine, bars, margins) -> list of installed-broken levels (default installed_broken);
+    injectable so the verdict below can be tested with a failure the data does not produce.
+    Returns dict(p1_ok, prefix_ok, ok): ok only when EVERY margin mode and the prefix check pass."""
+    checker = checker or installed_broken
+    runner = runner or run254
     v53 = B.run(bars, True)
     v54 = run254(bars, True)
     v54n = run254(bars, False)
@@ -645,27 +704,29 @@ def replay(path_csv):
     print(f"max strength v2.53 {max(r['str'] for r in v53.ctx_rows)}, v2.54 {max(r['str'] for r in v54.ctx_rows)}")
     # reviewer P1 (2026-10-13): the development build vs the fix, fixed margin and ATR margin
     print("\nP1 - a level installed although a close since its confirmation had broken it:")
+    p1_ok = True                         # every mode must pass - a later pass never clears an earlier failure
     for tag, mg in (("fixed margin (default 3 points)", None), ("ATR_FRAC 0.20", atr_margins(bars, 0.20))):
         dev = run254(bars, margins=mg, legacy_p1=True); fix = run254(bars, margins=mg)
-        bd, bf = installed_broken(dev, bars, mg), installed_broken(fix, bars, mg)
+        bd, bf = checker(dev, bars, mg), checker(fix, bars, mg)
         cd = sum(1 for r in dev.ctx_rows if r["kind"] == "CHOCH"); cf = sum(1 for r in fix.ctx_rows if r["kind"] == "CHOCH")
         sd = sum(1 for (_, a), (_, b) in zip(dev.state_after, fix.state_after) if a != b)
         print(f"  {tag:32s} dev build {len(bd):3d}, fixed {len(bf):3d};  CHOCH dev {cd} / fixed {cf};"
               f"  INTERNAL dev {len(dev.internal_rows)} / fixed {len(fix.internal_rows)};  H4 bars in another state {sd}")
         for x in bd[:3]:
             print(f"      dev: {x[0]} at {x[1]} level {x[2]} - broken by the close of {x[3]}")
-        ok_p1 = not bf
-        if not ok_p1:
-            print("      !! the fixed engine installed a broken level")
-    # no repaint
-    ok = ok_p1
-    for k in range(40, len(bars) + 1, 25):
-        part = run254(bars[:k]); cut = bars[k - 1][0] + H4
+        if bf:
+            p1_ok = False
+            print(f"      !! the fixed engine installed a broken level ({len(bf)}): {bf[:3]}")
+    # no repaint - its own verdict, reported as such
+    prefix_ok = True
+    for k in range(prefix_from, len(bars) + 1, prefix_step):
+        part = runner(bars[:k]); cut = bars[k - 1][0] + H4
         if [B.ctx_key(r) for r in part.ctx_rows] != [B.ctx_key(r) for r in v54.ctx_rows if r["bar"] <= cut] or \
            [(r["ev"], r["bar"], r["level"]) for r in part.prot_rows] != [(r["ev"], r["bar"], r["level"]) for r in v54.prot_rows if r["bar"] <= cut]:
-            ok = False; print(f"  prefix BROKEN at {k}"); break
-    print(f"prefix stability (cut every 25 bars): {'OK' if ok else 'BROKEN'}")
-    return ok
+            prefix_ok = False; print(f"  prefix BROKEN at {k}"); break
+    print(f"prefix stability (cut every {prefix_step} bars): {'OK' if prefix_ok else 'BROKEN'}")
+    print(f"P1 invariant, all margin modes: {'OK' if p1_ok else 'FAILED'}")
+    return dict(p1_ok=p1_ok, prefix_ok=prefix_ok, ok=p1_ok and prefix_ok)
 
 
 if __name__ == "__main__":

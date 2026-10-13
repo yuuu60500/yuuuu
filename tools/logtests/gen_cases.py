@@ -386,8 +386,8 @@ case("c52_ctx_internal_ok", twice54([ctx(*LEG0, also=0), internal("DOWN", "2026.
      ["swing consumed twice in one build  0 proven, 0 pending  (1 of 1 build(s) COMPLETE and read)"], NOT_PROVEN)
 
 # v2.54r2 (reviewer P1): a level installed by the very close that broke it is a log-provable defect
-def prot(tag, ev, d, bar, level, inst="0001", run=7, init=1, src=SRC):
-    return L(src, f"{tag},USDJPY,{ev},dir={d},live=0,leg=1,bar={bar},level={level},swing=2026.09.09 08:00,confirm=2026.09.10 00:00,"
+def prot(tag, ev, d, bar, level, inst="0001", run=7, init=1, src=SRC, leg=1, live=0):
+    return L(src, f"{tag},USDJPY,{ev},dir={d},live={live},leg={leg},bar={bar},level={level},swing=2026.09.09 08:00,confirm=2026.09.10 00:00,"
                   f"bos={bar},age=3,prev=NA,cand={level}" + tail(inst, run, init))
 PB = "2026.09.10 08:00"
 def installed(d, close, level, head):
@@ -406,6 +406,33 @@ case("c56_prot_installed_atr", installed("UP", "1.00143", "1.00146", [ATR]), ["-
      ["level installed already broken  0 proven, 2 pending", "close 1.00143 is 3 pt past it, the margin is per bar (ATR)"], ["installed already broken  1", "installed already broken  2"])
 case("c57_prot_installed_ok", installed("UP", "1.00143", "1.00045", [margin(1)]), ["-Ctx"],
      ["level installed already broken  0 proven, 0 pending"], ["PROVEN"])
+
+# v2.54: PROT / ANCHOR / INTERNAL rows are a judged category in the reload and live-vs-build comparisons
+def prows(level="1.00045", leg=1, **kw):
+    return [prot("HMI-PROT", "SET", "UP", PB, level, leg=leg, **kw), prot("HMI-ANCHOR", "SET", "UP", PB, level, leg=leg, **kw),
+            internal("DOWN", PB, *I_SW, "1.23010", **{k: v for k, v in kw.items() if k in ("run", "init", "inst")})]
+R54 = lambda b, rows, **kw: blk(b, ver="2.54", extra_rows=rows, **kw)
+case("p01_reload_prot_identical", [start("2.54")] + R54(1, prows()) + R54(2, prows()), R,
+     ["PROT   IDENTICAL over 3 / 3 row(s) (PROT / ANCHOR / INTERNAL)", "IDENTICAL inside the comparable region"])
+case("p02_reload_prot_mismatch", [start("2.54")] + R54(1, prows()) + R54(2, prows(level="1.00050")), R,
+     ["PROT   MISMATCH (4)", "differ INSIDE the comparable region", "A only  PROT HMI-PROT|SET|"], ["IDENTICAL inside"])
+case("p03_reload_prot_leg_only", [start("2.54")] + R54(1, prows()) + R54(2, prows(leg=2)), R,
+     ["PROT   same rows, leg numbered differently on 2 - PENDING REVIEW", "PENDING REVIEW, not a pass",
+      "2 protected-level row(s) the same but for the leg number"], ["IDENTICAL inside", "PROT   MISMATCH"])
+case("p04_reload_prot_none_v254", [start("2.54")] + R54(1, []) + R54(2, []), R,
+     ["PROT   no row on either side (nothing judged)"], ["PROT   IDENTICAL"])
+PL = "2026.09.30 13:00"
+lprot = prot("HMI-PROT", "ADVANCE", "UP", PL, "1.00045", live=1, leg=4)
+def b2p(rows): return blk(2, init=2, to="2026.09.30 14:00", marks=MK + ["2026.09.30 13:05:00"], extra_rows=rows)
+case("p05_live_prot_ok", [start()] + blk(1) + [live_ok, lprot] + [start(init=2)] + b2p([prot("HMI-PROT", "ADVANCE", "UP", PL, "1.00045", init=2, leg=4)]),
+     ["-LiveVsBuild"], ["protected-level rows compared: 1 (PROT / ANCHOR / INTERNAL)", "AGREE BOTH WAYS on every covered bar"], ["MISMATCH(ES)", "leg number"])
+case("p06_live_prot_missing", [start()] + blk(1) + [live_ok, lprot] + [start(init=2)] + b2p([]),
+     ["-LiveVsBuild"], ["MISMATCH(ES) on covered bars", "live only  [1->2] PROT HMI-PROT|ADVANCE|"], ["AGREE BOTH WAYS"])
+case("p07_live_prot_leg_only", [start()] + blk(1) + [live_ok, lprot] + [start(init=2)] + b2p([prot("HMI-PROT", "ADVANCE", "UP", PL, "1.00045", init=2, leg=1)]),
+     ["-LiveVsBuild"], ["AGREE BOTH WAYS on every covered bar", "1 protected-level row(s) agree but for the leg number - PENDING REVIEW"], ["MISMATCH(ES)"])
+case("p08_live_prot_other_id", [start()] + blk(1) + [live_ok, prot("HMI-PROT", "ADVANCE", "UP", PL, "1.00045", live=1, init=9)] + [start(init=2)]
+     + b2p([prot("HMI-PROT", "ADVANCE", "UP", PL, "1.00045", init=2)]),
+     ["-LiveVsBuild"], ["from another run/init than build 1 1", "nothing comparable yet - no PASS can be given."], ["AGREE BOTH WAYS"])
 
 # strength number only: same event, same swing, same state, str counted from another H4 start
 same_s = ctx_rows([E1, E3[:3] + (5,) + E3[4:]], also=0)

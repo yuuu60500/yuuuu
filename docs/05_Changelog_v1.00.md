@@ -1865,3 +1865,20 @@ tools/ReloadTest.ps1       -Ctx 新增「level installed already broken」：SET
 tools/logtests             92 组（新增 c53–c57）
 ```
 
+---
+
+## v2.54r3 —— 工具修订（A-66 回放判定；保护点行纳入重载 / 实时比较）—— MQL5 与 r2 相同
+
+```
+Date:     2026-10-13
+来源:     验收方「HMI v2.54r2 开发版审核报告」（2026-10-13）：A-65 修复通过（r2 编译 0/0）；P2 回放判定被后一种余量覆盖
+MQL5:     与 v2.54r2 字节相同（验收方 MetaEditor 5.0.0.6230 X64 编译 0 errors / 0 warnings），无需重编译
+
+tools/h4_protect_sim.py    replay_bars()：两种余量的不变量结果累积（任一失败即失败），前缀检查单独判定、单独显示，
+                           返回 p1_ok / prefix_ok / ok；检查器与前缀运行器可注入。场景 45/45：新增 5 组判定注入
+                           （固定余量失败 / ATR 失败 / 都失败 / 前缀失败 / 无注入）与「另有合法候选：保护点保持、锚点移动」多空各一
+tools/ReloadTest.ps1       同窗口重载与实时 vs 重建：HMI-PROT / HMI-ANCHOR / HMI-CTX-INTERNAL 作为独立判定类别（PROT 行），
+                           按字段比较（不含 live= 与身份）；leg= 只差段序号 → PENDING REVIEW（与 str 同理）；实时行同样受身份规则约束
+tools/logtests             100 组（新增 p01–p08）
+```
+

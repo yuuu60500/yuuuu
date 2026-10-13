@@ -1,5 +1,5 @@
-# v2.54r2 BRI-12 offline evidence (tools/h4_protect_sim.py), 2026-10-13
-# data: backtesting.py 0.6.6 backtesting/test/EURUSD.csv, sha256 81e977905a006cc8fbc034ebdb83c999a8ed6ba00191dc7ea5ef5b386fb74a82 (same file as v2.53_h4_dedup_offline.txt)
+# v2.54r3 BRI-12 offline evidence (tools/h4_protect_sim.py), 2026-10-13
+# data: backtesting.py 0.6.6 backtesting/test/EURUSD.csv, sha256 81e977905a006cc8fbc034ebdb83c999a8ed6ba00191dc7ea5ef5b386fb74a82 (shipped as Tools/data/EURUSD_H1.csv)
 
 ## python3 tools/h4_protect_sim.py
 PASS  legal new point [bull] P-1/P-2: first BOS sets protected at L1, next BOS advances to the higher L2
@@ -34,14 +34,22 @@ PASS  new leg [bull] P-2/P-5: a new leg after TRANS_OK starts its own protected 
 PASS  new leg [bear] P-2/P-5: a new leg after TRANS_OK starts its own protected (SET / INVALID), not the old leg's
 PASS  ATR margin shrinks, leg running [bull] P1: a close that breaks the primary and a higher pullback low -> BOS, the low processed (INTERNAL), protected / anchor kept; no CHOCH next bar (dev build: installs it, CHOCH)
 PASS  ATR margin shrinks, leg running [bear] P1: a close that breaks the primary and a higher pullback low -> BOS, the low processed (INTERNAL), protected / anchor kept; no CHOCH next bar (dev build: installs it, CHOCH)
+PASS  ATR margin shrinks, another legal candidate [bull] P1: the broken low processed, the next legal candidate taken: protected keeps (worse), anchor moves to it
+PASS  ATR margin shrinks, another legal candidate [bear] P1: the broken low processed, the next legal candidate taken: protected keeps (worse), anchor moves to it
 PASS  ATR margin shrinks, first BOS of a leg [bull] P1: the first BOS of a leg on such a close -> INVALID, not the broken low (dev build: SET it)
 PASS  ATR margin shrinks, first BOS of a leg [bear] P1 mirror: a close breaking both ways in RANGE is a BOS UP (v2.53 order); INVALID, nothing broken installed
 PASS  installed levels [bull] invariant: no level is installed (SET / ADVANCE / MOVE) once a close since its confirmation broke it
 PASS  installed levels [bear] invariant: no level is installed (SET / ADVANCE / MOVE) once a close since its confirmation broke it
+PASS  replay verdict: nothing injected -> p1 True, prefix True, overall True; prefix label matches its own check
+PASS  replay verdict: fixed-margin invariant fails, ATR passes -> p1 False, prefix True, overall False; prefix label matches its own check
+PASS  replay verdict: ATR invariant fails, fixed passes -> p1 False, prefix True, overall False; prefix label matches its own check
+PASS  replay verdict: both invariants fail -> p1 False, prefix True, overall False; prefix label matches its own check
+PASS  replay verdict: invariants pass, prefix check fails -> p1 True, prefix False, overall False; prefix label matches its own check
 PASS  prefix [bull] no repaint: a run cut at any bar holds exactly the events and protected rows the full run had
 PASS  prefix [bear] no repaint: a run cut at any bar holds exactly the events and protected rows the full run had
 
-38/38 checks as expected
+45/45 checks as expected
+exit=0
 
 ## python3 tools/h4_protect_sim.py --replay EURUSD_H1.csv
 replay EURUSD_H1.csv: 1292 H4 bars 2017.04.19 08:00 .. 2018.02.07 12:00
@@ -74,3 +82,5 @@ P1 - a level installed although a close since its confirmation had broken it:
   fixed margin (default 3 points)  dev build   0, fixed   0;  CHOCH dev 24 / fixed 24;  INTERNAL dev 32 / fixed 38;  H4 bars in another state 0
   ATR_FRAC 0.20                    dev build   0, fixed   0;  CHOCH dev 25 / fixed 25;  INTERNAL dev 23 / fixed 33;  H4 bars in another state 0
 prefix stability (cut every 25 bars): OK
+P1 invariant, all margin modes: OK
+exit=0

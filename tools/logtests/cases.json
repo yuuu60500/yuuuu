@@ -1201,6 +1201,107 @@
    "PROVEN"
   ]
  },
+ "p01_reload_prot_identical": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "PROT   IDENTICAL over 3 / 3 row(s) (PROT / ANCHOR / INTERNAL)",
+   "IDENTICAL inside the comparable region"
+  ],
+  "forbid": []
+ },
+ "p02_reload_prot_mismatch": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "PROT   MISMATCH (4)",
+   "differ INSIDE the comparable region",
+   "A only  PROT HMI-PROT|SET|"
+  ],
+  "forbid": [
+   "IDENTICAL inside"
+  ]
+ },
+ "p03_reload_prot_leg_only": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "PROT   same rows, leg numbered differently on 2 - PENDING REVIEW",
+   "PENDING REVIEW, not a pass",
+   "2 protected-level row(s) the same but for the leg number"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "PROT   MISMATCH"
+  ]
+ },
+ "p04_reload_prot_none_v254": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "PROT   no row on either side (nothing judged)"
+  ],
+  "forbid": [
+   "PROT   IDENTICAL"
+  ]
+ },
+ "p05_live_prot_ok": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "protected-level rows compared: 1 (PROT / ANCHOR / INTERNAL)",
+   "AGREE BOTH WAYS on every covered bar"
+  ],
+  "forbid": [
+   "MISMATCH(ES)",
+   "leg number"
+  ]
+ },
+ "p06_live_prot_missing": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "MISMATCH(ES) on covered bars",
+   "live only  [1->2] PROT HMI-PROT|ADVANCE|"
+  ],
+  "forbid": [
+   "AGREE BOTH WAYS"
+  ]
+ },
+ "p07_live_prot_leg_only": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "AGREE BOTH WAYS on every covered bar",
+   "1 protected-level row(s) agree but for the leg number - PENDING REVIEW"
+  ],
+  "forbid": [
+   "MISMATCH(ES)"
+  ]
+ },
+ "p08_live_prot_other_id": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "from another run/init than build 1 1",
+   "nothing comparable yet - no PASS can be given."
+  ],
+  "forbid": [
+   "AGREE BOTH WAYS"
+  ]
+ },
  "c09_ctx_strength_only": {
   "args": [
    "-Source",

@@ -220,6 +220,21 @@ function CtxParse([string]$msg) {
                        KeyNoStr = "$ev|$($f['swing'])|$($f['swing_px'])|$($f['close'])"
                        Event = $ev }
 }
+# v2.54 (BRI-12): HMI-PROT / HMI-ANCHOR / HMI-CTX-INTERNAL rows, judged like
+# HMI-CTX. The key leaves out live= and the identity; leg= counts legs from
+# the build's own H4 start (as str counts BOS), so it is in Key only and a
+# leg-number-only difference is PENDING REVIEW, not a mismatch.
+function ProtParse([string]$msg) {
+    $c = $msg -split ','
+    if ($c.Count -lt 4) { return $null }
+    $tag = $c[0]
+    if ($tag -eq 'HMI-CTX-INTERNAL') { $ev = 'INTERNAL'; $from = 2 } else { $ev = $c[2]; $from = 3 }
+    $f = @{}; foreach ($p in $c[$from..($c.Count-1)]) { $kv = $p -split '=', 2; if ($kv.Count -eq 2) { $f[$kv[0]] = $kv[1] } }
+    $skip = @('live', 'leg', 'inst', 'run', 'init')
+    $body = (@($f.Keys | Where-Object { $skip -notcontains $_ } | Sort-Object) | ForEach-Object { "$_=$($f[$_])" }) -join '|'
+    $kn = "$tag|$ev|$body"
+    [pscustomobject]@{ Tag = $tag; Ev = $ev; Bar = (PT16 $f['bar']); BarS = $f['bar']; KeyNoLeg = $kn; Key = "$kn|leg=$($f['leg'])" }
+}
 function RowKind([string]$r) { $c = $r -split ','; if ($c.Count -gt 1) { return $c[1] } return '?' }
 function KV([string]$s) { $m = @{}; foreach ($p in ($s -split ',')) { $kv = $p -split '=', 2; if ($kv.Count -eq 2) { $m[$kv[0].Trim()] = $kv[1].Trim() } }; return $m }
 
@@ -270,7 +285,7 @@ function Close-Block($bk) {
     $bk.Status = $(if ($bk.Why.Count -eq 0) { 'COMPLETE' } else { 'INCOMPLETE' })
 }
 
-$blocks = @(); $open = @{}; $verNow = @{}; $liveAll = @(); $liveCtx = @(); $orphanRows = 0; $orphanEnds = 0
+$blocks = @(); $open = @{}; $verNow = @{}; $liveAll = @(); $liveCtx = @(); $liveProt = @(); $orphanRows = 0; $orphanEnds = 0
 for ($i = 0; $i -lt $all.Count; $i++) {
     $l = $all[$i]
     if ($l -notmatch 'HMI') { continue }
@@ -328,6 +343,10 @@ for ($i = 0; $i -lt $all.Count; $i++) {
     elseif ($msg -match '^HMI-CTX,') {                          # a structure event outside a build = live
         $cr = CtxParse $msg
         if ($cr) { $liveCtx += [pscustomobject]@{ Src = $src; Idx = $i; Id = $id; C = $cr } }
+    }
+    elseif ($msg -match '^HMI-(PROT|ANCHOR|CTX-INTERNAL),') {         # v2.54: protected-level rows outside a build = live
+        $pr = ProtParse $msg
+        if ($pr) { $liveProt += [pscustomobject]@{ Src = $src; Idx = $i; Id = $id; P = $pr } }
     }
     if ($l -match 'HMI-BUILD,(.*)$') {
         if (-not $open.ContainsKey($src)) { $orphanRows++; continue }
@@ -987,7 +1006,9 @@ function Get-Struct($bk) {
     $poiById = @{}; $sessById = @{}; $blkById = @{}
     $poi = New-Object System.Collections.ArrayList; $sess = New-Object System.Collections.ArrayList
     $blk = New-Object System.Collections.ArrayList; $arm = New-Object System.Collections.ArrayList
+    $prot = New-Object System.Collections.ArrayList
     foreach ($m in $bk.Lines) {
+        if ($m -match '^HMI-(PROT|ANCHOR|CTX-INTERNAL),') { $pr = ProtParse $m; if ($pr) { [void]$prot.Add($pr) }; continue }
         if ($m -match '^HMI-CTX,') {
             $r = CtxParse $m
             if ($r) { [void]$ctx.Add($r); if ($r.Swing) { $k = "$($r.Dir)|$($r.Swing)"; if (-not $proc.ContainsKey($k)) { $proc[$k] = $r.Bar } } }
@@ -1044,7 +1065,7 @@ function Get-Struct($bk) {
     $blkBy = @{}; foreach ($x in $blk) { if (-not $blkBy.ContainsKey($x.B)) { $blkBy[$x.B] = $x } }
     $armOf = @{}; foreach ($x in @($arm | Sort-Object Time)) { if (-not $armOf.ContainsKey($x.BlockId)) { $armOf[$x.BlockId] = New-Object System.Collections.ArrayList }; [void]$armOf[$x.BlockId].Add($x) }
     $poiNew = @{}; foreach ($x in $poi) { if ($x.Kind -eq 'NEW' -and -not $poiNew.ContainsKey($x.P)) { $poiNew[$x.P] = $x } }
-    $s = [pscustomobject]@{ Ctx = $ctx; Proc = $proc; DedupN = $dedupN; TDedup = $tDedup
+    $s = [pscustomobject]@{ Ctx = $ctx; Proc = $proc; DedupN = $dedupN; TDedup = $tDedup; Prot = $prot
                             Poi = $poi; Sess = $sess; Blk = $blk; Arm = $arm; Models = $models
                             SessStart = $sessStart; SessEnd = $sessEnd; Starts = @($sess | Where-Object { $_.Kind -eq 'START' } | Sort-Object Time)
                             BlkBy = $blkBy; ArmOf = $armOf; ArmSorted = @($arm | Sort-Object Time); PoiNew = $poiNew }
@@ -1496,6 +1517,7 @@ function Show-LiveVsBuild([string]$src) {
     $lv  = @($liveAll | Where-Object { $_.Src -eq $src })
     if ($sel.Count -lt 2) { Write-Host "  fewer than two builds - nothing brackets a live stretch yet." -ForegroundColor Yellow; return }
     $pairs = 0; $cmp = 0; $pend = 0; $liveN = 0; $liveCtxN = 0; $strPend = 0; $bad = @(); $okRows = @(); $pendWhy = @(); $liqPend = 0
+    $liveProtN = 0; $legPend = 0
     for ($k = 1; $k -lt $sel.Count; $k++) {
         $A = $sel[$k - 1]; $B = $sel[$k]
         $rows = @($lv | Where-Object { $_.Idx -gt $A.EndIdx -and $_.Idx -lt $B.BeginIdx })
@@ -1506,7 +1528,9 @@ function Show-LiveVsBuild([string]$src) {
         # A's last M5 bar; B consumed it if it closed by B's last M5 bar.
         $lc  = @($liveCtx | Where-Object { $_.Src -eq $src -and $_.Idx -gt $A.EndIdx -and $_.Idx -lt $B.BeginIdx })
         $bc  = @((Get-Struct $B).Ctx | Where-Object { $_.Bar -gt $A.To -and $_.Bar -le $B.To })
-        if ($rows.Count -eq 0 -and $bIn.Count -eq 0 -and $lc.Count -eq 0 -and $bc.Count -eq 0) { continue }
+        $lp  = @($liveProt | Where-Object { $_.Src -eq $src -and $_.Idx -gt $A.EndIdx -and $_.Idx -lt $B.BeginIdx })
+        $bp  = @((Get-Struct $B).Prot | Where-Object { $_.Bar -gt $A.To -and $_.Bar -le $B.To })
+        if ($rows.Count -eq 0 -and $bIn.Count -eq 0 -and $lc.Count -eq 0 -and $bc.Count -eq 0 -and $lp.Count -eq 0 -and $bp.Count -eq 0) { continue }
         $pairs++
         $why = ''
         if ($A.Status -ne 'COMPLETE' -or $B.Status -ne 'COMPLETE') { $why = 'INCOMPLETE build: ' + ((@($A.Why) + @($B.Why)) -join '; ') }
@@ -1520,8 +1544,8 @@ function Show-LiveVsBuild([string]$src) {
         # lifetime that produced them), makes the pair PENDING - not a row
         # quietly set aside while the rest still passes.
         if ($A.Strict) {
-            $noId  = @(@($rows) + @($lc) | Where-Object { -not $_.Id }).Count
-            $alien = @(@($rows) + @($lc) | Where-Object { $_.Id -and $_.Id -ne $A.Id }).Count
+            $noId  = @(@($rows) + @($lc) + @($lp) | Where-Object { -not $_.Id }).Count
+            $alien = @(@($rows) + @($lc) + @($lp) | Where-Object { $_.Id -and $_.Id -ne $A.Id }).Count
             if ($noId -or $alien) {
                 $pend++
                 $pendWhy += "build $($A.Build)->$($B.Build): live rows without run/init $noId, from another run/init than build $($A.Build) $alien"
@@ -1541,7 +1565,8 @@ function Show-LiveVsBuild([string]$src) {
         # A-55: what is left after the pending LIQ rows and the edge rows are
         # set aside is what this pair can prove. Nothing left = nothing compared.
         $lcIn = @($lc | Where-Object { $_.C.Bar -gt $A.To -and $_.C.Bar -le $B.To } | ForEach-Object { $_.C })
-        if (($lIn.Count + $bIn.Count + $lcIn.Count + $bc.Count) -eq 0) {
+        $lpIn = @($lp | Where-Object { $_.P.Bar -gt $A.To -and $_.P.Bar -le $B.To } | ForEach-Object { $_.P })
+        if (($lIn.Count + $bIn.Count + $lcIn.Count + $bc.Count + $lpIn.Count + $bp.Count) -eq 0) {
             $pend++
             $pendWhy += "build $($A.Build)->$($B.Build): no judged event (LIQ pending or edge rows only) - not comparable"
             continue
@@ -1560,19 +1585,29 @@ function Show-LiveVsBuild([string]$src) {
         foreach ($x in $dc.B) { $bad += [pscustomobject]@{ Side = 'build only'; Row = "CTX $($x.Key)"; Pair = "$($A.Build)->$($B.Build)" } }
         $sn = $dcs.A.Count - $dc.A.Count
         if ($sn -gt 0) { $strPend += $sn; $pendWhy += "build $($A.Build)->$($B.Build): $sn H4 event(s) agree on swing and state but not on the strength number (the rebuild's H4 history starts later)" }
+        # v2.54: protected level / leg anchor / internal rows, the same way
+        $liveProtN += $lpIn.Count
+        $dp  = DiffKeys $lpIn $bp 'KeyNoLeg'
+        $dps = DiffKeys $lpIn $bp 'Key'
+        foreach ($x in $dp.A) { $bad += [pscustomobject]@{ Side = 'live only';  Row = "PROT $($x.KeyNoLeg)"; Pair = "$($A.Build)->$($B.Build)" } }
+        foreach ($x in $dp.B) { $bad += [pscustomobject]@{ Side = 'build only'; Row = "PROT $($x.KeyNoLeg)"; Pair = "$($A.Build)->$($B.Build)" } }
+        $ln = $dps.A.Count - $dp.A.Count
+        if ($ln -gt 0) { $legPend += $ln; $pendWhy += "build $($A.Build)->$($B.Build): $ln protected-level row(s) agree but for the leg number (the rebuild's H4 history starts later)" }
     }
     Write-Host ("  build pairs with a live stretch: {0}   comparable: {1}   pending review: {2}   liquidity pending: {3}" -f $pairs, $cmp, $pend, $liqPend)
     foreach ($w in $pendWhy) { Write-Host "    pending: $w" -ForegroundColor Yellow }
     if ($cmp -eq 0) { Write-Host "  nothing comparable yet - no PASS can be given." -ForegroundColor Yellow; return }
     Write-Host ("  live events compared: {0} (+ {1} H4 structure event(s))" -f $liveN, $liveCtxN)
+    if ($liveProtN -gt 0) { Write-Host ("  protected-level rows compared: {0} (PROT / ANCHOR / INTERNAL)" -f $liveProtN) }
     if ($okRows.Count) {
         $bm = $okRows | Group-Object { RowLabel $_ } | Sort-Object Name | ForEach-Object { "$($_.Name) $($_.Count)" }
         Write-Host ("  by model: " + ($bm -join '  |  '))
     }
     if ($bad.Count -eq 0) {
         $what = $(if ($liqPend -eq 0) { 'MODEL + LIQ' } else { "MODEL only; LIQ pending in $liqPend pair(s)" })
-        Write-Host "  AGREE BOTH WAYS on every covered bar ($what)." -ForegroundColor $(if ($liqPend -eq 0 -and $strPend -eq 0) { 'Green' } else { 'Yellow' })
+        Write-Host "  AGREE BOTH WAYS on every covered bar ($what)." -ForegroundColor $(if ($liqPend -eq 0 -and $strPend -eq 0 -and $legPend -eq 0) { 'Green' } else { 'Yellow' })
         if ($strPend -gt 0) { Write-Host "  $strPend H4 event(s) agree on swing and state but not on the strength number - PENDING REVIEW for those" -ForegroundColor Yellow }
+        if ($legPend -gt 0) { Write-Host "  $legPend protected-level row(s) agree but for the leg number - PENDING REVIEW for those" -ForegroundColor Yellow }
         if ($pend -gt 0) { Write-Host "  (the pending pairs above are NOT included in this result)" -ForegroundColor Yellow }
     } else {
         Write-Host "  $($bad.Count) MISMATCH(ES) on covered bars:" -ForegroundColor Red
@@ -1736,6 +1771,18 @@ function Compare-Builds($A, $B) {
     $nC  = $cA.Count + $cB.Count
     foreach ($x in $dC.A) { $cls += [pscustomobject]@{ Class = 'MISMATCH'; Side = 'A only'; Time = $x.Bar; Row = "CTX $($x.Key)" } }
     foreach ($x in $dC.B) { $cls += [pscustomobject]@{ Class = 'MISMATCH'; Side = 'B only'; Time = $x.Bar; Row = "CTX $($x.Key)" } }
+    # v2.54 (BRI-12): protected level, leg anchor and internal-swing rows - a
+    # judged category of their own, matched like CTX (leg number like str)
+    $pA = @((Get-Struct $A).Prot | Where-Object { $_.Bar -ge $rs -and $_.Bar -le $re })
+    $pB = @((Get-Struct $B).Prot | Where-Object { $_.Bar -ge $rs -and $_.Bar -le $re })
+    $dP  = DiffKeys $pA $pB 'KeyNoLeg'
+    $dPs = DiffKeys $pA $pB 'Key'
+    $mmP = $dP.A.Count + $dP.B.Count
+    $legP = $dPs.A.Count - $dP.A.Count
+    $nP  = $pA.Count + $pB.Count
+    $showP = ($nP -gt 0 -or (VerNum $A.Ver) -ge [decimal]2.54 -or (VerNum $B.Ver) -ge [decimal]2.54)
+    foreach ($x in $dP.A) { $cls += [pscustomobject]@{ Class = 'MISMATCH'; Side = 'A only'; Time = $x.Bar; Row = "PROT $($x.KeyNoLeg)" } }
+    foreach ($x in $dP.B) { $cls += [pscustomobject]@{ Class = 'MISMATCH'; Side = 'B only'; Time = $x.Bar; Row = "PROT $($x.KeyNoLeg)" } }
     $mm = @($cls | Where-Object Class -eq 'MISMATCH')
     $vC = $(if ($mmC) { "MISMATCH ($mmC)" } elseif ($nC -eq 0) { 'no event on either side (nothing judged)' }
             elseif ($strC) { "same events, strength numbered differently on $strC - PENDING REVIEW" }
@@ -1747,15 +1794,22 @@ function Compare-Builds($A, $B) {
     Write-Host "    MODEL  $vM" -ForegroundColor $(if ($mmM) { 'Red' } elseif ($nM -eq 0) { 'Yellow' } else { 'Gray' })
     Write-Host "    LIQ    $vL" -ForegroundColor $(if ($mmL) { 'Red' } elseif (-not $liqCmp -or $nL -eq 0) { 'Yellow' } else { 'Gray' })
     Write-Host "    CTX    $vC" -ForegroundColor $(if ($mmC) { 'Red' } elseif ($nC -eq 0 -or $strC) { 'Yellow' } else { 'Gray' })
+    if ($showP) {
+        $vP = $(if ($mmP) { "MISMATCH ($mmP)" } elseif ($nP -eq 0) { 'no row on either side (nothing judged)' }
+                elseif ($legP) { "same rows, leg numbered differently on $legP - PENDING REVIEW" }
+                else { "IDENTICAL over $($pA.Count) / $($pB.Count) row(s) (PROT / ANCHOR / INTERNAL)" })
+        Write-Host "    PROT   $vP" -ForegroundColor $(if ($mmP) { 'Red' } elseif ($nP -eq 0 -or $legP) { 'Yellow' } else { 'Gray' })
+    }
 
     if ($mm.Count -gt 0) {
         Write-Host "  $($mm.Count) event(s) differ INSIDE the comparable region - repaint or non-determinism:" -ForegroundColor Red
         $mm | Select-Object -First 20 | ForEach-Object { Write-Host ("    {0}  {1}" -f $_.Side, $_.Row) }
-    } elseif (($nM + $nL + $nC) -eq 0) {
+    } elseif (($nM + $nL + $nC + $nP) -eq 0) {
         Write-Host "  INSUFFICIENT SAMPLE - no judged event inside the comparable region; nothing was compared." -ForegroundColor Yellow
-    } elseif ($pend.Count -gt 0 -or -not $known -or $A.WarmEst -or $B.WarmEst -or $strC) {
+    } elseif ($pend.Count -gt 0 -or -not $known -or $A.WarmEst -or $B.WarmEst -or $strC -or $legP) {
         Write-Host "  no difference inside the comparable region - PENDING REVIEW, not a pass:" -ForegroundColor Yellow
         if ($strC)                  { Write-Host "    $strC H4 event(s) with the same swing and state but another strength number (H4 history start)" -ForegroundColor Yellow }
+        if ($legP)                  { Write-Host "    $legP protected-level row(s) the same but for the leg number (H4 history start)" -ForegroundColor Yellow }
         if ($pend.Count)            { Write-Host "    $($pend.Count) difference(s) before the region need a look (see file)" -ForegroundColor Yellow }
         if (-not $known)            { Write-Host "    parameter digest not logged (pre-v2.44 build)" -ForegroundColor Yellow }
         if ($A.WarmEst -or $B.WarmEst) { Write-Host "    warm-up end estimated, not logged (pre-v2.44 build)" -ForegroundColor Yellow }
