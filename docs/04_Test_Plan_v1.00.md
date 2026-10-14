@@ -961,6 +961,10 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           实时 vs 重建的 protected-level rows 双向一致；只差 leg 序号为 PENDING REVIEW。
           默认固定余量与 ATR_FRAC 各保留一份日志；ATR 下「level installed already broken」的 pending
           须用逐根余量 / 图表数据核对，不能按 0 proven 直接通过
-5  跨版本 v2.53 vs v2.54：差异逐条连到 P-4 / P-5 / P-6b 的具体日志证据 —— ReloadTest 归因扩展未完成，完成前不作结论
+5  跨版本 v2.53 vs v2.54（固定窗口：同品种两张图，同一根 M5 内各重建一次）：
+          `-Source <v2.53 源> -Versus <v2.54 源>`（BRI-12 模式，r4 起）。判据：verdicts 行 UNEXPLAINED = 0；
+          PENDING_ATTRIBUTION = 0，不为 0 时逐条给出人工结论（attribution_*.txt 每行一条）后方可通过；
+          第一处状态差异须落在 P-4 / P-5 / P-7 / 已处理摆动点的具体行上，分歧区间内的行只在起点已解释时计为已解释；
+          链路行仍先核对生命周期（A-58）。离线：python3 tools/h4_protect_attr.py → 0 / 0、9/9
 ```
 

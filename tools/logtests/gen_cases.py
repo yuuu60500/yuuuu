@@ -434,6 +434,65 @@ case("p08_live_prot_other_id", [start()] + blk(1) + [live_ok, prot("HMI-PROT", "
      + b2p([prot("HMI-PROT", "ADVANCE", "UP", PL, "1.00045", init=2)]),
      ["-LiveVsBuild"], ["from another run/init than build 1 1", "nothing comparable yet - no PASS can be given."], ["AGREE BOTH WAYS"])
 
+# ---- v2.54 (BRI-12) cross-version attribution: the offline model's runs written as logs. ReloadTest -Versus
+# must give exactly the model's verdicts (tools/h4_protect_attr.py); tampered v2.54 logs must not pass.
+import sys as _sys
+_sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+import h4_protect_attr as PA, h4_dedup_sim as HB, h4_protect_sim as HP          # noqa: E402
+SB = PA.synth_bars(700, 37)
+LINES, VM = PA.emit_case(SB)
+VS = ["-Source", "USDJPY#0A53,M5", "-Versus", "USDJPY#0B54,M5"]
+NOT_TRACED = ["traced to BRI-12 (protected level / new structure) with a concrete link"]
+def vcase(name, lines, expect, forbid=()):
+    os.makedirs(name, exist_ok=True)
+    open(os.path.join(name, "20261002.log"), "w", encoding="utf-8").write("\n".join(lines) + "\n")
+    C[name] = dict(args=VS, expect=expect, forbid=list(forbid))
+vcase("v01_versus254_model", LINES,
+      [f"verdicts: explained {VM['explained']}   PENDING_ATTRIBUTION 0   UNEXPLAINED 0",
+       f"all {VM['explained']} difference(s) traced to BRI-12 (protected level / new structure) with a concrete link",
+       "CTX P-4 protected level / internal", "CTX P-5 old structure"], ["PENDING_ATTRIBUTION - a manual", "UNEXPLAINED - not traced"])
+_old, _new = HB.run(SB, True), HP.run254(SB)
+_V = PA.attribute254(_old, _new)
+def _is54(l): return "inst=0B54" in l
+def _bar(l): return l.split("bar=")[1].split(",")[0]
+def drop(pred):
+    out, done = [], False
+    for l in LINES:
+        if not done and _is54(l) and pred(l): done = True; continue
+        out.append(l)
+    assert done; return out
+def edit(pred, fn):
+    out, done = [], False
+    for l in LINES:
+        if not done and _is54(l) and pred(l): l = fn(l); done = True
+        out.append(l)
+    assert done; return out
+_tI = next(w.split(" only ")[1].split(" CHOCH")[0] for (w, why) in _V["explained"] if "HMI-CTX-INTERNAL" in why)   # bar of a v2.53 CHOCH that INTERNAL explains
+vcase("v02_versus254_internal_removed", drop(lambda l: "HMI-CTX-INTERNAL," in l and _bar(l) == _tI),
+      ["states equal going in, and no BRI-12 row on this bar links it", "the divergence start is not explained"], NOT_TRACED)
+def _prot_broken(l):
+    c = float(l.split("close=")[1].split(",")[0]); d = l.split("dir=")[1].split(",")[0]
+    return l.replace("prot=" + l.split("prot=")[1].split(",")[0], "prot=" + f"{c + (0.0001 if d == 'DOWN' else -0.0001):.5f}")
+vcase("v03_versus254_internal_prot_broken", edit(lambda l: "HMI-CTX-INTERNAL," in l and "prot=NA" not in l, _prot_broken),
+      ["pt past the protected level", "that close is a CHOCH", "UNEXPLAINED - not traced"], NOT_TRACED)
+vcase("v04_versus254_break_level", edit(lambda l: l.split("  ")[-1].startswith("HMI-PROT,USDJPY,BREAK,"),
+                                        lambda l: l.replace("level=" + l.split("level=")[1].split(",")[0], "level=9.99999")),
+      ["is not the CHOCH swing", "UNEXPLAINED - not traced"], NOT_TRACED)
+vcase("v05_versus254_choch_no_prot", drop(lambda l: l.split("  ")[-1].startswith("HMI-PROT,USDJPY,BREAK,")),
+      ["a v2.54 CHOCH without HMI-PROT BREAK / FALLBACK on its bar", "UNEXPLAINED - not traced"], NOT_TRACED)
+_sl = next(r for r in _new.ctx_rows if r["kind"] == "TRANS_SAMELEG")
+_tch = max(r["bar"] for r in _new.ctx_rows if r["kind"] == "CHOCH" and r["bar"] < _sl["bar"])
+vcase("v06_versus254_sameleg_late", edit(lambda l: ",TRANS_SAMELEG," in l and _bar(l) == HB.tstr(_sl["bar"]),
+                                         lambda l: l.replace("swing=" + HB.tstr(_sl["swing"]), "swing=" + HB.tstr(_tch))),
+      ["TRANS_SAMELEG on a swing formed at / after the CHOCH close", "UNEXPLAINED - not traced"], NOT_TRACED)
+vcase("v07_versus254_messy_flip", edit(lambda l: "HMI-CTX,USDJPY,BOS," in l and "messy=0" in l and "str=1," not in l,
+                                       lambda l: l.replace("messy=0", "messy=1")),
+      ["but the rule gives 0 from this build's own events", "UNEXPLAINED - not traced"], NOT_TRACED)
+_fb = next(p for p in _new.prot_rows if p["ev"] == "FALLBACK")
+vcase("v08_versus254_fallback_with_level", edit(lambda l: l.split("  ")[-1].startswith("HMI-PROT,USDJPY,INVALID,") and f"leg={_fb['leg']}," in l,
+                                                lambda l: l.replace("level=NA", "level=1.10000")),
+      ["P-6b applies to an INVALID leg only", "UNEXPLAINED - not traced"], NOT_TRACED)
+
 # strength number only: same event, same swing, same state, str counted from another H4 start
 same_s = ctx_rows([E1, E3[:3] + (5,) + E3[4:]], also=0)
 case("c09_ctx_strength_only", [start()] + blk(1, extra_rows=same) + blk(2, extra_rows=same_s), R,

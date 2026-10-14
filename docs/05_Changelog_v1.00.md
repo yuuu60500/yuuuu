@@ -1882,3 +1882,21 @@ tools/ReloadTest.ps1       同窗口重载与实时 vs 重建：HMI-PROT / HMI-A
 tools/logtests             100 组（新增 p01–p08）
 ```
 
+---
+
+## v2.54r4 —— 工具：v2.53 → v2.54 跨版本归因（BRI-12 模式）—— MQL5 与 r2 相同
+
+```
+Date:     2026-10-14
+来源:     验收方「HMI v2.54r2 开发版审核报告」第 4 节第 2 项：第一处状态差异连到具体 P-4 / P-5 / P-6b 证据，再传到 POI / Session / MODEL
+MQL5:     与 v2.54r2 字节相同（0/0），无需重编译
+
+tools/h4_protect_attr.py   新：归因离线模型 —— 日志自洽检查、同态差异的本根 BRI-12 链接、分歧区间传播、段属性、H4 POI；
+                           篡改防护 9/9；--emit 把模型运行写成 MT5 日志行（两实例并排），供 ReloadTest 对照
+tools/ReloadTest.ps1       -Versus：新版本 >= 2.54 且旧版本 < 2.54 时用 BRI-12 归因（原 de-dup 模式不变）；
+                           CtxParse 增 KeyCore / Messy；HMI-CTX-INTERNAL 计入已处理摆动点（含来源）；
+                           链路中以 H4 方向不同为理由的规则须处于起点已解释的分歧区间（两种模式通用的门槛，de-dup 模式恒为通过）；
+                           POI 在另一版已被已解释的 OUT 移出后，其 INVALID / EXPIRED 视为已解释；结论行按模式写「BRI-12」或「the BOS de-dup」
+tools/logtests             108 组（新增 v01–v08：模型种子 37 的两版日志，及 7 种篡改）
+docs                       BRI-12 归因方法与限制；docs/04 v2.54 第 5 项判据；证据 docs/evidence/v2.54_attribution_offline.txt
+```

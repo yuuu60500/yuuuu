@@ -1,0 +1,111 @@
+# v2.53 -> v2.54 cross-version attribution (BRI-12), offline evidence, 2026-10-14
+# EURUSD data: backtesting.py 0.6.6 backtesting/test/EURUSD.csv, sha256 81e977905a006cc8fbc034ebdb83c999a8ed6ba00191dc7ea5ef5b386fb74a82
+
+## python3 tools/h4_protect_attr.py   (seeded synthetic series, guards)
+synthetic H4 series (seed 37, 700 bars): explained 200   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+PASS  guard: untouched v2.54 run                                                      -> explained (want explained)
+PASS  guard: INTERNAL row behind a v2.53-only CHOCH removed                           -> PENDING_ATTRIBUTION (want not explained)
+PASS  guard: INTERNAL row whose close breaks its protected level                      -> UNEXPLAINED (want UNEXPLAINED)
+PASS  guard: PROT BREAK level is not the CHOCH swing                                  -> UNEXPLAINED (want UNEXPLAINED)
+PASS  guard: v2.54 CHOCH without its PROT BREAK row                                   -> UNEXPLAINED (want UNEXPLAINED)
+PASS  guard: TRANS_SAMELEG on a swing formed after the CHOCH                          -> UNEXPLAINED (want UNEXPLAINED)
+PASS  guard: H4 close of an event bar changed                                         -> UNEXPLAINED (want UNEXPLAINED)
+PASS  guard: first BOS logged with str 9                                              -> UNEXPLAINED (want UNEXPLAINED)
+PASS  guard: POI made in v2.54 only, before any H4 direction difference               -> UNEXPLAINED (want UNEXPLAINED)
+
+9/9 attribution guards as expected
+exit=0
+
+## python3 tools/h4_protect_attr.py --replay EURUSD_H1.csv
+replay EURUSD_H1.csv: 1292 H4 bars 2017.04.19 08:00 .. 2018.02.07 12:00
+verdicts: explained 302   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  explained  CTX   P-4                                      22
+  explained  CTX   P-4 / P-7                                3
+  explained  CTX   P-5                                      10
+  explained  CTX   inside an explained divergence           103
+  explained  CTX   legs from 2017.04.25 16:00 / 2017.04.28  3
+  explained  CTX   legs from 2017.05.15 08:00 / 2017.05.12  3
+  explained  CTX   legs from 2017.06.02 16:00 / 2017.05.31  1
+  explained  CTX   legs from 2017.06.09 00:00 / 2017.06.13  1
+  explained  CTX   legs from 2017.07.17 20:00 / 2017.06.23  1
+  explained  CTX   legs from 2017.07.20 16:00 / 2017.06.23  3
+  explained  CTX   legs from 2017.08.16 20:00 / 2017.08.17  1
+  explained  CTX   legs from 2017.08.25 12:00 / 2017.08.17  3
+  explained  CTX   legs from 2017.10.05 12:00 / 2017.09.26  2
+  explained  CTX   legs from 2017.10.26 16:00 / 2017.11.01  1
+  explained  CTX   legs from 2017.11.03 16:00 / 2017.11.06  1
+  explained  CTX   legs from 2017.12.05 20:00 / 2017.12.06  2
+  explained  CTX   legs from 2017.12.20 16:00 / 2017.12.26  5
+  explained  CTX   legs from 2018.01.12 08:00 / 2017.12.26  2
+  explained  CTX   legs from 2018.01.19 04:00 / 2017.12.26  3
+  explained  CTX   legs from 2018.01.30 12:00 / 2017.12.26  2
+  explained  CTX   the transitions opened at different CHOC 2
+  explained  POI   H4 direction on its bar: v2.53 +1, the o 4
+  explained  POI   H4 direction on its bar: v2.53 -1, the o 9
+  explained  POI   H4 direction on its bar: v2.54 +1, the o 7
+  explained  POI   H4 direction on its bar: v2.54 -1, the o 2
+  explained  POI   the POI exists in one version only, its  40
+  explained  POI   the POI window is first-in first-out: sh 66
+
+PASS  guard: untouched v2.54 run                                                      -> explained (want explained)
+PASS  guard: INTERNAL row behind a v2.53-only CHOCH removed                           -> PENDING_ATTRIBUTION (want not explained)
+PASS  guard: INTERNAL row whose close breaks its protected level                      -> UNEXPLAINED (want UNEXPLAINED)
+PASS  guard: PROT BREAK level is not the CHOCH swing                                  -> UNEXPLAINED (want UNEXPLAINED)
+PASS  guard: v2.54 CHOCH without its PROT BREAK row                                   -> UNEXPLAINED (want UNEXPLAINED)
+PASS  guard: TRANS_SAMELEG on a swing formed after the CHOCH                          -> UNEXPLAINED (want UNEXPLAINED)
+PASS  guard: H4 close of an event bar changed                                         -> UNEXPLAINED (want UNEXPLAINED)
+PASS  guard: first BOS logged with str 9                                              -> UNEXPLAINED (want UNEXPLAINED)
+PASS  guard: POI made in v2.54 only, before any H4 direction difference               -> UNEXPLAINED (want UNEXPLAINED)
+
+9/9 attribution guards as expected
+exit=0
+
+## the same runs written as MT5 logs, ReloadTest.ps1 -Source USDJPY#0A53,M5 -Versus USDJPY#0B54,M5
+### eur
+model verdicts: explained 302   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  DIFFERENT VERSIONS (2.53 / 2.54) - not a repaint test; MODEL upgrade regression only.
+  structure attribution (v2.53 -> v2.54, whole build): CTX events 161 / 135; de-duplicated bars in v2.54: 70, first 2017.04.24 00:00
+    CTX P-4 protected level / internal    25
+    CTX P-5 old structure                 10
+    CTX P-7 failure first                  0
+    CTX transition opened elsewhere        2
+    CTX swing processed earlier            0
+    CTX inside an explained divergence   103
+    CTX leg attribute (str / messy)       34
+    CTX PENDING_ATTRIBUTION                0
+    CTX UNEXPLAINED                        0
+    chain differences in the common region: POI 128
+    verdicts: explained 302   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 0 MODEL difference(s) over 1 / 1 row(s); all 302 difference(s) traced to BRI-12 (protected level / new structure) with a concrete link
+### s11
+model verdicts: explained 171   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  DIFFERENT VERSIONS (2.53 / 2.54) - not a repaint test; MODEL upgrade regression only.
+  structure attribution (v2.53 -> v2.54, whole build): CTX events 90 / 78; de-duplicated bars in v2.54: 24, first 2026.01.13 00:00
+    CTX P-4 protected level / internal     8
+    CTX P-5 old structure                  2
+    CTX P-7 failure first                  0
+    CTX transition opened elsewhere        2
+    CTX swing processed earlier            0
+    CTX inside an explained divergence    44
+    CTX leg attribute (str / messy)       29
+    CTX PENDING_ATTRIBUTION                0
+    CTX UNEXPLAINED                        0
+    chain differences in the common region: POI 86
+    verdicts: explained 171   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 0 MODEL difference(s) over 1 / 1 row(s); all 171 difference(s) traced to BRI-12 (protected level / new structure) with a concrete link
+### s37
+model verdicts: explained 200   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  DIFFERENT VERSIONS (2.53 / 2.54) - not a repaint test; MODEL upgrade regression only.
+  structure attribution (v2.53 -> v2.54, whole build): CTX events 97 / 85; de-duplicated bars in v2.54: 38, first 2026.01.09 04:00
+    CTX P-4 protected level / internal    11
+    CTX P-5 old structure                  8
+    CTX P-7 failure first                  0
+    CTX transition opened elsewhere        1
+    CTX swing processed earlier            0
+    CTX inside an explained divergence    70
+    CTX leg attribute (str / messy)       19
+    CTX PENDING_ATTRIBUTION                0
+    CTX UNEXPLAINED                        0
+    chain differences in the common region: POI 91
+    verdicts: explained 200   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 0 MODEL difference(s) over 1 / 1 row(s); all 200 difference(s) traced to BRI-12 (protected level / new structure) with a concrete link

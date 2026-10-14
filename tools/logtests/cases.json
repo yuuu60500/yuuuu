@@ -1302,6 +1302,130 @@
    "AGREE BOTH WAYS"
   ]
  },
+ "v01_versus254_model": {
+  "args": [
+   "-Source",
+   "USDJPY#0A53,M5",
+   "-Versus",
+   "USDJPY#0B54,M5"
+  ],
+  "expect": [
+   "verdicts: explained 200   PENDING_ATTRIBUTION 0   UNEXPLAINED 0",
+   "all 200 difference(s) traced to BRI-12 (protected level / new structure) with a concrete link",
+   "CTX P-4 protected level / internal",
+   "CTX P-5 old structure"
+  ],
+  "forbid": [
+   "PENDING_ATTRIBUTION - a manual",
+   "UNEXPLAINED - not traced"
+  ]
+ },
+ "v02_versus254_internal_removed": {
+  "args": [
+   "-Source",
+   "USDJPY#0A53,M5",
+   "-Versus",
+   "USDJPY#0B54,M5"
+  ],
+  "expect": [
+   "states equal going in, and no BRI-12 row on this bar links it",
+   "the divergence start is not explained"
+  ],
+  "forbid": [
+   "traced to BRI-12 (protected level / new structure) with a concrete link"
+  ]
+ },
+ "v03_versus254_internal_prot_broken": {
+  "args": [
+   "-Source",
+   "USDJPY#0A53,M5",
+   "-Versus",
+   "USDJPY#0B54,M5"
+  ],
+  "expect": [
+   "pt past the protected level",
+   "that close is a CHOCH",
+   "UNEXPLAINED - not traced"
+  ],
+  "forbid": [
+   "traced to BRI-12 (protected level / new structure) with a concrete link"
+  ]
+ },
+ "v04_versus254_break_level": {
+  "args": [
+   "-Source",
+   "USDJPY#0A53,M5",
+   "-Versus",
+   "USDJPY#0B54,M5"
+  ],
+  "expect": [
+   "is not the CHOCH swing",
+   "UNEXPLAINED - not traced"
+  ],
+  "forbid": [
+   "traced to BRI-12 (protected level / new structure) with a concrete link"
+  ]
+ },
+ "v05_versus254_choch_no_prot": {
+  "args": [
+   "-Source",
+   "USDJPY#0A53,M5",
+   "-Versus",
+   "USDJPY#0B54,M5"
+  ],
+  "expect": [
+   "a v2.54 CHOCH without HMI-PROT BREAK / FALLBACK on its bar",
+   "UNEXPLAINED - not traced"
+  ],
+  "forbid": [
+   "traced to BRI-12 (protected level / new structure) with a concrete link"
+  ]
+ },
+ "v06_versus254_sameleg_late": {
+  "args": [
+   "-Source",
+   "USDJPY#0A53,M5",
+   "-Versus",
+   "USDJPY#0B54,M5"
+  ],
+  "expect": [
+   "TRANS_SAMELEG on a swing formed at / after the CHOCH close",
+   "UNEXPLAINED - not traced"
+  ],
+  "forbid": [
+   "traced to BRI-12 (protected level / new structure) with a concrete link"
+  ]
+ },
+ "v07_versus254_messy_flip": {
+  "args": [
+   "-Source",
+   "USDJPY#0A53,M5",
+   "-Versus",
+   "USDJPY#0B54,M5"
+  ],
+  "expect": [
+   "but the rule gives 0 from this build's own events",
+   "UNEXPLAINED - not traced"
+  ],
+  "forbid": [
+   "traced to BRI-12 (protected level / new structure) with a concrete link"
+  ]
+ },
+ "v08_versus254_fallback_with_level": {
+  "args": [
+   "-Source",
+   "USDJPY#0A53,M5",
+   "-Versus",
+   "USDJPY#0B54,M5"
+  ],
+  "expect": [
+   "P-6b applies to an INVALID leg only",
+   "UNEXPLAINED - not traced"
+  ],
+  "forbid": [
+   "traced to BRI-12 (protected level / new structure) with a concrete link"
+  ]
+ },
  "c09_ctx_strength_only": {
   "args": [
    "-Source",

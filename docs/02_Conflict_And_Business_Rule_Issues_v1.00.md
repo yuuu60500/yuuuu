@@ -879,7 +879,20 @@ A-65 修复前后在这段数据上 H4 状态完全相同（固定余量与 ATR 
 H4 状态与 v2.53 不同的 K 线 407 / 1292；H4 POI 事件只在 v2.53 70 条、只在 v2.54 58 条。逐根截断无重绘。
 模型只覆盖 H4；Session、M5 区块与 MODEL 的变化要在 MT5 里比较。
 
-**跨版本归因（待做的工具项）：** 现有 `-Versus` 只认 BOS 去重。v2.54 的差异须逐条连到具体日志证据：
-v2.53 的 CHOCH 在 v2.54 同一根同一摆动点记为 HMI-CTX-INTERNAL（P-4）；v2.53 的 TRANS_OK / TRANS_FAIL 在 v2.54 同一根
-记为 TRANS_SAMELEG 且该点形成于 CHOCH 之前（P-5）；v2.54 的 CHOCH 有 HMI-PROT BREAK / FALLBACK 行；
-其后的状态差异由第一个已解释的差异传播。方法先在离线模型中实现并自测，再移植到 ReloadTest。
+**跨版本归因（v2.54r4 完成，`tools/h4_protect_attr.py` 离线模型 + `ReloadTest -Versus` BRI-12 模式）：**
+新版本 ≥ 2.54、旧版本 < 2.54 时启用。每条差异连到日志里的具体行，不以「发生在规则改动之后」解释：
+- 日志自洽（否则 UNEXPLAINED）：v2.54 每条 CHOCH 同根有 HMI-PROT BREAK（level = 该 CHOCH 摆动价）或 FALLBACK；
+  FALLBACK 只出现在从未有过保护点的段；INTERNAL 的收盘越过自己的摆动点、未越过保护点（按日志余量）；
+  TRANS_SAMELEG 的摆动点形成于 CHOCH 之前；str 与 messy 符合规则；收盘与摆动价两版一致
+- 进入该根时两版状态相同：差异须由本根的 BRI-12 行解释 —— P-4（v2.54 CHOCH 有 BREAK；或 v2.53 CHOCH 的摆动点在 v2.54
+  同根记为 INTERNAL）、P-5（v2.53 TRANS_OK / FAIL ↔ v2.54 TRANS_SAMELEG，同一摆动点、形成于 CHOCH 之前）、
+  P-7（INVALID 段的 FALLBACK 与 v2.53 先判向上）、两版的 TRANSITION 由不同且已解释的 CHOCH 打开（超时与新结构各按自己的 CHOCH 计）、
+  摆动点已被另一版更早处理（注明时间与来源行）及其后同根改引用的下一个摆动点；否则 PENDING_ATTRIBUTION
+- 进入该根时两版状态不同：只在「起点已解释」的分歧区间内解释（状态差异本身来自两版日志的 ctx 字段）
+- 段属性（str / messy）：两版各自符合规则，且较早的段起点以来的差异全部已解释
+- 链路（POI → Session → Block → ARMED → MODEL）：沿用 A-57 / A-58 规则；凡以 H4 方向不同作理由的，该时刻须处在起点已解释的分歧区间内；
+  POI 在另一版已被已解释的 OUT 移出窗口后，其 INVALID / EXPIRED 只在一版出现 → 已解释
+- 限制：分歧区间内各行不逐行重推（日志只有事件根的收盘），只核对各版自身规则；M5 链路只能在 MT5 日志上验证
+验证：离线模型 EURUSD 302 / 0 / 0、合成序列（种子 37）200 / 0 / 0、篡改防护 9/9；同一运行写成 MT5 日志后
+ReloadTest 与模型逐类一致（EURUSD 302、种子 11 171、种子 37 200，均 0 PENDING / 0 UNEXPLAINED）；logtests v01–v08
+（种子 37 与 7 种篡改），v2.54r3 脚本 8 组全部失败（docs/evidence/v2.54_attribution_offline.txt）

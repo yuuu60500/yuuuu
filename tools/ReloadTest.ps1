@@ -215,9 +215,10 @@ function CtxParse([string]$msg) {
     $f = @{}; foreach ($p in $c[3..($c.Count-1)]) { $kv = $p -split '=', 2; if ($kv.Count -eq 2) { $f[$kv[0]] = $kv[1] } }
     $ev = "{0}|{1}|{2}|{3}|messy={4}" -f $f['bar'], $c[2], $f['dir'], $f['ctx'], $f['messy']
     [pscustomobject]@{ Kind = $c[2]; Dir = $f['dir']; Ctx = $f['ctx']; Bar = (PT16 $f['bar']); BarS = $f['bar']; Swing = $f['swing']
-                       Str = $f['str']; Close = $f['close']; SwPx = $f['swing_px']
+                       Str = $f['str']; Close = $f['close']; SwPx = $f['swing_px']; Messy = $f['messy']
                        Key = "$ev|str=$($f['str'])|$($f['swing'])|$($f['swing_px'])|$($f['close'])"
                        KeyNoStr = "$ev|$($f['swing'])|$($f['swing_px'])|$($f['close'])"
+                       KeyCore = "$($f['bar'])|$($c[2])|$($f['dir'])|$($f['ctx'])|$($f['swing'])|$($f['swing_px'])|$($f['close'])"
                        Event = $ev }
 }
 # v2.54 (BRI-12): HMI-PROT / HMI-ANCHOR / HMI-CTX-INTERNAL rows, judged like
@@ -233,7 +234,7 @@ function ProtParse([string]$msg) {
     $skip = @('live', 'leg', 'inst', 'run', 'init')
     $body = (@($f.Keys | Where-Object { $skip -notcontains $_ } | Sort-Object) | ForEach-Object { "$_=$($f[$_])" }) -join '|'
     $kn = "$tag|$ev|$body"
-    [pscustomobject]@{ Tag = $tag; Ev = $ev; Bar = (PT16 $f['bar']); BarS = $f['bar']; KeyNoLeg = $kn; Key = "$kn|leg=$($f['leg'])" }
+    [pscustomobject]@{ Tag = $tag; Ev = $ev; Bar = (PT16 $f['bar']); BarS = $f['bar']; KeyNoLeg = $kn; Key = "$kn|leg=$($f['leg'])"; F = $f }
 }
 function RowKind([string]$r) { $c = $r -split ','; if ($c.Count -gt 1) { return $c[1] } return '?' }
 function KV([string]$s) { $m = @{}; foreach ($p in ($s -split ',')) { $kv = $p -split '=', 2; if ($kv.Count -eq 2) { $m[$kv[0].Trim()] = $kv[1].Trim() } }; return $m }
@@ -715,6 +716,15 @@ function DoubleConsumed($bk) {
     return [pscustomobject]@{ Proven = $dup; Pending = $pend }
 }
 
+# Points a close is beyond a level in direction dir ('UP' above, 'DOWN' below);
+# $null when a price is missing, not a number or of another precision.
+function PtsBeyond([string]$close, [string]$level, [string]$dir) {
+    if (-not (PxOk $close) -or -not (PxOk $level) -or (PxDigits $close) -ne (PxDigits $level)) { return $null }
+    $ic = [Globalization.CultureInfo]::InvariantCulture; $pt = [Math]::Pow(10, -(PxDigits $level))
+    $x = [Math]::Round(([double]::Parse($close, $ic) - [double]::Parse($level, $ic)) / $pt)
+    if ($dir -eq 'DOWN') { $x = -$x }
+    return [int]$x
+}
 # v2.54r2 (BRI-12, reviewer P1 2026-10-13): a protected level / leg anchor is
 # never installed when the very close that installs it has broken it. The
 # log proves this one bar: the BOS / TRANS_OK / TRANS_FAIL row of the same
@@ -1002,16 +1012,27 @@ function DiffKeys($a, $b, [string]$prop = 'Key') {
 function KVfrom([string[]]$c, [int]$from) { $f = @{}; for ($i = $from; $i -lt $c.Count; $i++) { $kv = $c[$i] -split '=', 2; if ($kv.Count -eq 2) { $f[$kv[0]] = $kv[1] } }; return $f }
 function Get-Struct($bk) {
     if ($bk.PSObject.Properties['Struct']) { return $bk.Struct }
-    $ctx = New-Object System.Collections.ArrayList; $proc = @{}; $dedupN = 0; $tDedup = [datetime]::MaxValue
+    $ctx = New-Object System.Collections.ArrayList; $proc = @{}; $procSrc = @{}; $dedupN = 0; $tDedup = [datetime]::MaxValue
     $poiById = @{}; $sessById = @{}; $blkById = @{}
     $poi = New-Object System.Collections.ArrayList; $sess = New-Object System.Collections.ArrayList
     $blk = New-Object System.Collections.ArrayList; $arm = New-Object System.Collections.ArrayList
     $prot = New-Object System.Collections.ArrayList
     foreach ($m in $bk.Lines) {
-        if ($m -match '^HMI-(PROT|ANCHOR|CTX-INTERNAL),') { $pr = ProtParse $m; if ($pr) { [void]$prot.Add($pr) }; continue }
+        if ($m -match '^HMI-(PROT|ANCHOR|CTX-INTERNAL),') {
+            $pr = ProtParse $m
+            if ($pr) {
+                [void]$prot.Add($pr)
+                if ($pr.Tag -eq 'HMI-CTX-INTERNAL') {                  # v2.54: an internal swing is processed too
+                    $sw = @("$($pr.F['swing'])@") + @(([string]$pr.F['swings'] -split '\|') | Where-Object { $_ })
+                    foreach ($x in $sw) { $st = ($x -split '@')[0]; $k = "$($pr.F['dir'])|$st"
+                        if ($st -and -not $proc.ContainsKey($k)) { $proc[$k] = $pr.Bar; $procSrc[$k] = 'INTERNAL' } }
+                }
+            }
+            continue
+        }
         if ($m -match '^HMI-CTX,') {
             $r = CtxParse $m
-            if ($r) { [void]$ctx.Add($r); if ($r.Swing) { $k = "$($r.Dir)|$($r.Swing)"; if (-not $proc.ContainsKey($k)) { $proc[$k] = $r.Bar } } }
+            if ($r) { [void]$ctx.Add($r); if ($r.Swing) { $k = "$($r.Dir)|$($r.Swing)"; if (-not $proc.ContainsKey($k)) { $proc[$k] = $r.Bar; $procSrc[$k] = $r.Kind } } }
             continue
         }
         if ($m -match '^HMI-CTX-DEDUP,') {
@@ -1019,7 +1040,7 @@ function Get-Struct($bk) {
             $bar = PT16 $f['bar']; $dedupN++; if ($bar -lt $tDedup) { $tDedup = $bar }
             foreach ($s in ([string]$f['swings'] -split '\|')) {
                 $st = ($s -split '@')[0]; $k = "$($f['dir'])|$st"
-                if ($st -and -not $proc.ContainsKey($k)) { $proc[$k] = $bar }
+                if ($st -and -not $proc.ContainsKey($k)) { $proc[$k] = $bar; $procSrc[$k] = "$(($m -split ',')[2]) de-dup" }
             }
             continue
         }
@@ -1065,7 +1086,7 @@ function Get-Struct($bk) {
     $blkBy = @{}; foreach ($x in $blk) { if (-not $blkBy.ContainsKey($x.B)) { $blkBy[$x.B] = $x } }
     $armOf = @{}; foreach ($x in @($arm | Sort-Object Time)) { if (-not $armOf.ContainsKey($x.BlockId)) { $armOf[$x.BlockId] = New-Object System.Collections.ArrayList }; [void]$armOf[$x.BlockId].Add($x) }
     $poiNew = @{}; foreach ($x in $poi) { if ($x.Kind -eq 'NEW' -and -not $poiNew.ContainsKey($x.P)) { $poiNew[$x.P] = $x } }
-    $s = [pscustomobject]@{ Ctx = $ctx; Proc = $proc; DedupN = $dedupN; TDedup = $tDedup; Prot = $prot
+    $s = [pscustomobject]@{ Ctx = $ctx; Proc = $proc; ProcSrc = $procSrc; DedupN = $dedupN; TDedup = $tDedup; Prot = $prot
                             Poi = $poi; Sess = $sess; Blk = $blk; Arm = $arm; Models = $models
                             SessStart = $sessStart; SessEnd = $sessEnd; Starts = @($sess | Where-Object { $_.Kind -eq 'START' } | Sort-Object Time)
                             BlkBy = $blkBy; ArmOf = $armOf; ArmSorted = @($arm | Sort-Object Time); PoiNew = $poiNew }
@@ -1255,59 +1276,249 @@ function Show-StructAttribution($Old, $New, [datetime]$rs, [datetime]$re) {
         & $verdict 'UNEXPLAINED' "CTX $($r.Key)" "str=$($r.Str) but the strength rule gives $($r.StrRule) from this build's own events"
     }
 
-    # ---- CTX differences ---------------------------------------------------------
-    $d0 = DiffKeys $so.Ctx $sn.Ctx 'KeyNoStr'
-    $cls = [ordered]@{ 'suppressed duplicate' = 0; 'primary re-referenced' = 0; 'strength renumbered' = 0; 'PENDING_ATTRIBUTION' = 0; 'UNEXPLAINED' = 0 }
-    $explainedCtx = @{}
-    $newByEvent = @{}
-    foreach ($y in $d0.B) { if (-not $newByEvent.ContainsKey($y.Event)) { $newByEvent[$y.Event] = New-Object System.Collections.ArrayList }; [void]$newByEvent[$y.Event].Add($y) }
-    $paired = @{}
-    foreach ($x in $d0.A) {
-        if (-not $sn.DedupN -or $x.Bar -lt $tD) { $cls['UNEXPLAINED']++; & $verdict 'UNEXPLAINED' "CTX v$($Old.Ver) only $($x.Key)" 'before the first de-dup the two versions are the same code path'; continue }
-        $k = "$($x.Dir)|$($x.Swing)"
-        $dup = [bool]$x.Swing -and $sn.Proc.ContainsKey($k) -and $sn.Proc[$k] -lt $x.Bar
-        $mate = $null
-        if ($newByEvent.ContainsKey($x.Event)) { foreach ($y in $newByEvent[$x.Event]) { if (-not $paired.ContainsKey((ObjId $y))) { $mate = $y; break } } }
-        if ($dup -and $mate -and $sn.Proc["$($mate.Dir)|$($mate.Swing)"] -eq $mate.Bar) {
-            $paired[(ObjId $mate)] = 1; $cls['primary re-referenced']++; $explainedCtx[(ObjId $x)] = 1; $explainedCtx[(ObjId $mate)] = 1
-            & $verdict 'explained' "CTX $($x.Key)  ->  $($mate.Key)" "same bar and event; v$($New.Ver) processed swing $($x.Swing) at $($sn.Proc[$k].ToString('yyyy.MM.dd HH:mm')), so the next swing this close breaks for the first time ($($mate.Swing)) is the primary"
-        } elseif ($dup) {
-            $cls['suppressed duplicate']++; $explainedCtx[(ObjId $x)] = 1
-            & $verdict 'explained' "CTX v$($Old.Ver) only $($x.Key)" "swing $($x.Swing) was processed by v$($New.Ver) at $($sn.Proc[$k].ToString('yyyy.MM.dd HH:mm')) (de-dup): v$($Old.Ver) counts it again"
-        } else {
-            $cls['PENDING_ATTRIBUTION']++; & $verdict 'PENDING_ATTRIBUTION' "CTX v$($Old.Ver) only $($x.Key)" 'after a de-dup, but its swing was not processed earlier by the newer build and no paired event exists'
-        }
-    }
-    foreach ($y in $d0.B) {
-        if ($paired.ContainsKey((ObjId $y))) { continue }
-        if (-not $sn.DedupN -or $y.Bar -lt $tD) { $cls['UNEXPLAINED']++; & $verdict 'UNEXPLAINED' "CTX v$($New.Ver) only $($y.Key)" 'before the first de-dup the two versions are the same code path'; continue }
-        $cls['PENDING_ATTRIBUTION']++; & $verdict 'PENDING_ATTRIBUTION' "CTX v$($New.Ver) only $($y.Key)" 'after a de-dup, not paired with a duplicate the older build counted at this bar'
-    }
-    # same event, same swing, other str: explained only when both values follow
-    # the rule, both legs start at the same event, and every BOS one leg has and
-    # the other has not is itself an explained duplicate / re-reference
-    $byO = @{}; foreach ($r in $so.Ctx) { if (-not $byO.ContainsKey($r.KeyNoStr)) { $byO[$r.KeyNoStr] = New-Object System.Collections.ArrayList }; [void]$byO[$r.KeyNoStr].Add($r) }
-    $byN = @{}; foreach ($r in $sn.Ctx) { if (-not $byN.ContainsKey($r.KeyNoStr)) { $byN[$r.KeyNoStr] = New-Object System.Collections.ArrayList }; [void]$byN[$r.KeyNoStr].Add($r) }
-    $legDiff = @(@($d0.A) + @($d0.B) | Where-Object { $_.Kind -eq 'BOS' })
-    foreach ($k in $byO.Keys) {
-        if (-not $byN.ContainsKey($k)) { continue }
-        $n = [Math]::Min($byO[$k].Count, $byN[$k].Count)
-        for ($j = 0; $j -lt $n; $j++) {
-            $o = $byO[$k][$j]; $w = $byN[$k][$j]
-            if ($o.Str -eq $w.Str) { continue }
-            if ($badIds.ContainsKey((ObjId $o)) -or $badIds.ContainsKey((ObjId $w))) { continue }     # already UNEXPLAINED above
-            $inLeg = @($legDiff | Where-Object { $_.Leg -eq $o.Leg -and $_.Bar -le $o.Bar })
-            $allOk = (@($inLeg | Where-Object { -not $explainedCtx.ContainsKey((ObjId $_)) }).Count -eq 0)
-            if ($o.Leg -eq $w.Leg -and $inLeg.Count -gt 0 -and $allOk) {
-                $cls['strength renumbered']++
-                & $verdict 'explained' "CTX $($o.Key)  ->  str=$($w.Str)" ("leg from {0}: {1} BOS counted by one version only, each an explained duplicate; both values follow the rule" -f $o.Leg.ToString('yyyy.MM.dd HH:mm'), $inLeg.Count)
-            } else {
-                $cls['PENDING_ATTRIBUTION']++
-                & $verdict 'PENDING_ATTRIBUTION' "CTX $($o.Key)  ->  str=$($w.Str)" $(if ($o.Leg -ne $w.Leg) { 'the two legs start at different events' } else { 'the strength difference is not covered by explained duplicates in this leg' })
+    # A chain row explained by an H4 direction difference needs that difference
+    # to be explained too. v2.53 (de-dup) never kept the states apart for long;
+    # v2.54 does, so there it must sit in a divergence whose first bar is explained.
+    $divOk = { param([datetime]$t, [bool]$m5) $true }
+    $p254 = ((VerNum $New.Ver) -ge [decimal]2.54 -and (VerNum $Old.Ver) -lt [decimal]2.54)
+    if ($p254) {
+        # ---- BRI-12 (v2.53 -> v2.54): every difference hangs on a row of the logs --------
+        # (offline model and guards: tools/h4_protect_attr.py)
+        $cls = [ordered]@{ 'P-4 protected level / internal' = 0; 'P-5 old structure' = 0; 'P-7 failure first' = 0
+                           'transition opened elsewhere' = 0; 'swing processed earlier' = 0; 'inside an explained divergence' = 0
+                           'leg attribute (str / messy)' = 0; 'PENDING_ATTRIBUTION' = 0; 'UNEXPLAINED' = 0 }
+        $co = @($so.Ctx | Sort-Object Bar); $cn = @($sn.Ctx | Sort-Object Bar)
+        $symN = ($New.Src -split ',')[0]
+        $mgN = $(if ($margin.ContainsKey($symN)) { $margin[$symN] } elseif ($margin.ContainsKey(($symN -split '#')[0])) { $margin[($symN -split '#')[0]] } else { $null })
+        $ux = { param([string]$what, [string]$why) $cls['UNEXPLAINED']++; & $verdict 'UNEXPLAINED' $what $why }
+        # the messy rule (CtxEnter clears it, TRANS_FAIL sets it, a BOS in the trend keeps it)
+        foreach ($rows in @(,$co) + @(,$cn)) {
+            $m = $false
+            foreach ($r in $rows) {
+                switch ($r.Kind) { 'CHOCH' { $m = $false } 'TIMEOUT' { $m = $false } 'TRANS_OK' { $m = $false } 'TRANS_FAIL' { $m = $true }
+                                   'BOS' { if ($r.Leg -eq $r.Bar) { $m = $false } } }
+                if ((([string]$r.Messy) -eq '1') -ne $m -and -not $badIds.ContainsKey((ObjId $r))) {
+                    $badIds[(ObjId $r)] = 1; & $ux "CTX $($r.Key)" "messy=$($r.Messy) but the rule gives $([int]$m) from this build's own events" }
             }
         }
+        # the v2.54 log must agree with itself
+        $protAt = @{}
+        foreach ($p in @($sn.Prot | Where-Object { $_.Tag -eq 'HMI-PROT' })) { $k = $p.Bar.Ticks; if (-not $protAt.ContainsKey($k)) { $protAt[$k] = New-Object System.Collections.ArrayList }; [void]$protAt[$k].Add($p) }
+        $lastChoch = { param($rows, [datetime]$t) $b = $null; foreach ($r in $rows) { if ($r.Bar -ge $t) { break }; if ($r.Kind -eq 'CHOCH') { $b = $r.Bar } }; return $b }
+        foreach ($r in $cn) {
+            if ($r.Kind -eq 'CHOCH') {
+                $ends = @($(if ($protAt.ContainsKey($r.Bar.Ticks)) { $protAt[$r.Bar.Ticks] | Where-Object { $_.Ev -eq 'BREAK' -or $_.Ev -eq 'FALLBACK' } }))
+                if (-not $ends.Count) { & $ux "CTX v$($New.Ver) $($r.Key)" 'a v2.54 CHOCH without HMI-PROT BREAK / FALLBACK on its bar' }
+                elseif ($ends[0].Ev -eq 'BREAK' -and $ends[0].F['level'] -ne $r.SwPx) { & $ux "CTX v$($New.Ver) $($r.Key)" "HMI-PROT BREAK level $($ends[0].F['level']) is not the CHOCH swing $($r.SwPx)" }
+            } elseif ($r.Kind -eq 'TRANS_SAMELEG') {
+                $tch = & $lastChoch $cn $r.Bar
+                if ($tch -and (PT16 $r.Swing) -ge $tch) { & $ux "CTX v$($New.Ver) $($r.Key)" "TRANS_SAMELEG on a swing formed at / after the CHOCH close $(T16 $tch): P-5 accepts that swing" }
+            }
+        }
+        $legLv = @{}
+        foreach ($p in @($sn.Prot | Where-Object { $_.Tag -eq 'HMI-PROT' })) {
+            if ($p.Ev -eq 'FALLBACK' -and $legLv.ContainsKey($p.F['leg'])) { & $ux "PROT FALLBACK $($p.BarS) leg $($p.F['leg'])" 'the leg had a protected level - P-6b applies to an INVALID leg only' }
+            if ($p.F['level'] -and $p.F['level'] -ne 'NA') { $legLv[$p.F['leg']] = 1 }
+        }
+        $intAt = @{}
+        foreach ($p in @($sn.Prot | Where-Object { $_.Tag -eq 'HMI-CTX-INTERNAL' })) {
+            $f = $p.F; $what = "INTERNAL $($p.BarS) swing $($f['swing']) @ $($f['swing_px'])"
+            $k = $p.Bar.Ticks; if (-not $intAt.ContainsKey($k)) { $intAt[$k] = New-Object System.Collections.ArrayList }; [void]$intAt[$k].Add($p)
+            $xs = PtsBeyond $f['close'] $f['swing_px'] $f['dir']
+            if ($xs -eq $null) { $cls['PENDING_ATTRIBUTION']++; & $verdict 'PENDING_ATTRIBUTION' $what 'close or swing price not judgeable' }
+            elseif ($xs -le 0 -or ($mgN -ne $null -and $mgN -ge 0 -and $xs -le $mgN)) { & $ux $what "close $($f['close']) does not break its own swing by more than the margin" }
+            if ($f['prot'] -and $f['prot'] -ne 'NA') {
+                $xp = PtsBeyond $f['close'] $f['prot'] $f['dir']
+                if ($xp -ne $null -and $xp -gt 0) {
+                    if ($mgN -ne $null -and $mgN -ge 0) { if ($xp -gt $mgN) { & $ux $what "close $($f['close']) is $xp pt past the protected level $($f['prot']) (> margin $mgN): that close is a CHOCH" } }
+                    else { $cls['PENDING_ATTRIBUTION']++; & $verdict 'PENDING_ATTRIBUTION' $what "close is $xp pt past the protected level $($f['prot']); the margin is per bar / not logged" }
+                }
+            }
+        }
+        # ---- differences, bar by bar ----
+        $d0 = DiffKeys $co $cn 'KeyCore'
+        $atO = @{}; foreach ($r in $d0.A) { $k = $r.Bar.Ticks; if (-not $atO.ContainsKey($k)) { $atO[$k] = New-Object System.Collections.ArrayList }; [void]$atO[$k].Add($r) }
+        $atN = @{}; foreach ($r in $d0.B) { $k = $r.Bar.Ticks; if (-not $atN.ContainsKey($k)) { $atN[$k] = New-Object System.Collections.ArrayList }; [void]$atN[$k].Add($r) }
+        $evbars = @(@($co | ForEach-Object { $_.Bar.Ticks }) + @($cn | ForEach-Object { $_.Bar.Ticks }) | Sort-Object -Unique)
+        $afterO = @{}; $afterN = @{}; $stA = 'RANGE'; $stB = 'RANGE'; $ia = 0; $ib = 0
+        foreach ($b in $evbars) {
+            while ($ia -lt $co.Count -and $co[$ia].Bar.Ticks -le $b) { $stA = $co[$ia].Ctx; $ia++ }
+            while ($ib -lt $cn.Count -and $cn[$ib].Bar.Ticks -le $b) { $stB = $cn[$ib].Ctx; $ib++ }
+            $afterO[$b] = $stA; $afterN[$b] = $stB
+        }
+        $divStart = @{}; $cur = $null; $prevEq = $true
+        foreach ($b in $evbars) {
+            $eq = ($afterO[$b] -eq $afterN[$b])
+            if (-not $eq -and $prevEq) { $cur = $b }
+            $divStart[$b] = $(if ($eq) { $null } else { $cur })
+            $prevEq = $eq
+        }
+        $barOk = @{}; $explainedCtx = @{}
+        $before = { param([long]$tk) $last = $null; foreach ($b in $evbars) { if ($b -lt $tk) { $last = $b } else { break } }; return $last }
+        $stBefore = { param($rows, [datetime]$t) $st = 'RANGE'; foreach ($r in $rows) { if ($r.Bar -lt $t) { $st = $r.Ctx } else { break } }; return $st }
+        $note = { param($r, [string]$who, [string]$cat, [string]$why) $explainedCtx[(ObjId $r)] = 1; $cls[$cat]++; & $verdict 'explained' "CTX v$who only $($r.Key)" $why }
+        foreach ($tk in @(@($atO.Keys) + @($atN.Keys) | Sort-Object -Unique)) {
+            $t = New-Object DateTime ([long]$tk)
+            $xs = @($(if ($atO.ContainsKey($tk)) { $atO[$tk] })); $ys = @($(if ($atN.ContainsKey($tk)) { $atN[$tk] }))
+            $bo = & $stBefore $co $t; $bn = & $stBefore $cn $t
+            if ($bo -ne $bn) {
+                $lb = & $before $tk; $s0 = $(if ($lb -ne $null) { $divStart[$lb] } else { $null })
+                $ok = ($s0 -ne $null -and $barOk.ContainsKey($s0) -and $barOk[$s0])
+                foreach ($pair in @($xs | ForEach-Object { ,@($_, $Old.Ver) }) + @($ys | ForEach-Object { ,@($_, $New.Ver) })) {
+                    $r = $pair[0]; $who = $pair[1]
+                    if ($ok) { & $note $r $who 'inside an explained divergence' ("states differ going in (v{0} {1} / v{2} {3}) since {4}, an explained difference" -f $Old.Ver, $bo, $New.Ver, $bn, (T16 (New-Object DateTime ([long]$s0)))) }
+                    else { $cls['PENDING_ATTRIBUTION']++; & $verdict 'PENDING_ATTRIBUTION' "CTX v$who only $($r.Key)" ("states differ going in (v{0} {1} / v{2} {3}); the divergence start is not explained" -f $Old.Ver, $bo, $New.Ver, $bn) }
+                }
+                $barOk[$tk] = $ok; continue
+            }
+            $why = @{}; $cat = @{}
+            $set = { param($r, [string]$c, [string]$w) if (-not $why.ContainsKey((ObjId $r))) { $why[(ObjId $r)] = $w; $cat[(ObjId $r)] = $c } }
+            # P-4: a v2.54 CHOCH at the leg's protected level; P-7: failure first in an INVALID leg
+            foreach ($y in @($ys | Where-Object { $_.Kind -eq 'CHOCH' })) {
+                $ends = @($(if ($protAt.ContainsKey($tk)) { $protAt[$tk] | Where-Object { $_.Ev -eq 'BREAK' -or $_.Ev -eq 'FALLBACK' } }))
+                if ($ends.Count -and $ends[0].Ev -eq 'BREAK' -and $ends[0].F['level'] -eq $y.SwPx) {
+                    & $set $y 'P-4 protected level / internal' "P-4: the leg's protected level $($y.SwPx) broken by close $($y.Close) (HMI-PROT BREAK)"
+                    foreach ($x in $xs) { & $set $x 'P-4 protected level / internal' "P-4 / P-7: on this bar v2.54 judged the leg's failure at its protected level first; v2.53 $($x.Kind) by the latest swing" }
+                } elseif ($ends.Count -and $ends[0].Ev -eq 'FALLBACK') {
+                    foreach ($x in @($xs | Where-Object { $_.Kind -eq 'BOS' -and $_.Dir -ne $y.Dir })) {
+                        & $set $y 'P-7 failure first' 'P-7: failure first - v2.54 (INVALID leg, P-6b) broke the latest swing before checking the other side'
+                        & $set $x 'P-7 failure first' "P-7: v2.53 checked the other side first on the same close" }
+                }
+            }
+            # P-4: a v2.53 CHOCH whose swing v2.54 processed as internal on this bar
+            foreach ($x in @($xs | Where-Object { $_.Kind -eq 'CHOCH' })) {
+                if (-not $intAt.ContainsKey($tk)) { continue }
+                foreach ($it in $intAt[$tk]) {
+                    $sw = @($it.F['swing']) + @(([string]$it.F['swings'] -split '\|') | Where-Object { $_ } | ForEach-Object { ($_ -split '@')[0] })
+                    if ($it.F['dir'] -eq $x.Dir -and $sw -contains $x.Swing) {
+                        & $set $x 'P-4 protected level / internal' ("P-4: v2.54 processed swing {0} as internal on this bar (HMI-CTX-INTERNAL), protected level {1} not broken by close {2}" -f $x.Swing, $it.F['prot'], $it.F['close']) }
+                }
+            }
+            # P-5: old structure
+            foreach ($x in @($xs | Where-Object { $_.Kind -eq 'TRANS_OK' -or $_.Kind -eq 'TRANS_FAIL' })) {
+                foreach ($y in @($ys | Where-Object { $_.Kind -eq 'TRANS_SAMELEG' -and $_.Dir -eq $x.Dir -and $_.Swing -eq $x.Swing })) {
+                    $tch = & $lastChoch $cn $t
+                    if ($tch -and (PT16 $x.Swing) -lt $tch) {
+                        $w = "P-5: swing $($x.Swing) formed before the CHOCH close $(T16 $tch) - old structure resolves no transition in v$($New.Ver)"
+                        & $set $x 'P-5 old structure' $w; & $set $y 'P-5 old structure' $w }
+                }
+            }
+            # both in TRANSITION, opened by different CHOCH bars (both explained)
+            if ($bo -eq 'TRANSITION') {
+                $cho = & $lastChoch $co $t; $chn = & $lastChoch $cn $t
+                if ($cho -and $chn -and $cho -ne $chn) {
+                    $src = @(@($atO[$cho.Ticks]) + @($atN[$cho.Ticks]) + @($atO[$chn.Ticks]) + @($atN[$chn.Ticks]) | Where-Object { $_ })
+                    if ($src.Count -and @($src | Where-Object { -not $explainedCtx.ContainsKey((ObjId $_)) }).Count -eq 0) {
+                        foreach ($r in @($xs) + @($ys)) { & $set $r 'transition opened elsewhere' ("the transitions opened at different CHOCH bars (v{0} {1}, v{2} {3}, both explained): the timeout and the new-structure test count from each version's own CHOCH" -f $Old.Ver, (T16 $cho), $New.Ver, (T16 $chn)) }
+                    }
+                }
+            }
+            # a swing the other version had processed on an earlier bar
+            foreach ($pair in @($xs | ForEach-Object { ,@($_, $sn, $New.Ver) }) + @($ys | ForEach-Object { ,@($_, $so, $Old.Ver) })) {
+                $r = $pair[0]; $other = $pair[1]; $ov = $pair[2]
+                if (-not $r.Swing) { continue }
+                $k = "$($r.Dir)|$($r.Swing)"
+                if ($other.Proc.ContainsKey($k) -and $other.Proc[$k] -lt $t) {
+                    & $set $r 'swing processed earlier' ("swing {0} was processed by v{1} at {2} ({3})" -f $r.Swing, $ov, (T16 $other.Proc[$k]), $other.ProcSrc[$k]) }
+            }
+            # re-referenced: the next swing this close breaks for the first time
+            foreach ($pair in @($ys | ForEach-Object { ,@($_, $xs, $sn) }) + @($xs | ForEach-Object { ,@($_, $ys, $so) })) {
+                $r = $pair[0]; $others = $pair[1]; $mine = $pair[2]
+                if ($why.ContainsKey((ObjId $r))) { continue }
+                $mate = @($others | Where-Object { $why.ContainsKey((ObjId $_)) -and $_.Kind -eq $r.Kind -and $_.Dir -eq $r.Dir -and $_.Swing -ne $r.Swing }) | Select-Object -First 1
+                $k = "$($r.Dir)|$($r.Swing)"
+                if ($mate -and $mine.Proc.ContainsKey($k) -and $mine.Proc[$k] -eq $t) {
+                    & $set $r 'swing processed earlier' "re-referenced: the other version had processed $($mate.Swing), so this close breaks $($r.Swing) first" }
+            }
+            $ok = $true
+            foreach ($pair in @($xs | ForEach-Object { ,@($_, $Old.Ver) }) + @($ys | ForEach-Object { ,@($_, $New.Ver) })) {
+                $r = $pair[0]; $who = $pair[1]
+                if ($why.ContainsKey((ObjId $r))) { & $note $r $who $cat[(ObjId $r)] $why[(ObjId $r)] }
+                else { $ok = $false; $cls['PENDING_ATTRIBUTION']++; & $verdict 'PENDING_ATTRIBUTION' "CTX v$who only $($r.Key)" 'states equal going in, and no BRI-12 row on this bar links it' }
+            }
+            $barOk[$tk] = $ok
+        }
+        # leg attributes: the same event with another str / messy
+        $byO = @{}; foreach ($r in $co) { if (-not $byO.ContainsKey($r.KeyCore)) { $byO[$r.KeyCore] = New-Object System.Collections.ArrayList }; [void]$byO[$r.KeyCore].Add($r) }
+        $byN = @{}; foreach ($r in $cn) { if (-not $byN.ContainsKey($r.KeyCore)) { $byN[$r.KeyCore] = New-Object System.Collections.ArrayList }; [void]$byN[$r.KeyCore].Add($r) }
+        $diffs = @(@($d0.A) + @($d0.B))
+        foreach ($k in $byO.Keys) {
+            if (-not $byN.ContainsKey($k)) { continue }
+            $n = [Math]::Min($byO[$k].Count, $byN[$k].Count)
+            for ($j = 0; $j -lt $n; $j++) {
+                $o = $byO[$k][$j]; $w = $byN[$k][$j]
+                if (([string]$o.Str -eq [string]$w.Str -and [string]$o.Messy -eq [string]$w.Messy) -or $badIds.ContainsKey((ObjId $o)) -or $badIds.ContainsKey((ObjId $w))) { continue }
+                $what = "CTX $($o.Key)  ->  str=$($w.Str) messy=$($w.Messy)"
+                $lo = $(if ($o.Leg -lt $w.Leg) { $o.Leg } else { $w.Leg })
+                $win = @($diffs | Where-Object { $_.Bar -ge $lo -and $_.Bar -le $o.Bar })
+                if ($win.Count -and @($win | Where-Object { -not $explainedCtx.ContainsKey((ObjId $_)) }).Count -eq 0) {
+                    $cls['leg attribute (str / messy)']++
+                    & $verdict 'explained' $what ("legs from {0} / {1}: both values follow the rules, and every difference since is explained" -f (T16 $o.Leg), (T16 $w.Leg)) }
+                else { $cls['PENDING_ATTRIBUTION']++; & $verdict 'PENDING_ATTRIBUTION' $what 'leg attribute differs and not every difference since the leg start is explained' }
+            }
+        }
+        $cls['UNEXPLAINED'] += $dataBad + @($badO).Count + @($badN).Count
+        $divOk = { param([datetime]$t, [bool]$m5)
+            $lim = $(if ($m5) { $t.AddMinutes(-5) } else { $t })
+            $last = $null; foreach ($b in $evbars) { if ($b -le $lim.Ticks) { $last = $b } else { break } }
+            if ($last -eq $null) { return $false }
+            $s0 = $divStart[$last]
+            return ($s0 -ne $null -and $barOk.ContainsKey($s0) -and $barOk[$s0]) }
+    } else {
+        # ---- CTX differences ---------------------------------------------------------
+        $d0 = DiffKeys $so.Ctx $sn.Ctx 'KeyNoStr'
+        $cls = [ordered]@{ 'suppressed duplicate' = 0; 'primary re-referenced' = 0; 'strength renumbered' = 0; 'PENDING_ATTRIBUTION' = 0; 'UNEXPLAINED' = 0 }
+        $explainedCtx = @{}
+        $newByEvent = @{}
+        foreach ($y in $d0.B) { if (-not $newByEvent.ContainsKey($y.Event)) { $newByEvent[$y.Event] = New-Object System.Collections.ArrayList }; [void]$newByEvent[$y.Event].Add($y) }
+        $paired = @{}
+        foreach ($x in $d0.A) {
+            if (-not $sn.DedupN -or $x.Bar -lt $tD) { $cls['UNEXPLAINED']++; & $verdict 'UNEXPLAINED' "CTX v$($Old.Ver) only $($x.Key)" 'before the first de-dup the two versions are the same code path'; continue }
+            $k = "$($x.Dir)|$($x.Swing)"
+            $dup = [bool]$x.Swing -and $sn.Proc.ContainsKey($k) -and $sn.Proc[$k] -lt $x.Bar
+            $mate = $null
+            if ($newByEvent.ContainsKey($x.Event)) { foreach ($y in $newByEvent[$x.Event]) { if (-not $paired.ContainsKey((ObjId $y))) { $mate = $y; break } } }
+            if ($dup -and $mate -and $sn.Proc["$($mate.Dir)|$($mate.Swing)"] -eq $mate.Bar) {
+                $paired[(ObjId $mate)] = 1; $cls['primary re-referenced']++; $explainedCtx[(ObjId $x)] = 1; $explainedCtx[(ObjId $mate)] = 1
+                & $verdict 'explained' "CTX $($x.Key)  ->  $($mate.Key)" "same bar and event; v$($New.Ver) processed swing $($x.Swing) at $($sn.Proc[$k].ToString('yyyy.MM.dd HH:mm')), so the next swing this close breaks for the first time ($($mate.Swing)) is the primary"
+            } elseif ($dup) {
+                $cls['suppressed duplicate']++; $explainedCtx[(ObjId $x)] = 1
+                & $verdict 'explained' "CTX v$($Old.Ver) only $($x.Key)" "swing $($x.Swing) was processed by v$($New.Ver) at $($sn.Proc[$k].ToString('yyyy.MM.dd HH:mm')) (de-dup): v$($Old.Ver) counts it again"
+            } else {
+                $cls['PENDING_ATTRIBUTION']++; & $verdict 'PENDING_ATTRIBUTION' "CTX v$($Old.Ver) only $($x.Key)" 'after a de-dup, but its swing was not processed earlier by the newer build and no paired event exists'
+            }
+        }
+        foreach ($y in $d0.B) {
+            if ($paired.ContainsKey((ObjId $y))) { continue }
+            if (-not $sn.DedupN -or $y.Bar -lt $tD) { $cls['UNEXPLAINED']++; & $verdict 'UNEXPLAINED' "CTX v$($New.Ver) only $($y.Key)" 'before the first de-dup the two versions are the same code path'; continue }
+            $cls['PENDING_ATTRIBUTION']++; & $verdict 'PENDING_ATTRIBUTION' "CTX v$($New.Ver) only $($y.Key)" 'after a de-dup, not paired with a duplicate the older build counted at this bar'
+        }
+        # same event, same swing, other str: explained only when both values follow
+        # the rule, both legs start at the same event, and every BOS one leg has and
+        # the other has not is itself an explained duplicate / re-reference
+        $byO = @{}; foreach ($r in $so.Ctx) { if (-not $byO.ContainsKey($r.KeyNoStr)) { $byO[$r.KeyNoStr] = New-Object System.Collections.ArrayList }; [void]$byO[$r.KeyNoStr].Add($r) }
+        $byN = @{}; foreach ($r in $sn.Ctx) { if (-not $byN.ContainsKey($r.KeyNoStr)) { $byN[$r.KeyNoStr] = New-Object System.Collections.ArrayList }; [void]$byN[$r.KeyNoStr].Add($r) }
+        $legDiff = @(@($d0.A) + @($d0.B) | Where-Object { $_.Kind -eq 'BOS' })
+        foreach ($k in $byO.Keys) {
+            if (-not $byN.ContainsKey($k)) { continue }
+            $n = [Math]::Min($byO[$k].Count, $byN[$k].Count)
+            for ($j = 0; $j -lt $n; $j++) {
+                $o = $byO[$k][$j]; $w = $byN[$k][$j]
+                if ($o.Str -eq $w.Str) { continue }
+                if ($badIds.ContainsKey((ObjId $o)) -or $badIds.ContainsKey((ObjId $w))) { continue }     # already UNEXPLAINED above
+                $inLeg = @($legDiff | Where-Object { $_.Leg -eq $o.Leg -and $_.Bar -le $o.Bar })
+                $allOk = (@($inLeg | Where-Object { -not $explainedCtx.ContainsKey((ObjId $_)) }).Count -eq 0)
+                if ($o.Leg -eq $w.Leg -and $inLeg.Count -gt 0 -and $allOk) {
+                    $cls['strength renumbered']++
+                    & $verdict 'explained' "CTX $($o.Key)  ->  str=$($w.Str)" ("leg from {0}: {1} BOS counted by one version only, each an explained duplicate; both values follow the rule" -f $o.Leg.ToString('yyyy.MM.dd HH:mm'), $inLeg.Count)
+                } else {
+                    $cls['PENDING_ATTRIBUTION']++
+                    & $verdict 'PENDING_ATTRIBUTION' "CTX $($o.Key)  ->  str=$($w.Str)" $(if ($o.Leg -ne $w.Leg) { 'the two legs start at different events' } else { 'the strength difference is not covered by explained duplicates in this leg' })
+                }
+            }
+        }
+        $cls['UNEXPLAINED'] += $dataBad + @($badO).Count + @($badN).Count
     }
-    $cls['UNEXPLAINED'] += $dataBad + @($badO).Count + @($badN).Count
     foreach ($k in $cls.Keys) { Write-Host ("    CTX {0,-30} {1,5}" -f $k, $cls[$k]) -ForegroundColor $(if ($k -eq 'UNEXPLAINED' -and $cls[$k]) { 'Red' } elseif ($k -eq 'PENDING_ATTRIBUTION' -and $cls[$k]) { 'Yellow' } else { 'Gray' }) }
 
     # ---- H4 state / direction ----------------------------------------------------
@@ -1367,6 +1578,7 @@ function Show-StructAttribution($Old, $New, [datetime]$rs, [datetime]$re) {
     $poiItems = @(@($dP.A | ForEach-Object { [pscustomobject]@{ X = $_; InOld = $true } }) + @($dP.B | ForEach-Object { [pscustomobject]@{ X = $_; InOld = $false } }) | Sort-Object { $_.X.Time }, { if ($_.X.Kind -eq 'NEW') { 0 } else { 1 } })
     $explainedNewTimes = @()
     $deferPoi = @()
+    $exOut = @{}                                    # "version|POI" -> time of an explained OUT in that version
     foreach ($it in $poiItems) {
         $x = $it.X; $sd = & $side $x $it.InOld; $chainCount.POI++
         $what = "POI v$($sd.Has) only $($x.Key)"
@@ -1374,14 +1586,16 @@ function Show-StructAttribution($Old, $New, [datetime]$rs, [datetime]$re) {
         $inBoth = $pO.ContainsKey($x.P) -and $pN.ContainsKey($x.P)
         if ($x.Kind -eq 'NEW') {
             $dh = DirAt $sd.HasCtx $x.Time $false; $dn = DirAt $sd.NotCtx $x.Time $false
-            if ($dh -ne $dn -and $dh -eq $x.Dir) { $ex["POI|$($x.P)"] = 1; $explainedNewTimes += $x.Time
+            if ($dh -ne $dn -and $dh -eq $x.Dir -and (& $divOk $x.Time $false)) { $ex["POI|$($x.P)"] = 1; $explainedNewTimes += $x.Time
                 & $verdict 'explained' $what "a POI needs the H4 trend in its direction on its own bar: v$($sd.Has) $dh, v$($sd.Hasnt) $dn" }
+            elseif ($dh -ne $dn -and $dh -eq $x.Dir) { & $verdict 'PENDING_ATTRIBUTION' $what "H4 direction differs on its bar (v$($sd.Has) $dh, v$($sd.Hasnt) $dn), but that divergence does not start at an explained difference" }
             else { & $verdict 'PENDING_ATTRIBUTION' $what "H4 direction on its bar is the same in both ($dh) or not its own" }
         } elseif (-not $inBoth) {
             if ($ex.ContainsKey("POI|$($x.P)")) { & $verdict 'explained' $what 'the POI exists in one build only, and its creation is explained' }
             else { & $verdict 'PENDING_ATTRIBUTION' $what 'the POI exists in one build only and its creation is not explained' }
         } elseif ($x.Kind -eq 'OUT') {
             if (@($explainedNewTimes | Where-Object { $_ -le $x.Time }).Count) { $ex["POIEV|$($x.Key)"] = 1
+                if (-not $exOut.ContainsKey("$($sd.Has)|$($x.P)")) { $exOut["$($sd.Has)|$($x.P)"] = $x.Time }
                 & $verdict 'explained' $what 'the POI window is first-in first-out: an explained POI made in one build only by then shifts it' }
             else { & $verdict 'PENDING_ATTRIBUTION' $what 'no explained POI difference before it to shift the window' }
         } else { $deferPoi += $it }                  # EXPIRED / INVALID of a POI in both: needs the sessions
@@ -1401,7 +1615,7 @@ function Show-StructAttribution($Old, $New, [datetime]$rs, [datetime]$re) {
         if ($x.Kind -eq 'START') {
             $dh = DirAt $sd.HasCtx $x.Time $true; $dn = DirAt $sd.NotCtx $x.Time $true
             if ($ex.ContainsKey("POI|$($x.P)")) { $ex["SESS|$($x.S)"] = 1; $explainedStartTimes += $x.Time; & $verdict 'explained' $what 'its POI exists in one build only, explained' }
-            elseif ($dh -ne $dn -and $dh -eq $x.Dir) { $ex["SESS|$($x.S)"] = 1; $explainedStartTimes += $x.Time
+            elseif ($dh -ne $dn -and $dh -eq $x.Dir -and (& $divOk $x.Time $true)) { $ex["SESS|$($x.S)"] = 1; $explainedStartTimes += $x.Time
                 & $verdict 'explained' $what "a session starts only with the H4 trend in its POI's direction: v$($sd.Has) $dh, v$($sd.Hasnt) $dn" }
             else { & $verdict 'PENDING_ATTRIBUTION' $what 'same POI in both, same H4 direction at the touch' }
         } else {
@@ -1413,7 +1627,7 @@ function Show-StructAttribution($Old, $New, [datetime]$rs, [datetime]$re) {
             }
             $dh = DirAt $sd.HasCtx $x.Time $true; $dn = DirAt $sd.NotCtx $x.Time $true
             $oe = $(if ($sd.NotS.SessEnd.ContainsKey($x.S)) { $sd.NotS.SessEnd[$x.S] } else { $null })
-            if (($x.Reason -eq 'CONTEXT_FLIP' -or $x.Reason -eq 'CONTEXT_NEUTRAL') -and $dh -ne $dn) { $ex["SESSEND|$($sd.Has)|$($x.S)"] = 1
+            if (($x.Reason -eq 'CONTEXT_FLIP' -or $x.Reason -eq 'CONTEXT_NEUTRAL') -and $dh -ne $dn -and (& $divOk $x.Time $true)) { $ex["SESSEND|$($sd.Has)|$($x.S)"] = 1
                 & $verdict 'explained' $what "ended by the H4 direction, which differs at that bar: v$($sd.Has) $dh, v$($sd.Hasnt) $dn" }
             elseif ($x.Reason -eq 'NEW_SESSION' -and @($explainedStartTimes | Where-Object { $_ -eq $x.Time }).Count) { $ex["SESSEND|$($sd.Has)|$($x.S)"] = 1
                 & $verdict 'explained' $what 'ended by a new session whose start is explained' }
@@ -1426,7 +1640,10 @@ function Show-StructAttribution($Old, $New, [datetime]$rs, [datetime]$re) {
         $x = $it.X; $sd = & $side $x $it.InOld
         $what = "POI v$($sd.Has) only $($x.Key)"
         $touch = @(@($sessItems | Where-Object { $_.X.Kind -eq 'START' -and $_.X.P -eq $x.P -and $_.X.Time -le $x.Time -and $ex.ContainsKey("SESS|$($_.X.S)") })).Count
+        $ko = "$($sd.Hasnt)|$($x.P)"
         if ($touch) { & $verdict 'explained' $what 'its POI was touched (session) in one build only by then, explained: only an untouched POI ages out' }
+        elseif ($exOut.ContainsKey($ko) -and $exOut[$ko] -le $x.Time) {
+            & $verdict 'explained' $what ("v{0} had dropped this POI from its window at {1} (OUT, explained): nothing of it happens there afterwards" -f $sd.Hasnt, (T16 $exOut[$ko])) }
         else { & $verdict 'PENDING_ATTRIBUTION' $what 'same POI in both, no explained touch difference before it' }
     }
 
@@ -1456,7 +1673,7 @@ function Show-StructAttribution($Old, $New, [datetime]$rs, [datetime]$re) {
         if ($ex.ContainsKey("BLK|$($x.B)")) { $ex["ARM|$($x.A)"] = 1; $explainedArmTimes += $x.Time; & $verdict 'explained' $what 'its block exists in one build only, explained' }
         elseif ($eb -and $eb.Before) { $ex["ARM|$($x.A)"] = 1; $explainedArmTimes += $x.Time
             & $verdict 'explained' $what ("v{0} had ended the block's session at {1} ({2}, explained): nothing of it is ARMED there from then on" -f $sd.Hasnt, (T16 $eb.End.Time), $eb.End.Reason) }
-        elseif ($dh -ne $dn) { $ex["ARM|$($x.A)"] = 1; $explainedArmTimes += $x.Time; & $verdict 'explained' $what "ARMED needs the H4 trend in the session's direction: v$($sd.Has) $dh, v$($sd.Hasnt) $dn" }
+        elseif ($dh -ne $dn -and (& $divOk $x.Time $true)) { $ex["ARM|$($x.A)"] = 1; $explainedArmTimes += $x.Time; & $verdict 'explained' $what "ARMED needs the H4 trend in the session's direction: v$($sd.Has) $dh, v$($sd.Hasnt) $dn" }
         elseif ($eb) { & $verdict 'PENDING_ATTRIBUTION' $what ("v{0} ended the block's session only at {1} ({2}), after this ARMED; same H4 direction in both" -f $sd.Hasnt, (T16 $eb.End.Time), $eb.End.Reason) }
         else { & $verdict 'PENDING_ATTRIBUTION' $what 'same block and session in both, same H4 direction' }
     }
@@ -1493,7 +1710,8 @@ function Show-StructAttribution($Old, $New, [datetime]$rs, [datetime]$re) {
         $lines | Set-Content $out
         Write-Host "    every verdict with its reason written to $out" -ForegroundColor DarkGray
     }
-    return [pscustomobject]@{ Unexplained = $tally.UNEXPLAINED; Pending = $tally.PENDING_ATTRIBUTION; Explained = $tally.explained; ModelDiff = $chainCount.MODEL }
+    return [pscustomobject]@{ Unexplained = $tally.UNEXPLAINED; Pending = $tally.PENDING_ATTRIBUTION; Explained = $tally.explained; ModelDiff = $chainCount.MODEL
+                              Mode = $(if ($p254) { 'BRI-12' } else { 'de-dup' }) }
 }
 
 function RowLabel([string]$r) { $c = $r -split ','; if ($c[1] -eq 'LIQ') { return "LIQ $($c[5]) $($c[6])" } return $c[6] }
@@ -1705,12 +1923,14 @@ function Compare-Builds($A, $B) {
             $att = Show-StructAttribution $old $new $rs $re
             if ($moved) { Write-Host "    (windows start at different bars: an early difference can also come from the start - use a fixed window)" -ForegroundColor Yellow }
         }
+        $cause = $(if ($att -and $att.Mode -eq 'BRI-12') { 'BRI-12 (protected level / new structure)' } else { 'the BOS de-dup' })
+        $causeS = $(if ($att -and $att.Mode -eq 'BRI-12') { 'BRI-12' } else { 'the de-dup' })
         if ($att -and $att.Unexplained) {
-            Write-Host ("  upgrade regression: {0} MODEL difference(s) over {1} / {2} row(s); {3} difference(s) UNEXPLAINED - not traced to the BOS de-dup" -f $d.Count, $mA.Count, $mB.Count, $att.Unexplained) -ForegroundColor Red
+            Write-Host ("  upgrade regression: {0} MODEL difference(s) over {1} / {2} row(s); {3} difference(s) UNEXPLAINED - not traced to {4}" -f $d.Count, $mA.Count, $mB.Count, $att.Unexplained, $cause) -ForegroundColor Red
         } elseif ($att -and $att.Pending) {
-            Write-Host ("  upgrade regression: {0} MODEL difference(s) over {1} / {2} row(s); {3} difference(s) PENDING_ATTRIBUTION - a manual conclusion is needed for each, so NOT 'all from the de-dup'" -f $d.Count, $mA.Count, $mB.Count, $att.Pending) -ForegroundColor Yellow
+            Write-Host ("  upgrade regression: {0} MODEL difference(s) over {1} / {2} row(s); {3} difference(s) PENDING_ATTRIBUTION - a manual conclusion is needed for each, so NOT 'all from {4}'" -f $d.Count, $mA.Count, $mB.Count, $att.Pending, $causeS) -ForegroundColor Yellow
         } elseif ($att -and $att.Explained) {
-            Write-Host ("  upgrade regression: {0} MODEL difference(s) over {1} / {2} row(s); all {3} difference(s) traced to the BOS de-dup with a concrete link" -f $d.Count, $mA.Count, $mB.Count, $att.Explained) -ForegroundColor Yellow
+            Write-Host ("  upgrade regression: {0} MODEL difference(s) over {1} / {2} row(s); all {3} difference(s) traced to {4} with a concrete link" -f $d.Count, $mA.Count, $mB.Count, $att.Explained, $cause) -ForegroundColor Yellow
         } elseif ($d.Count) {
             Write-Host ("  upgrade regression: {0} difference(s) over {1} / {2} MODEL row(s)" -f $d.Count, $mA.Count, $mB.Count) -ForegroundColor Red
             $d | Select-Object -First 20 | ForEach-Object { Write-Host "    $($_.Side)  $($_.Row)" }
