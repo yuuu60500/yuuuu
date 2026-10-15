@@ -452,17 +452,19 @@ def emit_lines(bars, e, ver, inst, init, sym="USDJPY", src="USDJPY,M5"):
     return [l for (_, _, l) in sorted(rows, key=lambda z: (z[0], z[1]))]
 
 
-def emit_case(bars, sym="USDJPY", src="USDJPY,M5"):
-    """two side-by-side builds, v2.53 (inst 0A53) and v2.54 (inst 0B54), plus the model's verdict counts"""
+def emit_case(bars, sym="USDJPY", src="USDJPY,M5", warm_idx=0):
+    """two side-by-side builds, v2.53 (inst 0A53) and v2.54 (inst 0B54), plus the model's verdict counts.
+    warm_idx > 0 starts ReloadTest's compared (M5) region later than the H4 history, as in a real build"""
     old, new = B.run(bars, True), P.run254(bars)
     V = summary(attribute254(old, new))
     frm, to = tstr(bars[0][0]), tstr(bars[-1][0] + 4 * 3600)
+    warm = tstr(bars[warm_idx][0])
     T = "2026.10.02 10:00:00.000"
     def build(ver, inst, init, e):
         L = lambda payload: f"{T}  H4M5_Identification ({src})  {payload}"
         idt = f",run=7,init={init}"
         head = [L(f"HMI v{ver} starting on {sym} PERIOD_M5  instance={inst} run=7 init={init}"),
-                L(f"HMI-BUILD-BEGIN,{sym},m5_bars=5000,h4_bars={len(bars)},from={frm},to={to},ver={ver},params=461F006E,inst={inst},build=1,warmup_end={frm}{idt}")]
+                L(f"HMI-BUILD-BEGIN,{sym},m5_bars=5000,h4_bars={len(bars)},from={frm},to={to},ver={ver},params=461F006E,inst={inst},build=1,warmup_end={warm}{idt}")]
         mk = [L(f"HMI-BUILD,{sym},MODEL,1,100,100,OB,CISD,{tstr(bars[-3][0])}:00,1.23456,{tstr(bars[-4][0])}:00,1.23400,inst={inst}{idt}")]
         end = [L(f"HMI-BUILD-END,{sym},marks=1,cycles=1,pois=0,blocks=0,build=1,liq=READY,liqev=0,unknown=0,liqwait=0,inst={inst}{idt}")]
         return head + emit_lines(bars, e, ver, inst, init, sym, src) + mk + end

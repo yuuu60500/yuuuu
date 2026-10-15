@@ -492,6 +492,21 @@ _fb = next(p for p in _new.prot_rows if p["ev"] == "FALLBACK")
 vcase("v08_versus254_fallback_with_level", edit(lambda l: l.split("  ")[-1].startswith("HMI-PROT,USDJPY,INVALID,") and f"leg={_fb['leg']}," in l,
                                                 lambda l: l.replace("level=NA", "level=1.10000")),
       ["P-6b applies to an INVALID leg only", "UNEXPLAINED - not traced"], NOT_TRACED)
+# A-68: the compared region starts after the H4 history - a POI made before it in one build only must still
+# explain its OUT / EXPIRED / INVALID inside it (creation judged silently by the same rule)
+LINES_W, _ = PA.emit_case(SB, warm_idx=250)
+vcase("v09_versus254_poi_before_region", LINES_W,
+      ["PENDING_ATTRIBUTION 0   UNEXPLAINED 0", "traced to BRI-12 (protected level / new structure) with a concrete link"],
+      ["PENDING_ATTRIBUTION - a manual", "UNEXPLAINED - not traced"])
+# A-67: -Ctx keeps each instance's own chain; two instances of one symbol must not be read as one leg,
+# and each instance's break margin is its own (the margin notice follows its "starting on" line)
+B2 = ("BOS", "UP", "BULLISH", 1, "2026.09.08 04:00", "2026.09.06 12:00", "1.22900", "1.22950")
+B3 = ("BOS", "UP", "BULLISH", 2, "2026.09.09 12:00", "2026.09.07 16:00", "1.23050", "1.23200")
+TWO = ([start("2.53", "0A53", 7, 1), margin()] + blk(1, ver="2.53", inst="0A53", init=1, extra_rows=ctx_rows([LEG0], also=0, inst="0A53", init=1))
+       + [start("2.54", "0B54", 7, 2), ATR] + blk(1, ver="2.54", inst="0B54", init=2, extra_rows=ctx_rows([B2, B3], also=0, inst="0B54", init=2)))
+case("c58_ctx_two_instances", TWO, ["-Ctx"],
+     ["USDJPY#0A53", "USDJPY#0B54", "A-33 stale BOS  0 suspect(s), 0 pending, of 1 continuation BOS  (margin per bar (ATR)"],
+     ["1 suspect", "SUSPECT"])
 
 # strength number only: same event, same swing, same state, str counted from another H4 start
 same_s = ctx_rows([E1, E3[:3] + (5,) + E3[4:]], also=0)

@@ -1,0 +1,187 @@
+# v2.54r2 MT5 run, logs 20261013 / 20261014 / 20261015 (user terminal, server = local + 2 h), analysed with ReloadTest.ps1 r5
+# log sha256:
+#   66665267b5b15bb34d6bfeced50b3b4937b5be9160f7a50775ba00be6f097eae  20261013.log
+#   36eec49b39388c477e2cc4de6860cb581ce2546060f87fdf5ca54963b05c6e44  20261014.log
+#   c7d85b71ac94abaea2bec6cf66bb20b8c09405f82362588f27c4df2ea7cafa44  20261015.log
+
+## timeline (local time)
+10-14 10:36-10:37  v2.54 attached: EURUSD#DBFD (default), USDJPY#EB67, AUDUSD#92D1, XAUUSD#2896 (margin degenerates to 0), EURUSD#C901 (ATR_FRAC 0.05)
+                   no build follows the two manual reloads (Properties -> OK without a change): no same-window v2.54 pair exists
+10-14 12:02 / 13:45 XAUUSD, 14:20 EURUSD, 16:00 AUDUSD + USDJPY: automatic rebuilds of every instance of the symbol at once (same window across versions)
+10-14 ~16:46 .. 10-15 09:06  no log line - sleep; 10-15 09:06 every chart rebuilt once on wake
+
+## -Ctx -Days 3 (per instance, A-67)
+  AUDUSD#92D1
+      transitions  opened 9 = ok 6 + fail 2 + timeout 0 + still open 1
+      swing consumed twice in one build  0 proven, 0 pending  (3 of 3 build(s) COMPLETE and read)
+      level installed already broken  0 proven, 0 pending  (159 SET / ADVANCE / MOVE row(s))
+      A-33 stale BOS  0 suspect(s), 0 pending, of 31 continuation BOS  (margin 3 pt, H4SwingRight 2)
+  AUDUSD#F40A
+      transitions  opened 18 = ok 7 + fail 9 + timeout 1 + still open 1
+      swing consumed twice in one build  0 proven, 0 pending  (9 of 9 build(s) COMPLETE and read)
+      A-33 stale BOS  0 suspect(s), 0 pending, of 26 continuation BOS  (margin not logged, H4SwingRight 2)
+  EURUSD#7877
+      transitions  opened 15 = ok 4 + fail 8 + timeout 2 + still open 1
+      swing consumed twice in one build  0 proven, 0 pending  (9 of 9 build(s) COMPLETE and read)
+      A-33 stale BOS  0 suspect(s), 0 pending, of 27 continuation BOS  (margin not logged, H4SwingRight 2)
+  EURUSD#C901
+      transitions  opened 4 = ok 1 + fail 3 + timeout 0 + still open 0
+      swing consumed twice in one build  0 proven, 0 pending  (3 of 3 build(s) COMPLETE and read)
+      level installed already broken  0 proven, 0 pending  (135 SET / ADVANCE / MOVE row(s))
+      A-33 stale BOS  0 suspect(s), 3 pending, of 31 continuation BOS  (margin per bar (ATR), H4SwingRight 2)
+        PENDING  2026.07.16 04:00 swing 2026.07.14 12:00 @ 1.14626: close 1.14631 at 2026.07.16 00:00 is 5 pt past it, the margin is per bar (ATR)
+        PENDING  2026.08.14 20:00 swing 2026.08.10 08:00 @ 1.15656: close 1.15660 at 2026.08.14 16:00 is 4 pt past it, the margin is per bar (ATR)
+        PENDING  2026.09.14 12:00 swing 2026.09.02 08:00 @ 1.15662: close 1.15656 at 2026.09.14 08:00 is 6 pt past it, the margin is per bar (ATR)
+  EURUSD#DBFD
+      transitions  opened 4 = ok 1 + fail 3 + timeout 0 + still open 0
+      swing consumed twice in one build  0 proven, 0 pending  (3 of 3 build(s) COMPLETE and read)
+      level installed already broken  0 proven, 0 pending  (135 SET / ADVANCE / MOVE row(s))
+      A-33 stale BOS  0 suspect(s), 0 pending, of 31 continuation BOS  (margin 3 pt, H4SwingRight 2)
+  GBPUSD
+      transitions  opened 13 = ok 5 + fail 7 + timeout 0 + still open 1
+      swing consumed twice in one build  0 proven, 0 pending  (9 of 9 build(s) COMPLETE and read)
+      A-33 stale BOS  0 suspect(s), 1 pending, of 33 continuation BOS  (margin not logged, H4SwingRight 2)
+        PENDING  2026.08.03 04:00 swing 2026.07.20 08:00 @ 1.34811: close 1.34813 at 2026.08.01 00:00 is 2 pt past it, the margin is not in the log
+  NZDUSD
+      transitions  opened 13 = ok 6 + fail 7 + timeout 0 + still open 0
+      swing consumed twice in one build  0 proven, 0 pending  (10 of 10 build(s) COMPLETE and read)
+      A-33 stale BOS  0 suspect(s), 1 pending, of 34 continuation BOS  (margin not logged, H4SwingRight 2)
+        PENDING  2026.07.02 12:00 swing 2026.07.01 16:00 @ 0.56898: close 0.56940 at 2026.07.02 12:00 is 42 pt past it, the margin is not in the log
+  USDCAD
+      transitions  opened 11 = ok 5 + fail 5 + timeout 1 + still open 0
+      swing consumed twice in one build  0 proven, 0 pending  (9 of 9 build(s) COMPLETE and read)
+      A-33 stale BOS  0 suspect(s), 1 pending, of 36 continuation BOS  (margin not logged, H4SwingRight 2)
+        PENDING  2026.09.16 16:00 swing 2026.09.14 16:00 @ 1.39296: close 1.39297 at 2026.09.16 04:00 is 1 pt past it, the margin is not in the log
+  USDCHF
+      transitions  opened 18 = ok 9 + fail 7 + timeout 1 + still open 1
+      swing consumed twice in one build  0 proven, 0 pending  (9 of 9 build(s) COMPLETE and read)
+      A-33 stale BOS  0 suspect(s), 0 pending, of 24 continuation BOS  (margin not logged, H4SwingRight 2)
+  USDJPY#D61E
+      transitions  opened 14 = ok 7 + fail 6 + timeout 1 + still open 0
+      swing consumed twice in one build  0 proven, 0 pending  (9 of 9 build(s) COMPLETE and read)
+      A-33 stale BOS  0 suspect(s), 0 pending, of 26 continuation BOS  (margin not logged, H4SwingRight 2)
+  USDJPY#EB67
+      transitions  opened 9 = ok 4 + fail 3 + timeout 1 + still open 1
+      swing consumed twice in one build  0 proven, 0 pending  (3 of 3 build(s) COMPLETE and read)
+      level installed already broken  0 proven, 0 pending  (111 SET / ADVANCE / MOVE row(s))
+      A-33 stale BOS  0 suspect(s), 0 pending, of 25 continuation BOS  (margin 3 pt, H4SwingRight 2)
+  XAUUSD#0051
+      transitions  opened 15 = ok 6 + fail 5 + timeout 3 + still open 1
+      swing consumed twice in one build  0 proven, 0 pending  (9 of 9 build(s) COMPLETE and read)
+      A-33 stale BOS  0 suspect(s), 0 pending, of 27 continuation BOS  (margin not logged, H4SwingRight 2)
+  XAUUSD#2896
+      transitions  opened 10 = ok 2 + fail 5 + timeout 3 + still open 0
+      swing consumed twice in one build  0 proven, 0 pending  (4 of 4 build(s) COMPLETE and read)
+      level installed already broken  0 proven, 0 pending  (174 SET / ADVANCE / MOVE row(s))
+      A-33 stale BOS  0 suspect(s), 0 pending, of 26 continuation BOS  (margin 0 pt, H4SwingRight 2)
+
+## -LiveVsBuild on 20261014.log only (no stretch across the sleep, A-60)
+--- AUDUSD#92D1,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 3 (+ 0 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- AUDUSD#F40A,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 1 (+ 0 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- EURUSD#7877,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 2 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- EURUSD#C901,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 2 (+ 1 H4 structure event(s))
+  protected-level rows compared: 2 (PROT / ANCHOR / INTERNAL)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- EURUSD#DBFD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 2 (+ 1 H4 structure event(s))
+  protected-level rows compared: 2 (PROT / ANCHOR / INTERNAL)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- GBPUSD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+    pending: build 9->10: 2 live row(s) on an edge bar, not provably covered
+  live events compared: 1 (+ 0 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- NZDUSD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 6 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDCAD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 5 (+ 0 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDCHF,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 3 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDJPY#D61E,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 2 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDJPY#EB67,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 2 (+ 1 H4 structure event(s))
+  protected-level rows compared: 2 (PROT / ANCHOR / INTERNAL)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- XAUUSD#0051,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- XAUUSD#2896,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+
+## v2.53 vs v2.54, same window (10-15 09:06 rebuild of both), -Source <v2.53> -Versus <v2.54> (BRI-12 mode)
+--- EURUSD#7877,M5  vs  EURUSD#DBFD,M5 : last complete build of each ---
+  common region: 2026.09.22 10:35 .. 2026.10.15 11:05  (same window)
+  events inside it: A 38 MODEL + 46 LIQ / B 88 MODEL + 46 LIQ
+  DIFFERENT VERSIONS (2.53 / 2.54) - not a repaint test; MODEL upgrade regression only.
+    CTX P-4 protected level / internal     9
+    CTX P-5 old structure                  0
+    CTX P-7 failure first                  0
+    CTX PENDING_ATTRIBUTION                0
+    CTX UNEXPLAINED                        0
+    H4 state differs in 7 interval(s), first from 2026.07.06 16:00:
+    chain differences in the common region: POI 12   SESS 4   BLK 23   ARM 15   MODEL 52
+    verdicts: explained 163   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 52 MODEL difference(s) over 38 / 88 row(s); all 163 difference(s) traced to BRI-12 (protected level / new structure) with a concrete link
+--- USDJPY#D61E,M5  vs  USDJPY#EB67,M5 : last complete build of each ---
+  common region: 2026.09.22 10:35 .. 2026.10.15 11:05  (same window)
+  events inside it: A 90 MODEL + 45 LIQ / B 127 MODEL + 45 LIQ
+  DIFFERENT VERSIONS (2.53 / 2.54) - not a repaint test; MODEL upgrade regression only.
+    CTX P-4 protected level / internal     6
+    CTX P-5 old structure                  2
+    CTX P-7 failure first                  0
+    CTX PENDING_ATTRIBUTION                0
+    CTX UNEXPLAINED                        0
+    H4 state differs in 6 interval(s), first from 2026.07.10 04:00:
+    chain differences in the common region: POI 27   SESS 16   BLK 77   ARM 64   MODEL 207
+    verdicts: explained 453   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 207 MODEL difference(s) over 90 / 127 row(s); all 453 difference(s) traced to BRI-12 (protected level / new structure) with a concrete link
+--- XAUUSD#0051,M5  vs  XAUUSD#2896,M5 : last complete build of each ---
+  common region: 2026.09.21 16:50 .. 2026.10.15 11:05  (same window)
+  events inside it: A 76 MODEL + 45 LIQ / B 109 MODEL + 45 LIQ
+  DIFFERENT VERSIONS (2.53 / 2.54) - not a repaint test; MODEL upgrade regression only.
+    CTX P-4 protected level / internal     6
+    CTX P-5 old structure                  8
+    CTX P-7 failure first                  0
+    CTX PENDING_ATTRIBUTION                0
+    CTX UNEXPLAINED                        0
+    H4 state differs in 8 interval(s), first from 2026.06.26 16:00:
+    chain differences in the common region: POI 16   SESS 10   BLK 34   ARM 27   MODEL 99
+    verdicts: explained 234   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 99 MODEL difference(s) over 76 / 109 row(s); all 234 difference(s) traced to BRI-12 (protected level / new structure) with a concrete link
+--- AUDUSD#F40A,M5  vs  AUDUSD#92D1,M5 : last complete build of each ---
+  common region: 2026.09.22 10:30 .. 2026.10.15 11:05  (same window)
+  events inside it: A 0 MODEL + 51 LIQ / B 92 MODEL + 51 LIQ
+  DIFFERENT VERSIONS (2.53 / 2.54) - not a repaint test; MODEL upgrade regression only.
+    CTX P-4 protected level / internal    12
+    CTX P-5 old structure                  2
+    CTX P-7 failure first                  0
+    CTX PENDING_ATTRIBUTION                0
+    CTX UNEXPLAINED                        0
+    H4 state differs in 9 interval(s), first from 2026.07.17 08:00:
+    chain differences in the common region: POI 10   SESS 4   BLK 33   ARM 28   MODEL 92
+    verdicts: explained 224   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 92 MODEL difference(s) over 0 / 92 row(s); all 224 difference(s) traced to BRI-12 (protected level / new structure) with a concrete link

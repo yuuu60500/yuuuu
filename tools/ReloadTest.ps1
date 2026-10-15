@@ -160,9 +160,15 @@ foreach ($f in $logs) { $all += Get-Content $f.FullName }
 $instOf = New-Object 'System.Collections.Generic.List[string]'
 $idOf   = New-Object 'System.Collections.Generic.List[string]'   # v2.50 "run/init" per line; '' when not logged
 $srcInst = @{}
+$startInst = @{}                     # plain source -> instance of its latest "starting on" line
 for ($i = 0; $i -lt $all.Count; $i++) {
     $l = $all[$i]; $in = ''; $id = ''
     if ($l -match '(?:,inst=|instance=)([0-9A-Fa-f]{4})') { $in = $Matches[1].ToUpper() }
+    # A-67: OnInit's untagged notices (the break margin) belong to the instance
+    # whose "starting on" line came just before them on that chart source -
+    # with two instances of one symbol, two different margins must not merge.
+    if ($l -match '\(([A-Za-z0-9._]+,[A-Za-z0-9]+)\)\s+HMI v\S+ starting on' -and $in) { $startInst[$Matches[1]] = $in }
+    elseif (-not $in -and $l -match '\(([A-Za-z0-9._]+,[A-Za-z0-9]+)\)\s+HMI: ' -and $startInst.ContainsKey($Matches[1])) { $in = $startInst[$Matches[1]] }
     # v2.50 identity (A-48): the terminal run id and the initialisation number.
     # Event and diagnostic rows carry ",run=R,init=I" after inst= and lose them
     # together with inst=; the BEGIN line keeps them as k=v fields of its own
@@ -771,6 +777,11 @@ if ($Ctx) {
         if ($l -notmatch 'HMI-CTX,(.*)$') { continue }
         $c = $Matches[1] -split ','
         if ($c.Count -lt 11) { continue }
+        # A-67: one chart instance = one context chain. Two instances of a symbol
+        # (two versions side by side, or another margin) are SYMBOL#INSTANCE
+        # sources; merged by symbol, one version's close looked like an earlier
+        # break of the other version's swing.
+        $gsym = $(if ($l -match '\(([A-Za-z0-9._#]+),[A-Za-z0-9]+\)\s+HMI-CTX,') { $Matches[1] } else { $c[0] })
         $f = @{}
         foreach ($p in $c[2..($c.Count-1)]) { $kv = $p -split '=', 2; if ($kv.Count -eq 2) { $f[$kv[0]] = $kv[1] } }
         # Prices go through InvariantCulture on purpose: on a pt-BR / de-DE
@@ -783,11 +794,11 @@ if ($Ctx) {
         if ($swOk) { [void][double]::TryParse([string]$f['swing_px'], [Globalization.NumberStyles]::Float, $ic, [ref]$swp) }
         if ($clOk) { [void][double]::TryParse([string]$f['close'],    [Globalization.NumberStyles]::Float, $ic, [ref]$cls) }
         $rows += [pscustomobject]@{
-            Sym = $c[0]; Kind = $c[1]; Dir = $f['dir']; Live = $f['live']
+            Sym = $gsym; Kind = $c[1]; Dir = $f['dir']; Live = $f['live']
             Ctx = $f['ctx']; Str = [int]$f['str']; Messy = $f['messy']
             Bar = $f['bar']; Swing = $f['swing']; SwPx = $swp; Close = $cls; SwRaw = [string]$f['swing_px']; CloseRaw = [string]$f['close']; SwOk = $swOk; CloseOk = $clOk
             Raw = $Matches[1]
-            Key = "$($c[0])|$($c[1])|$($f['bar'])|$($f['swing'])"
+            Key = "$gsym|$($c[1])|$($f['bar'])|$($f['swing'])"
         }
     }
     if ($rows.Count -eq 0) {
@@ -1579,6 +1590,19 @@ function Show-StructAttribution($Old, $New, [datetime]$rs, [datetime]$re) {
     $explainedNewTimes = @()
     $deferPoi = @()
     $exOut = @{}                                    # "version|POI" -> time of an explained OUT in that version
+    # A-68: H4 history reaches back before the compared (M5) region, so a POI
+    # made there in one build only can leave the window, expire or die inside
+    # it. Its creation is judged by the same rule, silently (no verdict: it
+    # lies outside the region) - only so its later rows have something to
+    # link to. Same window on both sides: the H4 history before the region is
+    # the same bars in both builds.
+    $dPall = DiffKeys @($so.Poi | Where-Object { $_.Kind -eq 'NEW' -and $_.Time -lt $rs }) @($sn.Poi | Where-Object { $_.Kind -eq 'NEW' -and $_.Time -lt $rs }) 'Key'
+    foreach ($it in @(@($dPall.A | ForEach-Object { [pscustomobject]@{ X = $_; InOld = $true } }) + @($dPall.B | ForEach-Object { [pscustomobject]@{ X = $_; InOld = $false } }))) {
+        $x = $it.X; $sd = & $side $x $it.InOld
+        if (& $early $x.Time) { continue }
+        $dh = DirAt $sd.HasCtx $x.Time $false; $dn = DirAt $sd.NotCtx $x.Time $false
+        if ($dh -ne $dn -and $dh -eq $x.Dir -and (& $divOk $x.Time $false)) { $ex["POI|$($x.P)"] = 1; $explainedNewTimes += $x.Time }
+    }
     foreach ($it in $poiItems) {
         $x = $it.X; $sd = & $side $x $it.InOld; $chainCount.POI++
         $what = "POI v$($sd.Has) only $($x.Key)"

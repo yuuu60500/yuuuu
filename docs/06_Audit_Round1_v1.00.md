@@ -1978,3 +1978,43 @@ Verification:            场景内注入 5 组：固定余量失败 + ATR 通过
 Status:                  **FIXED —— v2.54r3（工具；MQL5 不变）**
 ```
 
+
+## Audit Round 25 —— v2.54r2 首次 MT5 运行（用户日志 2026-10-13 .. 10-15）
+
+```
+挂图:                    10-14 10:36 起 v2.54r2：EURUSD（默认）、USDJPY、AUDUSD、XAUUSD（余量退化为 0）、EURUSD（ATR_FRAC 0.05）；v2.53r3 八图照常
+已得证据（docs/evidence/v2.54_mt5_run_20261015.txt）:
+  v2.53 vs v2.54 同窗口:  四品种（10-15 唤醒后两版同时重建，窗口相同）BRI-12 归因全部可追溯 ——
+                         EURUSD 163 / USDJPY 453 / XAUUSD 234 / AUDUSD 224 条差异（CTX、POI、Session、Block、ARMED、MODEL），
+                         PENDING 0、UNEXPLAINED 0；其中 MODEL 差异 52 / 207 / 99 / 92 条
+  实时 vs 重建:           10-14 不跨休眠的区间，13 个实例全部双向一致；v2.54 的 EURUSD（两实例）与 USDJPY 含 H4 事件和 PROT / ANCHOR 行
+  -Ctx（按实例）:         重复消费 0 proven / 0 pending（全部构建完整）；保护点 / 锚点装入即被越过 0（714 行 SET / ADVANCE / MOVE）；
+                         transitions 全部平衡；stale BOS 0 suspect（pending 只在 ATR 实例或日志中没有余量行的 v2.53 实例）
+缺口:                    v2.54 同窗口重载 —— 「属性 → 确定」不改参数时终端没有重建，日志中没有任何一对同窗口的 v2.54 构建；
+                         XAUUSD v2.54 不跨休眠的实时区间里没有事件；10-14 → 10-15 跨休眠（A-60），不作实时证据
+```
+
+### A-67 —— **`-Ctx` 把同一品种的多个实例合成一条结构链**（工具，成立）
+
+```
+Observed:                v2.53 与 v2.54（及 ATR 实例）同品种并排时，-Ctx 按 payload 品种分组：一个版本的收盘被当作另一版本摆动点的
+                         「更早越过」（AUDUSD / USDJPY / XAUUSD 各 2 条 suspect），XAUUSD transitions「still open -1」；
+                         两实例余量不同（3 点 / ATR）时合成 -1，默认实例也被标为 ATR pending
+Fix (r5):                -Ctx 按行的来源（SYMBOL#INSTANCE）分组；OnInit 的无标签提示行（余量）归属于同一图表源上紧接其前的
+                         「starting on」行的实例，余量按实例记录
+Verification:            同一份日志：所有 suspect 消失、transitions 全部平衡、默认实例「margin 3 pt」、ATR 实例「margin per bar (ATR)」；
+                         logtests c58（两实例，合并读法会给出 1 suspect）；r4 脚本此用例失败
+Status:                  **FIXED —— v2.54r5（工具；MQL5 不变）**
+```
+
+### A-68 —— **区域开始前创建的 POI，其区域内事件无法关联**（工具，成立）
+
+```
+Observed:                四品种 BRI-12 归因中 13 条 PENDING，全部是 POI 的 OUT / EXPIRED / INVALID：POI 在 H4 历史里（比较区域开始之前）
+                         只在一版创建，归因只在区域内判断创建，区域内的后续事件「creation not explained」
+Fix (r5):                区域开始之前只在一版创建的 POI，用同一规则（方向不同且处在起点已解释的分歧区间）静默判断创建（不出判定行，
+                         只供其区域内事件关联）；两版同窗口，区域之前的 H4 历史是同一批 K 线
+Verification:            同一份日志：13 → 0 PENDING（EURUSD 163、USDJPY 453、XAUUSD 234、AUDUSD 224 全部可追溯）；
+                         logtests v09（模型种子 37、区域从第 250 根开始）；r4 脚本此用例失败
+Status:                  **FIXED —— v2.54r5（工具；MQL5 不变）**
+```

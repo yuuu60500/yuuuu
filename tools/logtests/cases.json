@@ -1426,6 +1426,36 @@
    "traced to BRI-12 (protected level / new structure) with a concrete link"
   ]
  },
+ "v09_versus254_poi_before_region": {
+  "args": [
+   "-Source",
+   "USDJPY#0A53,M5",
+   "-Versus",
+   "USDJPY#0B54,M5"
+  ],
+  "expect": [
+   "PENDING_ATTRIBUTION 0   UNEXPLAINED 0",
+   "traced to BRI-12 (protected level / new structure) with a concrete link"
+  ],
+  "forbid": [
+   "PENDING_ATTRIBUTION - a manual",
+   "UNEXPLAINED - not traced"
+  ]
+ },
+ "c58_ctx_two_instances": {
+  "args": [
+   "-Ctx"
+  ],
+  "expect": [
+   "USDJPY#0A53",
+   "USDJPY#0B54",
+   "A-33 stale BOS  0 suspect(s), 0 pending, of 1 continuation BOS  (margin per bar (ATR)"
+  ],
+  "forbid": [
+   "1 suspect",
+   "SUSPECT"
+  ]
+ },
  "c09_ctx_strength_only": {
   "args": [
    "-Source",

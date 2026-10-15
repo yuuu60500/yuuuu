@@ -1900,3 +1900,19 @@ tools/ReloadTest.ps1       -Versus：新版本 >= 2.54 且旧版本 < 2.54 时�
 tools/logtests             108 组（新增 v01–v08：模型种子 37 的两版日志，及 7 种篡改）
 docs                       BRI-12 归因方法与限制；docs/04 v2.54 第 5 项判据；证据 docs/evidence/v2.54_attribution_offline.txt
 ```
+
+---
+
+## v2.54r5 —— 工具修订（A-67 -Ctx 按实例；A-68 区域前创建的 POI）—— MQL5 与 r2 相同
+
+```
+Date:     2026-10-15
+来源:     v2.54r2 首次 MT5 运行（用户日志 2026-10-13 .. 10-15）
+MQL5:     与 v2.54r2 字节相同（0/0）
+
+tools/ReloadTest.ps1   -Ctx 按 SYMBOL#INSTANCE 分组；OnInit 余量提示行归属于其前的「starting on」实例（A-67）；
+                       -Versus：区域开始前只在一版创建的 POI 静默判断创建，供区域内事件关联（A-68）
+tools/h4_protect_attr.py  emit_case(warm_idx=) —— 比较区域晚于 H4 历史开始
+tools/logtests         110 组（新增 v09、c58）
+docs                   Audit Round 25；证据 docs/evidence/v2.54_mt5_run_20261015.txt
+```
