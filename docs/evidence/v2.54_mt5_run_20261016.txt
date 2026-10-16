@@ -323,3 +323,71 @@
     chain differences in the common region: POI 7   SESS 2   BLK 16   ARM 15   MODEL 46
     verdicts: explained 143   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
   upgrade regression: 46 MODEL difference(s) over 0 / 46 row(s); all 143 difference(s) traced to BRI-12 (protected level / new structure) with a concrete link
+
+## 5. supplement: full 20261016.log (ends 16:40 local; superset of the 11:20 upload)
+# sha256 49572b88299bf6673d860af806049baf011bf470fcfc52684dd30ef297749a76  20261016.log (full day)
+# later builds: XAUUSD (both versions) 12:02 / 12:10 / 13:57 local; EURUSD (DBFD, C901, 7877) 16:40 local; no other chart rebuilt
+### 5a. ReloadTest r5 -LiveVsBuild on the full log alone
+--- AUDUSD#92D1,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- AUDUSD#F40A,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- EURUSD#7877,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- EURUSD#C901,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- EURUSD#DBFD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- GBPUSD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- NZDUSD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDCAD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDCHF,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- USDJPY#D61E,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- USDJPY#EB67,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- XAUUSD#0051,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 1 (+ 0 H4 structure event(s))
+  by model: MSS 1
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- XAUUSD#2896,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+### 5b. XAUUSD rows logged outside a build block (live rows), whole day
+  XAUUSD#2896 (v2.54): 0 row(s)
+  XAUUSD#0051 (v2.53): 1 row(s)
+    10:09:59 local  HMI-LIVE,XAUUSD,MODEL,1,2543,2543,OB,MSS,2026.10.16 12:10:00,4186.63,2026.10.13 16:30:00,4189.68,inst=0051
+### 5c. build rows whose event bar falls inside each closed live stretch (server bars (to_prev .. to_next])
+  stretch (local)          server bars                 XAUUSD#2896 v2.54   XAUUSD#0051 v2.53
+  09:06 -> 11:00           10-16 11:00 .. 12:55        0                   1 MODEL (the 12:10 MSS above)
+  11:00 -> 11:01 -> 11:03  12:55 .. 12:55              0                   0
+  11:03 -> 12:02           12:55 .. 13:55              0                   0
+  12:02 -> 12:10           13:55 .. 14:05              0                   0
+  12:10 -> 13:57           14:05 .. 15:50              0                   0
+  13:57 -> 16:40 (no XAUUSD rebuild; log end)  live rows 0, no build to compare
+  The 12:10 MSS appears in every v2.53 build of the day and in no v2.54 build; it lies inside the 10-16 11:03 same-window
+  v2.53 vs v2.54 sample (section 4: XAUUSD 191 differences, PENDING 0, UNEXPLAINED 0).
+  Verdict: XAUUSD v2.54 live vs build - live and build are both empty in every closed stretch of 10-16; no event to compare.
+  The missing evening XAUUSD refresh lost nothing (no live row after 13:57). Sample still insufficient - not written as PASS.
