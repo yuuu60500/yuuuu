@@ -2018,3 +2018,21 @@ Verification:            同一份日志：13 → 0 PENDING（EURUSD 163、USDJP
                          logtests v09（模型种子 37、区域从第 250 根开始）；r4 脚本此用例失败
 Status:                  **FIXED —— v2.54r5（工具；MQL5 不变）**
 ```
+
+
+## Audit Round 26 —— v2.54r2 MT5 运行补齐（用户日志 2026-10-14 .. 10-16）
+
+```
+证据:                    docs/evidence/v2.54_mt5_run_20261016.txt（ReloadTest r5）
+同窗口重载:              10-16 11:01 / 11:03 同一根 M5 内的两次重建，五个 v2.54 实例 MODEL / LIQ / CTX / PROT 全部 IDENTICAL ——
+                         EURUSD 默认 89 / 43 / 11 / 25、EURUSD ATR 90 / 43 / 10 / 23、USDJPY 128 / 44 / 9 / 23、XAUUSD 109 / 45 / 10 / 20、
+                         AUDUSD 46 / 51 / 12 / 25；第二组样本（10-15 09:55 刷新对，四实例）同样全部一致；v2.53 四实例亦一致
+实时 vs 重建:            10-15、10-16 各自单独分析（不跨休眠），所有可比区间双向一致；连同 10-14（Round 25），
+                         v2.54 实时比较覆盖 MODEL（CISD / MSS / PA）、LIQ、H4 事件（BOS / TRANS_FAIL / TRANS_SAMELEG）与 PROT / ANCHOR 行
+                         XAUUSD v2.54：三天中不跨休眠的已收尾区间里没有任何事件 —— 样本不足，不写通过
+v2.53 vs v2.54:          第二个同窗口样本（10-16 11:03）四品种 955 条差异全部可追溯（EURUSD 166、USDJPY 455、XAUUSD 191、AUDUSD 143），
+                         PENDING 0、UNEXPLAINED 0；连同 10-15 样本共 2029 条
+-Ctx:                    v2.54 五实例：重复消费 0、保护点 / 锚点装入即被越过 0（2852 行）、stale BOS 0 suspect；transitions 平衡
+重载方法:                「属性 → 确定」不改参数不触发重建；图表「刷新 / Atualizar」可以（10-15 09:55、10-16 11:01 / 11:03）
+保留的限制:              A-59、A-60 不变；XAUUSD v2.54 实时样本不足；GBPUSD / USDCHF 历史 MODEL 样本不足；v2.52 → v2.53 原生比较未执行
+```

@@ -1,0 +1,325 @@
+# v2.54r2 MT5 run, logs 20261014 / 20261015 / 20261016 (user terminal, server = local + 2 h), ReloadTest.ps1 r5
+# log sha256:
+#   36eec49b39388c477e2cc4de6860cb581ce2546060f87fdf5ca54963b05c6e44  20261014.log
+#   fb6bb18e91c866c9dfccb017c761ea12a3fb8c787946be6a418cf88f8779e3e8  20261015.log
+#   11d68c6517cb6f49ddae5c62dc6954651ff7d268956ad16ee069a734ab5c9429  20261016.log
+# 20261016.log ends 11:20 local (uploaded during the day); 20261015.log ends 16:34 local, then sleep
+
+## 1. same-window reload (last two builds, 10-16 11:01 / 11:03 local, all rebuilt in one M5 bar)
+--- EURUSD#DBFD,M5 : comparing the last two builds ---
+  A  v2.54 params=461F006E build=13 id=1791818856/9 liq=READY from=2026.09.23 04:05 to=2026.10.16 12:55 warmup_end=2026.09.23 12:25 rows=89 MODEL + 43 LIQ
+  B  v2.54 params=461F006E build=14 id=1791818856/9 liq=READY from=2026.09.23 04:05 to=2026.10.16 12:55 warmup_end=2026.09.23 12:25 rows=89 MODEL + 43 LIQ
+  common region: 2026.09.23 12:30 .. 2026.10.16 13:00  (same window)
+    MODEL  IDENTICAL over 89 / 89 row(s)
+    LIQ    IDENTICAL over 43 / 43 row(s)
+    CTX    IDENTICAL over 11 / 11 event(s)
+    PROT   IDENTICAL over 25 / 25 row(s) (PROT / ANCHOR / INTERNAL)
+  IDENTICAL inside the comparable region (89 MODEL + 43 LIQ) - no repaint found there.
+--- EURUSD#C901,M5 : comparing the last two builds ---
+  A  v2.54 params=A047970C build=13 id=1791818856/13 liq=READY from=2026.09.23 04:05 to=2026.10.16 12:55 warmup_end=2026.09.23 12:25 rows=90 MODEL + 43 LIQ
+  B  v2.54 params=A047970C build=14 id=1791818856/13 liq=READY from=2026.09.23 04:05 to=2026.10.16 12:55 warmup_end=2026.09.23 12:25 rows=90 MODEL + 43 LIQ
+  common region: 2026.09.23 12:30 .. 2026.10.16 13:00  (same window)
+    MODEL  IDENTICAL over 90 / 90 row(s)
+    LIQ    IDENTICAL over 43 / 43 row(s)
+    CTX    IDENTICAL over 10 / 10 event(s)
+    PROT   IDENTICAL over 23 / 23 row(s) (PROT / ANCHOR / INTERNAL)
+  IDENTICAL inside the comparable region (90 MODEL + 43 LIQ) - no repaint found there.
+--- USDJPY#EB67,M5 : comparing the last two builds ---
+  A  v2.54 params=461F006E build=11 id=1791818856/10 liq=READY from=2026.09.23 04:05 to=2026.10.16 12:55 warmup_end=2026.09.23 12:25 rows=128 MODEL + 44 LIQ
+  B  v2.54 params=461F006E build=12 id=1791818856/10 liq=READY from=2026.09.23 04:05 to=2026.10.16 12:55 warmup_end=2026.09.23 12:25 rows=128 MODEL + 44 LIQ
+  common region: 2026.09.23 12:30 .. 2026.10.16 13:00  (same window)
+    MODEL  IDENTICAL over 128 / 128 row(s)
+    LIQ    IDENTICAL over 44 / 44 row(s)
+    CTX    IDENTICAL over 9 / 9 event(s)
+    PROT   IDENTICAL over 23 / 23 row(s) (PROT / ANCHOR / INTERNAL)
+  IDENTICAL inside the comparable region (128 MODEL + 44 LIQ) - no repaint found there.
+--- XAUUSD#2896,M5 : comparing the last two builds ---
+  A  v2.54 params=461F006E build=11 id=1791818856/12 liq=READY from=2026.09.22 10:20 to=2026.10.16 12:55 warmup_end=2026.09.22 18:40 rows=109 MODEL + 45 LIQ
+  B  v2.54 params=461F006E build=12 id=1791818856/12 liq=READY from=2026.09.22 10:20 to=2026.10.16 12:55 warmup_end=2026.09.22 18:40 rows=109 MODEL + 45 LIQ
+  common region: 2026.09.22 18:45 .. 2026.10.16 13:00  (same window)
+    MODEL  IDENTICAL over 109 / 109 row(s)
+    LIQ    IDENTICAL over 45 / 45 row(s)
+    CTX    IDENTICAL over 10 / 10 event(s)
+    PROT   IDENTICAL over 20 / 20 row(s) (PROT / ANCHOR / INTERNAL)
+  IDENTICAL inside the comparable region (109 MODEL + 45 LIQ) - no repaint found there.
+--- AUDUSD#92D1,M5 : comparing the last two builds ---
+  A  v2.54 params=461F006E build=11 id=1791818856/11 liq=READY from=2026.09.23 04:00 to=2026.10.16 12:55 warmup_end=2026.09.23 12:20 rows=46 MODEL + 51 LIQ
+  B  v2.54 params=461F006E build=12 id=1791818856/11 liq=READY from=2026.09.23 04:00 to=2026.10.16 12:55 warmup_end=2026.09.23 12:20 rows=46 MODEL + 51 LIQ
+  common region: 2026.09.23 12:25 .. 2026.10.16 13:00  (same window)
+    MODEL  IDENTICAL over 46 / 46 row(s)
+    LIQ    IDENTICAL over 51 / 51 row(s)
+    CTX    IDENTICAL over 12 / 12 event(s)
+    PROT   IDENTICAL over 25 / 25 row(s) (PROT / ANCHOR / INTERNAL)
+  IDENTICAL inside the comparable region (46 MODEL + 51 LIQ) - no repaint found there.
+--- EURUSD#7877,M5 : comparing the last two builds ---
+  A  v2.53 params=461F006E build=22 id=1791818856/8 liq=READY from=2026.09.23 04:05 to=2026.10.16 12:55 warmup_end=2026.09.23 12:25 rows=39 MODEL + 43 LIQ
+  B  v2.53 params=461F006E build=23 id=1791818856/8 liq=READY from=2026.09.23 04:05 to=2026.10.16 12:55 warmup_end=2026.09.23 12:25 rows=39 MODEL + 43 LIQ
+  common region: 2026.09.23 12:30 .. 2026.10.16 13:00  (same window)
+    MODEL  IDENTICAL over 39 / 39 row(s)
+    LIQ    IDENTICAL over 43 / 43 row(s)
+    CTX    IDENTICAL over 14 / 14 event(s)
+  IDENTICAL inside the comparable region (39 MODEL + 43 LIQ) - no repaint found there.
+--- USDJPY#D61E,M5 : comparing the last two builds ---
+  A  v2.53 params=461F006E build=20 id=1791818856/3 liq=READY from=2026.09.23 04:05 to=2026.10.16 12:55 warmup_end=2026.09.23 12:25 rows=90 MODEL + 44 LIQ
+  B  v2.53 params=461F006E build=21 id=1791818856/3 liq=READY from=2026.09.23 04:05 to=2026.10.16 12:55 warmup_end=2026.09.23 12:25 rows=90 MODEL + 44 LIQ
+  common region: 2026.09.23 12:30 .. 2026.10.16 13:00  (same window)
+    MODEL  IDENTICAL over 90 / 90 row(s)
+    LIQ    IDENTICAL over 44 / 44 row(s)
+    CTX    IDENTICAL over 14 / 14 event(s)
+  IDENTICAL inside the comparable region (90 MODEL + 44 LIQ) - no repaint found there.
+--- XAUUSD#0051,M5 : comparing the last two builds ---
+  A  v2.53 params=461F006E build=19 id=1791818856/1 liq=READY from=2026.09.22 10:20 to=2026.10.16 12:55 warmup_end=2026.09.22 18:40 rows=52 MODEL + 45 LIQ
+  B  v2.53 params=461F006E build=20 id=1791818856/1 liq=READY from=2026.09.22 10:20 to=2026.10.16 12:55 warmup_end=2026.09.22 18:40 rows=52 MODEL + 45 LIQ
+  common region: 2026.09.22 18:45 .. 2026.10.16 13:00  (same window)
+    MODEL  IDENTICAL over 52 / 52 row(s)
+    LIQ    IDENTICAL over 45 / 45 row(s)
+    CTX    IDENTICAL over 12 / 12 event(s)
+  IDENTICAL inside the comparable region (52 MODEL + 45 LIQ) - no repaint found there.
+--- AUDUSD#F40A,M5 : comparing the last two builds ---
+  A  v2.53 params=461F006E build=20 id=1791818856/5 liq=READY from=2026.09.23 04:00 to=2026.10.16 12:55 warmup_end=2026.09.23 12:20 rows=0 MODEL + 51 LIQ
+  B  v2.53 params=461F006E build=21 id=1791818856/5 liq=READY from=2026.09.23 04:00 to=2026.10.16 12:55 warmup_end=2026.09.23 12:20 rows=0 MODEL + 51 LIQ
+  common region: 2026.09.23 12:25 .. 2026.10.16 13:00  (same window)
+    MODEL  INSUFFICIENT SAMPLE - no MODEL row on either side
+    LIQ    IDENTICAL over 51 / 51 row(s)
+    CTX    IDENTICAL over 16 / 16 event(s)
+  IDENTICAL inside the comparable region (0 MODEL + 51 LIQ) - no repaint found there.
+
+## 1b. second sample: 20261015.log cut at 09:55:30 local (refresh pairs at 09:55)
+--- EURUSD#DBFD,M5 : comparing the last two builds ---
+  common region: 2026.09.22 11:25 .. 2026.10.15 11:55  (same window)
+    MODEL  IDENTICAL over 89 / 89 row(s)
+    LIQ    IDENTICAL over 43 / 43 row(s)
+    CTX    IDENTICAL over 12 / 12 event(s)
+    PROT   IDENTICAL over 29 / 29 row(s) (PROT / ANCHOR / INTERNAL)
+  IDENTICAL inside the comparable region (89 MODEL + 43 LIQ) - no repaint found there.
+--- EURUSD#C901,M5 : comparing the last two builds ---
+  common region: 2026.09.22 11:25 .. 2026.10.15 11:55  (same window)
+    MODEL  IDENTICAL over 90 / 90 row(s)
+    LIQ    IDENTICAL over 43 / 43 row(s)
+    CTX    IDENTICAL over 11 / 11 event(s)
+    PROT   IDENTICAL over 27 / 27 row(s) (PROT / ANCHOR / INTERNAL)
+  IDENTICAL inside the comparable region (90 MODEL + 43 LIQ) - no repaint found there.
+--- USDJPY#EB67,M5 : comparing the last two builds ---
+  common region: 2026.09.22 11:25 .. 2026.10.15 11:55  (same window)
+    MODEL  IDENTICAL over 127 / 127 row(s)
+    LIQ    IDENTICAL over 45 / 45 row(s)
+    CTX    IDENTICAL over 10 / 10 event(s)
+    PROT   IDENTICAL over 25 / 25 row(s) (PROT / ANCHOR / INTERNAL)
+  IDENTICAL inside the comparable region (127 MODEL + 45 LIQ) - no repaint found there.
+--- XAUUSD#2896,M5 : comparing the last two builds ---
+  common region: 2026.09.21 17:40 .. 2026.10.15 11:55  (same window)
+    MODEL  IDENTICAL over 109 / 109 row(s)
+    LIQ    IDENTICAL over 43 / 43 row(s)
+    CTX    IDENTICAL over 9 / 9 event(s)
+    PROT   IDENTICAL over 18 / 18 row(s) (PROT / ANCHOR / INTERNAL)
+  IDENTICAL inside the comparable region (109 MODEL + 43 LIQ) - no repaint found there.
+
+## 2. live vs rebuild, 20261015.log alone (no stretch across a sleep)
+--- AUDUSD#92D1,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 2   comparable: 2   pending review: 0   liquidity pending: 0
+  live events compared: 3 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- AUDUSD#F40A,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 2   comparable: 2   pending review: 0   liquidity pending: 0
+  live events compared: 3 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- EURUSD#7877,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 1 (+ 0 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- EURUSD#C901,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 1 (+ 0 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- EURUSD#DBFD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 1 (+ 0 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- GBPUSD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 2 (+ 0 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- NZDUSD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- USDCAD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 2   comparable: 1   pending review: 1   liquidity pending: 0
+    pending: build 12->13: 1 live row(s) on an edge bar, not provably covered
+    pending: build 12->13: no judged event (LIQ pending or edge rows only) - not comparable
+  live events compared: 12 (+ 0 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDCHF,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 1 (+ 0 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDJPY#D61E,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 1 (+ 0 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDJPY#EB67,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 1 (+ 0 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- XAUUSD#0051,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- XAUUSD#2896,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+
+## 2. live vs rebuild, 20261016.log alone (no stretch across a sleep)
+--- AUDUSD#92D1,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- AUDUSD#F40A,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- EURUSD#7877,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- EURUSD#C901,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- EURUSD#DBFD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- GBPUSD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- NZDUSD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDCAD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDCHF,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- USDJPY#D61E,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- USDJPY#EB67,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- XAUUSD#0051,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 1 (+ 0 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- XAUUSD#2896,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+
+## 3. -Ctx -Days 3 (per instance)
+  AUDUSD#92D1
+      transitions  opened 9 = ok 6 + fail 2 + timeout 0 + still open 1
+      swing consumed twice in one build  0 proven, 0 pending  (12 of 12 build(s) COMPLETE and read)
+      level installed already broken  0 proven, 0 pending  (622 SET / ADVANCE / MOVE row(s))
+      A-33 stale BOS  0 suspect(s), 0 pending, of 31 continuation BOS  (margin 3 pt, H4SwingRight 2)
+  AUDUSD#F40A
+      transitions  opened 18 = ok 7 + fail 9 + timeout 1 + still open 1
+      swing consumed twice in one build  0 proven, 0 pending  (14 of 14 build(s) COMPLETE and read)
+      A-33 stale BOS  0 suspect(s), 0 pending, of 25 continuation BOS  (margin not logged, H4SwingRight 2)
+  EURUSD#7877
+      transitions  opened 15 = ok 5 + fail 8 + timeout 2 + still open 0
+      swing consumed twice in one build  0 proven, 0 pending  (16 of 16 build(s) COMPLETE and read)
+      A-33 stale BOS  0 suspect(s), 0 pending, of 27 continuation BOS  (margin not logged, H4SwingRight 2)
+  EURUSD#C901
+      transitions  opened 5 = ok 1 + fail 3 + timeout 0 + still open 1
+      swing consumed twice in one build  0 proven, 0 pending  (14 of 14 build(s) COMPLETE and read)
+      level installed already broken  0 proven, 0 pending  (630 SET / ADVANCE / MOVE row(s))
+      A-33 stale BOS  0 suspect(s), 3 pending, of 31 continuation BOS  (margin per bar (ATR), H4SwingRight 2)
+  EURUSD#DBFD
+      transitions  opened 5 = ok 1 + fail 3 + timeout 0 + still open 1
+      swing consumed twice in one build  0 proven, 0 pending  (14 of 14 build(s) COMPLETE and read)
+      level installed already broken  0 proven, 0 pending  (630 SET / ADVANCE / MOVE row(s))
+      A-33 stale BOS  0 suspect(s), 0 pending, of 31 continuation BOS  (margin 3 pt, H4SwingRight 2)
+  GBPUSD
+      transitions  opened 13 = ok 5 + fail 8 + timeout 0 + still open 0
+      swing consumed twice in one build  0 proven, 0 pending  (13 of 13 build(s) COMPLETE and read)
+      A-33 stale BOS  0 suspect(s), 2 pending, of 35 continuation BOS  (margin not logged, H4SwingRight 2)
+  NZDUSD
+      transitions  opened 14 = ok 6 + fail 7 + timeout 0 + still open 1
+      swing consumed twice in one build  0 proven, 0 pending  (14 of 14 build(s) COMPLETE and read)
+      A-33 stale BOS  0 suspect(s), 0 pending, of 32 continuation BOS  (margin not logged, H4SwingRight 2)
+  USDCAD
+      transitions  opened 11 = ok 5 + fail 5 + timeout 1 + still open 0
+      swing consumed twice in one build  0 proven, 0 pending  (13 of 13 build(s) COMPLETE and read)
+      A-33 stale BOS  0 suspect(s), 1 pending, of 37 continuation BOS  (margin not logged, H4SwingRight 2)
+  USDCHF
+      transitions  opened 18 = ok 10 + fail 7 + timeout 1 + still open 0
+      swing consumed twice in one build  0 proven, 0 pending  (13 of 13 build(s) COMPLETE and read)
+      A-33 stale BOS  0 suspect(s), 0 pending, of 24 continuation BOS  (margin not logged, H4SwingRight 2)
+  USDJPY#D61E
+      transitions  opened 14 = ok 7 + fail 6 + timeout 1 + still open 0
+      swing consumed twice in one build  0 proven, 0 pending  (14 of 14 build(s) COMPLETE and read)
+      A-33 stale BOS  0 suspect(s), 0 pending, of 26 continuation BOS  (margin not logged, H4SwingRight 2)
+  USDJPY#EB67
+      transitions  opened 9 = ok 4 + fail 3 + timeout 1 + still open 1
+      swing consumed twice in one build  0 proven, 0 pending  (12 of 12 build(s) COMPLETE and read)
+      level installed already broken  0 proven, 0 pending  (436 SET / ADVANCE / MOVE row(s))
+      A-33 stale BOS  0 suspect(s), 0 pending, of 25 continuation BOS  (margin 3 pt, H4SwingRight 2)
+  XAUUSD#0051
+      transitions  opened 15 = ok 6 + fail 6 + timeout 3 + still open 0
+      swing consumed twice in one build  0 proven, 0 pending  (13 of 13 build(s) COMPLETE and read)
+      A-33 stale BOS  0 suspect(s), 0 pending, of 27 continuation BOS  (margin not logged, H4SwingRight 2)
+  XAUUSD#2896
+      transitions  opened 11 = ok 2 + fail 5 + timeout 3 + still open 1
+      swing consumed twice in one build  0 proven, 0 pending  (12 of 12 build(s) COMPLETE and read)
+      level installed already broken  0 proven, 0 pending  (534 SET / ADVANCE / MOVE row(s))
+      A-33 stale BOS  0 suspect(s), 0 pending, of 26 continuation BOS  (margin 0 pt, H4SwingRight 2)
+
+## 4. v2.53 vs v2.54, same window (10-16 11:03 rebuild of both), BRI-12 attribution
+--- EURUSD#7877,M5  vs  EURUSD#DBFD,M5 : last complete build of each ---
+  common region: 2026.09.23 12:30 .. 2026.10.16 13:00  (same window)
+  DIFFERENT VERSIONS (2.53 / 2.54) - not a repaint test; MODEL upgrade regression only.
+    CTX P-4 protected level / internal     9
+    CTX P-5 old structure                  2
+    CTX P-7 failure first                  0
+    CTX PENDING_ATTRIBUTION                0
+    CTX UNEXPLAINED                        0
+    H4 state differs in 8 interval(s), first from 2026.07.06 16:00:
+    chain differences in the common region: POI 12   SESS 4   BLK 23   ARM 15   MODEL 52
+    verdicts: explained 166   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 52 MODEL difference(s) over 39 / 89 row(s); all 166 difference(s) traced to BRI-12 (protected level / new structure) with a concrete link
+--- USDJPY#D61E,M5  vs  USDJPY#EB67,M5 : last complete build of each ---
+  common region: 2026.09.23 12:30 .. 2026.10.16 13:00  (same window)
+  DIFFERENT VERSIONS (2.53 / 2.54) - not a repaint test; MODEL upgrade regression only.
+    CTX P-4 protected level / internal     6
+    CTX P-5 old structure                  2
+    CTX P-7 failure first                  0
+    CTX PENDING_ATTRIBUTION                0
+    CTX UNEXPLAINED                        0
+    H4 state differs in 6 interval(s), first from 2026.07.10 04:00:
+    chain differences in the common region: POI 28   SESS 16   BLK 77   ARM 64   MODEL 208
+    verdicts: explained 455   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 208 MODEL difference(s) over 90 / 128 row(s); all 455 difference(s) traced to BRI-12 (protected level / new structure) with a concrete link
+--- XAUUSD#0051,M5  vs  XAUUSD#2896,M5 : last complete build of each ---
+  common region: 2026.09.22 18:45 .. 2026.10.16 13:00  (same window)
+  DIFFERENT VERSIONS (2.53 / 2.54) - not a repaint test; MODEL upgrade regression only.
+    CTX P-4 protected level / internal     6
+    CTX P-5 old structure                  8
+    CTX P-7 failure first                  0
+    CTX PENDING_ATTRIBUTION                0
+    CTX UNEXPLAINED                        0
+    H4 state differs in 8 interval(s), first from 2026.06.26 16:00:
+    chain differences in the common region: POI 15   SESS 8   BLK 23   ARM 20   MODEL 75
+    verdicts: explained 191   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 75 MODEL difference(s) over 52 / 109 row(s); all 191 difference(s) traced to BRI-12 (protected level / new structure) with a concrete link
+--- AUDUSD#F40A,M5  vs  AUDUSD#92D1,M5 : last complete build of each ---
+  common region: 2026.09.23 12:25 .. 2026.10.16 13:00  (same window)
+  DIFFERENT VERSIONS (2.53 / 2.54) - not a repaint test; MODEL upgrade regression only.
+    CTX P-4 protected level / internal    12
+    CTX P-5 old structure                  2
+    CTX P-7 failure first                  0
+    CTX PENDING_ATTRIBUTION                0
+    CTX UNEXPLAINED                        0
+    H4 state differs in 9 interval(s), first from 2026.07.17 08:00:
+    chain differences in the common region: POI 7   SESS 2   BLK 16   ARM 15   MODEL 46
+    verdicts: explained 143   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 46 MODEL difference(s) over 0 / 46 row(s); all 143 difference(s) traced to BRI-12 (protected level / new structure) with a concrete link
