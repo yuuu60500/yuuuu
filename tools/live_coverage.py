@@ -21,7 +21,9 @@ is not live evidence. For the rows logged before the sleep it is still checked, 
     reverse  next first build rows with event time after the day's last 'to' and at least 10 min before the
              day's last log line (+ server offset) - the part the terminal provably ran - are all live rows
 It is reported as cross-sleep evidence for the reviewer to weigh, never as an intraday PASS.
-Exit status 1 when a compared intraday row differs or a cross-sleep row is not matched (a leg-only match counts as
+Live rows at the edges of a stretch (an event stamped after the later build's 'to', which a build still holds up to
+'to' + 5 min) are not counted; they are listed with the build that holds them.
+Exit status 1 when a compared intraday row differs, an edge row is in neither build, or a cross-sleep row is not matched (a leg-only match counts as
 not matched here; ReloadTest treats it as PENDING REVIEW).
 
     python3 tools/live_coverage.py [--ver 2.54] [--offset 2] LOG [LOG ...]    (logs in date order)
@@ -152,6 +154,7 @@ def main():
     srcs = sorted({s for _, seq, _, _ in days for s in seq})
     total = collections.defaultdict(collections.Counter)
     diffs = 0
+    edges = []
     print(f'== intraday live vs build, v{a.ver} instances (rows compared per category / differences)')
     print(f'  {"instance":14} {"day":10} pairs  {"MODEL":>5} {"LIQ":>4} {"CTX":>4} {"PROT":>4}  diff  outside')
     for src in srcs:
@@ -170,16 +173,23 @@ def main():
                     print(f'  {src} {name}: live row run/init differs from build {x["head"]["build"]} - stretch skipped')
                     continue
                 pairs += 1
-                used = 0
+                used = set()
                 for cat in CATS:
                     lo, hi = window(cat, x['head']['to'], y['head']['to'])
-                    lv = [r.key() for r in x['live'] if r.cat == cat and lo <= r.time <= hi]
+                    inw = [r for r in x['live'] if r.cat == cat and lo <= r.time <= hi]
+                    lv = [r.key() for r in inw]
                     bd = [r.key() for r in y['rows'] if r.cat == cat and lo <= r.time <= hi]
                     k, dd = compare(lv, bd)
                     n[cat] += k
                     d += dd
-                    used += len(lv)
-                outside += len(x['live']) - used
+                    used.update(id(r) for r in inw)
+                rest = [r for r in x['live'] if id(r) not in used]
+                outside += len(rest)
+                later = collections.Counter(r.key() for r in y['rows'])
+                earlier = collections.Counter(r.key() for r in x['rows'])
+                for r in rest:
+                    edges.append((src, name, r, 'in the later build' if later[r.key()] else
+                                  ('in the earlier build' if earlier[r.key()] else 'IN NEITHER BUILD'), y))
             if pairs:
                 total[src].update(n)
                 diffs += d
@@ -189,7 +199,16 @@ def main():
         t = total[src]
         print(f'  {src:14} {"":10} {"":5}  {t["MODEL"]:5} {t["LIQ"]:4} {t["CTX"]:4} {t["PROT"]:4}')
     print(f'  differences on compared rows: {diffs}')
-    print('  ("outside": live rows of a stretch whose event time is at its edges and is not judged)')
+    print('  ("outside": live rows of a stretch whose event time is at its edges; not counted, listed below)')
+    edge_bad = 0
+    edge_ok = collections.defaultdict(collections.Counter)
+    if edges:
+        print('\n== edge rows (outside the judged window, not counted in the table)')
+    for src, name, r, v, y in edges:
+        edge_bad += v == 'IN NEITHER BUILD'
+        if v != 'IN NEITHER BUILD':
+            edge_ok[src][r.cat] += 1
+        print(f'  {src} {name}  live {r.local}  {r.cat:5} {v:20} later build {y["local"]} local to={y["head"]["to"]}  {r.msg[:90]}')
 
     print(f'\n== across a sleep (A-60) - rows logged after the last build of a day, checked against the next first build')
     xs = collections.defaultdict(collections.Counter)
@@ -245,12 +264,13 @@ def main():
         t = total[src]
         have = [c for c in CATS if t[c]]
         only_x = [c for c in CATS if not t[c] and xs[src][c]]
-        none = [c for c in CATS if not t[c] and not xs[src][c]]
+        only_e = [c for c in CATS if not t[c] and edge_ok[src][c]]
+        none = [c for c in CATS if not t[c] and not xs[src][c] and not edge_ok[src][c]]
         print(f'  {src:14} intraday: {", ".join(have) or "-":24} across a sleep only: {", ".join(only_x) or "-":18} '
-              f'no sample: {", ".join(none) or "-"}')
+              f'edge only: {", ".join(only_e) or "-":12} no sample: {", ".join(none) or "-"}')
     if xbad:
         print(f'  across a sleep: {xbad} row(s) not matched - see above')
-    return 0 if diffs == 0 and xbad == 0 else 1
+    return 0 if diffs == 0 and xbad == 0 and edge_bad == 0 else 1
 
 
 if __name__ == '__main__':

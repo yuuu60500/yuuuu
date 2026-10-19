@@ -2069,4 +2069,12 @@ Round 26 更正:           「所有可比区间双向一致」成立；「每�
                          不当作当日区间通过；是否计入由验收方判定
 补测要求:                五个 v2.54 图开机后刷新；白天定时刷新，看到实时事件后过一根完整 M5 再刷新；休眠前必须刷新；
                          跨午夜提交两天日志；结果按 MODEL / LIQ / CTX / PROT 分列（live_coverage.py）
+10-19 补测:              日志 09:17 .. 16:20（不跨休眠；v2.54 刷新 09:45 黄金、13:35–13:56、15:51），差异 0。
+                         新增当日区间：AUDUSD MODEL 13 / LIQ 1 / CTX 1 / PROT 2，USDJPY LIQ 2 / CTX 1 / PROT 2，XAUUSD LIQ 2
+                         10-14 .. 10-19 合计（MODEL / LIQ / CTX / PROT）：EURUSD 默认 1/2/2/2、EURUSD ATR 1/2/2/2、AUDUSD 15/5/2/2、
+                         USDJPY 0/5/2/4、XAUUSD 0/2/0/0 —— EURUSD 两实例与 AUDUSD 四类齐全
+                         边界行：USDJPY MSS 实时 13:35:00，时间戳 15:35 = 13:36 重建的 to + 5 分钟，重建里原样存在；
+                         按验收方窗口（止于后一次构建的 to）不计入，单列。live_coverage.py 增列边界行（两次构建都没有 → 退出码 1）
+                         仍缺：XAUUSD MODEL（任何区间都没有）；XAUUSD CTX / PROT 只有跨休眠；USDJPY MODEL 只有跨休眠与边界行
+                         证据 docs/evidence/v2.54_live_coverage_20261019.txt
 ```
