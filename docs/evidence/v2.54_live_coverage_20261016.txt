@@ -1,0 +1,64 @@
+# v2.54 live vs build coverage by category (MODEL / LIQ / CTX / PROT), logs 20261014 .. 20261016 (user terminal, server = local + 2 h)
+# command: python3 tools/live_coverage.py 20261014.log 20261015.log 20261016.log      (exit 0)
+# log sha256:
+#   36eec49b39388c477e2cc4de6860cb581ce2546060f87fdf5ca54963b05c6e44  20261014.log
+#   fb6bb18e91c866c9dfccb017c761ea12a3fb8c787946be6a418cf88f8779e3e8  20261015.log
+#   49572b88299bf6673d860af806049baf011bf470fcfc52684dd30ef297749a76  20261016.log (full day, to 16:40 local)
+# The intraday table equals the reviewer's independent count (v2.54r6 review, 2026-10-16, 10-16 to 11:20):
+#   DBFD 1/2/2/2, C901 1/2/2/2, USDJPY 0/3/1/2, XAUUSD 0/0/0/0, AUDUSD 2/4/1/0; the rest of 10-16 adds no row.
+# Guard: one live CTX row altered (intraday) -> differences 2, exit 1; one pre-sleep PROT level altered -> forward
+#   MISSING, reverse missing 1, the category drops out of the cross-sleep line, exit 1.
+
+== intraday live vs build, v2.54 instances (rows compared per category / differences)
+  instance       day        pairs  MODEL  LIQ  CTX PROT  diff  outside
+  AUDUSD#92D1    20261014       1      2    1    0    0     0        0
+  AUDUSD#92D1    20261015       4      0    3    1    0     0        0
+  AUDUSD#92D1    20261016       4      0    0    0    0     0        0
+  EURUSD#C901    20261014       1      0    2    1    2     0        0
+  EURUSD#C901    20261015       6      1    0    0    0     0        0
+  EURUSD#C901    20261016       5      0    0    1    0     0        0
+  EURUSD#DBFD    20261014       1      0    2    1    2     0        0
+  EURUSD#DBFD    20261015       6      1    0    0    0     0        0
+  EURUSD#DBFD    20261016       5      0    0    1    0     0        0
+  USDJPY#EB67    20261014       1      0    2    1    2     0        0
+  USDJPY#EB67    20261015       4      0    1    0    0     0        0
+  USDJPY#EB67    20261016       4      0    0    0    0     0        0
+  XAUUSD#2896    20261014       2      0    0    0    0     0        0
+  XAUUSD#2896    20261015       4      0    0    0    0     0        0
+  XAUUSD#2896    20261016       6      0    0    0    0     0        0
+  total
+  AUDUSD#92D1                          2    4    1    0
+  EURUSD#C901                          1    2    2    2
+  EURUSD#DBFD                          1    2    2    2
+  USDJPY#EB67                          0    3    1    2
+  XAUUSD#2896                          0    0    0    0
+  differences on compared rows: 0
+  ("outside": live rows of a stretch whose event time is at its edges and is not judged)
+
+== across a sleep (A-60) - rows logged after the last build of a day, checked against the next first build
+  XAUUSD#2896 20261014: 4 live row(s) after the last build (13:45:55.848 local, to=2026.10.14 15:40)
+    next first build 20261015 09:06:33.101 local, to=2026.10.15 11:00, params 461F006E
+    forward  13:55:00.030  LIQ   exact     HMI-LIVE,XAUUSD,LIQ,-1,0,0,SSL,SWEEP,2026.10.14 15:55:00,4105.18,2026.10.14 15:40:00,0,inst=2896,run=179181885
+    forward  14:05:00.017  CTX   exact     HMI-CTX,XAUUSD,BOS,dir=DOWN,live=1,ctx=BEARISH,str=2,messy=1,bar=2026.10.14 16:00,swing=2026.10.08 16:00,swing
+    forward  14:05:00.017  PROT  exact     HMI-PROT,XAUUSD,ADVANCE,dir=DOWN,live=1,leg=11,bar=2026.10.14 16:00,level=4170.44,swing=2026.10.14 04:00,confi
+    forward  14:05:00.017  PROT  exact     HMI-ANCHOR,XAUUSD,MOVE,dir=DOWN,live=1,leg=11,bar=2026.10.14 16:00,level=4170.44,swing=2026.10.14 04:00,confir
+    reverse  awake window 10-14 15:40 .. 18:36 server (last line 16:46:36 local): 4 build row(s) {'LIQ': 1, 'CTX': 1, 'PROT': 2}, missing from live 0
+  USDJPY#EB67 20261015: 1 live row(s) after the last build (15:52:21.917 local, to=2026.10.15 17:45)
+    next first build 20261016 09:06:48.781 local, to=2026.10.16 11:00, params 461F006E
+    forward  16:04:58.916  MODEL exact     HMI-LIVE,USDJPY,MODEL,1,3016,3016,OB,CISD,2026.10.15 18:05:00,158.077,2026.10.15 02:05:00,158.142,inst=EB67,ru
+    reverse  awake window 10-15 17:45 .. 18:24 server (last line 16:34:58 local): 1 build row(s) {'MODEL': 1}, missing from live 0
+  XAUUSD#2896 20261015: 1 live row(s) after the last build (13:47:03.670 local, to=2026.10.15 15:40)
+    next first build 20261016 09:06:53.029 local, to=2026.10.16 11:00, params 461F006E
+    forward  14:24:58.869  LIQ   exact     HMI-LIVE,XAUUSD,LIQ,1,0,0,BSL,SWEEP,2026.10.15 16:25:00,4161.78,2026.10.15 16:15:00,0,inst=2896,run=1791818856
+    reverse  awake window 10-15 15:40 .. 18:24 server (last line 16:34:58 local): 1 build row(s) {'LIQ': 1}, missing from live 0
+  USDJPY#EB67 20261016: 1 live row(s) after the last build (11:03:13.045 local, to=2026.10.16 12:55)
+    no later log - not checked
+  USDJPY#EB67: both directions agree for MODEL 1
+  XAUUSD#2896: both directions agree for LIQ 2, CTX 1, PROT 2
+
+== category coverage, v2.54
+  AUDUSD#92D1    intraday: MODEL, LIQ, CTX          across a sleep only: -                  no sample: PROT
+  EURUSD#C901    intraday: MODEL, LIQ, CTX, PROT    across a sleep only: -                  no sample: -
+  EURUSD#DBFD    intraday: MODEL, LIQ, CTX, PROT    across a sleep only: -                  no sample: -
+  USDJPY#EB67    intraday: LIQ, CTX, PROT           across a sleep only: MODEL              no sample: -
+  XAUUSD#2896    intraday: -                        across a sleep only: LIQ, CTX, PROT     no sample: MODEL

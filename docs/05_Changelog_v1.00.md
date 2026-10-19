@@ -1916,3 +1916,16 @@ tools/h4_protect_attr.py  emit_case(warm_idx=) —— 比较区域晚于 H4 历�
 tools/logtests         110 组（新增 v09、c58）
 docs                   Audit Round 25；证据 docs/evidence/v2.54_mt5_run_20261015.txt
 ```
+
+## v2.54 —— 证据工具 live_coverage.py（MQL5 与 r2 相同；ReloadTest.ps1 与 r5 相同）
+
+```
+Date:     2026-10-19
+来源:     验收方「HMI v2.54r6 验收复核」（2026-10-16）：实时结果按 MODEL、LIQ、CTX、PROT 分开记录
+MQL5:     与 v2.54r2 字节相同（0/0）
+
+tools/live_coverage.py  只读证据工具：同一日志文件内相邻完整构建之间的实时行，按实例 × 日 × 类别计数并双向比较；
+                        跨休眠（A-60）的休眠前实时行单列（正向：次日首次重建中出现；反向：醒着的窗口内的重建行都是实时行）
+docs                    Audit Round 27（含 Round 26 更正）；证据 docs/evidence/v2.54_live_coverage_20261016.txt；
+                        v2.54 验收清单第 6 项的运行状态与补测方法
+```
