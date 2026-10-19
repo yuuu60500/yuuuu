@@ -2076,5 +2076,7 @@ Round 26 更正:           「所有可比区间双向一致」成立；「每�
                          边界行：USDJPY MSS 实时 13:35:00，时间戳 15:35 = 13:36 重建的 to + 5 分钟，重建里原样存在；
                          按验收方窗口（止于后一次构建的 to）不计入，单列。live_coverage.py 增列边界行（两次构建都没有 → 退出码 1）
                          仍缺：XAUUSD MODEL（任何区间都没有）；XAUUSD CTX / PROT 只有跨休眠；USDJPY MODEL 只有跨休眠与边界行
+                         XAUUSD v2.54 重建中 109 条 MODEL 全部落在 10-01 .. 10-09 的 6 天，10-09 之后没有 —— 运行期间黄金 MODEL
+                         本来就不触发，等实时样本的时间不可预估；是否按现有范围冻结（XAUUSD MODEL 写「无样本」）由验收方判定
                          证据 docs/evidence/v2.54_live_coverage_20261019.txt
 ```

@@ -78,3 +78,9 @@
   EURUSD#DBFD    intraday: MODEL, LIQ, CTX, PROT    across a sleep only: -                  edge only: -            no sample: -
   USDJPY#EB67    intraday: LIQ, CTX, PROT           across a sleep only: MODEL              edge only: MODEL        no sample: -
   XAUUSD#2896    intraday: LIQ                      across a sleep only: CTX, PROT          edge only: -            no sample: MODEL
+
+== XAUUSD#2896 MODEL rows in its last build of 10-19 (15:51 local; from 2026.09.23 15:10 to 2026.10.19 17:45 server)
+  109 MODEL rows, all on 6 days: 10-01 26, 10-02 14, 10-05 18, 10-06 39, 10-07 1, 10-09 11; none since 10-09.
+  By server hour they spread over the whole day (11:00-19:00 server 38, 19:00-24:00 server 28).
+  The runs 10-14 .. 10-19 fall in that quiet stretch: no live XAUUSD MODEL is expected until the model fires again,
+  so the wait for a live XAUUSD MODEL sample is open-ended.
