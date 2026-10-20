@@ -6,9 +6,9 @@ Two synthetic UTF-16 log days of one v2.54 instance, written like the MT5 Expert
   day 2  first build (holds the LIQ 12:40)
 Each case alters one thing in a copy and states the exit status the tool must give.
 
-    python3 tools/live_coverage_tests.py
+    python3 tools/live_coverage_tests.py [--workdir DIR]
 """
-import os, subprocess, sys, tempfile
+import contextlib, os, subprocess, sys, tempfile
 
 TOOL = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'live_coverage.py')
 ID = 'inst=T1,run=100,init=7'
@@ -73,6 +73,28 @@ def drop(old, which=0):
     return f
 
 
+# v2.55: HMI-REF at the ARMED bar 12:05 (close 12:10) and HMI-BRK + MODEL on the bar 12:15 (close 12:20), live between
+# build 1 (to 11:55) and build 2 (to 12:25), which holds all three; the second day only keeps the runner's two files
+REF = 'HMI-REF,AUDUSD,CISD,cycle={},dir=1,live={},armed=2026.10.19 12:10,armed_mp=3,state=OK,level=0.69780,' \
+      'ref=2026.10.19 11:50,cand_level=0.69780,run_from=2026.10.19 11:50,run_to=2026.10.19 11:55,brk_bar=-,brk_close=NA,brk_mp=NA'
+BRK = 'HMI-BRK,AUDUSD,CISD,cycle={},dir=1,live={},bar=2026.10.19 12:15,close=0.69785,mp=3,prev_bar=2026.10.19 12:10,' \
+      'prev_close=0.69781,prev_mp=3,level=0.69780,ref=2026.10.19 11:50'
+M255 = 'AUDUSD,MODEL,1,{},{},OB,CISD,2026.10.19 12:20:00,0.69779,2026.10.19 11:50:00,0.69780'
+
+
+def days255():
+    b = lambda n, to: begin(n, to).replace('ver=2.54', 'ver=2.55')
+    d1 = [line('10:00:00.000', b(1, '2026.10.19 11:55')), line('10:00:00.010', end(1, 0, 0)),
+          line('10:10:00.000', REF.format(30, 1) + ',' + ID), line('10:20:00.000', BRK.format(30, 1) + ',' + ID),
+          line('10:20:00.000', 'HMI-LIVE,' + M255.format(30, 30) + ',' + ID),
+          line('10:31:00.000', b(2, '2026.10.19 12:25')),
+          line('10:31:00.001', REF.format(4, 0) + ',' + ID), line('10:31:00.002', BRK.format(4, 0) + ',' + ID),
+          line('10:31:00.003', 'HMI-BUILD,' + M255.format(4, 4) + ',' + ID), line('10:31:00.010', end(2, 1, 0)),
+          line('11:00:00.000', 'HMI-POI,AUDUSD,TOUCH,id=1,dir=1,bar=2026.10.19 13:00,' + ID)]
+    d2 = [line('09:00:00.000', b(3, '2026.10.20 10:55')), line('09:00:00.010', end(3, 0, 0))]
+    return d1, d2
+
+
 LIVE_M = '10:10:00.000'
 CASES = [
     ('unaltered', lambda d: d, 0),
@@ -91,26 +113,41 @@ CASES = [
     ('build END marks wrong', sub('marks=2,', 'marks=3,'), 1),
     ('build never closed', drop('HMI-BUILD-END', 1), 1),
     ('live row cannot be parsed', sub('HMI-LIVE,' + LIQ, 'HMI-LIVE,AUDUSD,LIQ,-1,0,0,SSL,SWEEP,not-a-time'), 1),
+    # v2.55 (--ver 2.55): HMI-REF / HMI-BRK are a category of their own (B8); cycle= is init-relative, not compared
+    ('v2.55 unaltered (cycle ids differ)', lambda d: d, 0, '2.55'),
+    ('v2.55 live HMI-BRK prev_mp changed', sub('cycle=30,dir=1,live=1,bar=2026.10.19 12:15,close=0.69785,mp=3,'
+                                               'prev_bar=2026.10.19 12:10,prev_close=0.69781,prev_mp=3',
+                                               'cycle=30,dir=1,live=1,bar=2026.10.19 12:15,close=0.69785,mp=3,'
+                                               'prev_bar=2026.10.19 12:10,prev_close=0.69781,prev_mp=4'), 1, '2.55'),
+    ('v2.55 live HMI-REF missing', drop('HMI-REF,AUDUSD,CISD,cycle=30,'), 1, '2.55'),
 ]
 
 
 def main():
+    # --workdir DIR: write the fixtures there instead of a TemporaryDirectory (a sandbox may refuse its 0700 directory;
+    # reviewer, v2.54r8 review)
+    work = sys.argv[sys.argv.index('--workdir') + 1] if '--workdir' in sys.argv else None
     ok = 0
-    with tempfile.TemporaryDirectory() as tmp:
-        for name, alter, want in CASES:
-            d1, d2 = alter(days())
+    with (contextlib.nullcontext(work) if work else tempfile.TemporaryDirectory()) as tmp:
+        os.makedirs(tmp, exist_ok=True)
+        for name, alter, want, *ver in CASES:
+            ver = ver[0] if ver else '2.54'
+            d1, d2 = alter(days255() if ver == '2.55' else days())
             paths = []
             for n, d in (('20261019.log', d1), ('20261020.log', d2)):
                 p = os.path.join(tmp, n)
                 with open(p, 'wb') as fh:
                     fh.write(('\r\n'.join(d) + '\r\n').encode('utf-16'))
                 paths.append(p)
-            r = subprocess.run([sys.executable, '-I', TOOL] + paths, capture_output=True, text=True)
+            r = subprocess.run([sys.executable, '-I', TOOL, '--ver', ver] + paths, capture_output=True, text=True)
             last = (r.stdout.strip().splitlines() or [''])[-1]
             good = r.returncode == want and (want == 1) == last.startswith('RESULT: NOT PASSED') and not r.stderr
             if name == 'unaltered':
                 good = good and 'AUDUSD#T1      20261019       1      1    1    1    1     0        1' in r.stdout \
                     and 'in the later build' in r.stdout and 'both directions agree for LIQ 1' in r.stdout
+            if name.startswith('v2.55 unaltered'):
+                good = good and 'AUDUSD#T1      20261019       1      1    0    0    0    2     0        0' in r.stdout \
+                    and 'intraday: MODEL, B8' in r.stdout
             ok += good
             print(f'  {"ok  " if good else "FAIL"} {name:40} exit {r.returncode} (want {want})  {last[:70]}')
             if not good:

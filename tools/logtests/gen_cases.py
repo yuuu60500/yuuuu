@@ -517,5 +517,97 @@ b2s = blk(2, init=2, to="2026.09.30 14:00", marks=MK + ["2026.09.30 13:05:00"], 
 case("c10_live_ctx_strength_only", [start()] + blk(1) + [live_ok, lctx] + [start(init=2)] + b2s, ["-LiveVsBuild"],
      ["AGREE BOTH WAYS on every covered bar", "1 H4 event(s) agree on swing and state but not on the strength number"], ["MISMATCH(ES)"])
 
+# ---- v2.55 BRI-08: -Versus v2.54 -> v2.55, the B8 category in reload and live vs build ----------------------------
+# The logs come from tools/bri08_sim.py: every scenario of docs/02 "BRI-08 修订稿 2" in one ladder series, its v2.54 and
+# v2.55 builds as the MQL writes them (ARM, HMI-REF, MODEL, HMI-BRK). ladder_check() proves each scenario gives in the
+# series what it gives alone; the expected verdict counts are the scenario table's (expected_verdicts()).
+import bri08_sim as B8                                                                  # noqa: E402
+SER, SPANS = B8.ladder(B8.SCEN)
+V8 = ["-Source", "USDJPY#0B54,M5", "-Versus", "USDJPY#0C55,M5"]
+NOT8 = ["traced to BRI-08 (first effective close) with a concrete link"]
+def b8pair(d, v54=None, v55=None):
+    a = B8.emit_build(SER, d, "2.54", "0B54", 1); b = B8.emit_build(SER, d, "2.55", "0C55", 2)
+    return (v54(a) if v54 else a) + (v55(b) if v55 else b)
+def b8case(name, lines, expect, forbid=(), args=V8):
+    os.makedirs(name, exist_ok=True)
+    open(os.path.join(name, "20261002.log"), "w", encoding="utf-8").write("\n".join(lines) + "\n")
+    C[name] = dict(args=args, expect=expect, forbid=list(forbid))
+for d, nm in ((1, "bull"), (-1, "bear")):
+    B8.ladder_check(SER, SPANS, d)
+    ev = B8.expected_verdicts(SER, d); tot = sum(ev.values())
+    b8case(f"e0{1 if d > 0 else 2}_versus255_{nm}", b8pair(d),
+           [f"verdicts: explained {tot}   PENDING_ATTRIBUTION 0   UNEXPLAINED 0", f"all {tot} difference(s) traced to BRI-08 (first effective close) with a concrete link",
+            f"    {'B8-C5':<12} {ev['C5']:>4}", f"    {'B8-SLOW':<12} {ev['SLOW']:>4}", f"    {'B8-SHIFT':<12} {ev['SHIFT']:>4}", f"    {'B8-NA':<12} {ev['NA']:>4}",
+            "other rows that differ: 0"], ["UNEXPLAINED - not traced", "NOT JUDGED"])
+def one(pred, fn):                       # change the first line pred() picks, exactly once
+    def f(lines):
+        out, done = [], False
+        for l in lines:
+            if not done and pred(l): l = fn(l); done = True
+            if l is not None: out.append(l)
+        assert done; return out
+    return f
+def fld(l, k): return l.split(f",{k}=")[1].split(",")[0]
+def setf(l, k, v): return l.replace(f",{k}={fld(l, k)},", f",{k}={v},", 1)
+_slow = lambda l: l.split("  ")[-1].startswith("HMI-BRK,") and fld(l, "prev_close") > fld(l, "level")          # bull: prev past the level
+b8case("e03_versus255_prev_not_in_zone", b8pair(1, v55=one(_slow, lambda l: setf(l, "prev_close", fld(l, "level")))),
+       ["is not between the level", "v2.54 would confirm on this bar too", "UNEXPLAINED - not traced to BRI-08"], NOT8)
+b8case("e04_versus255_na_brk_not_beyond", b8pair(1, v55=one(lambda l: "state=NA_BROKEN" in l, lambda l: setf(l, "brk_close", fld(l, "cand_level")))),
+       ["NA_BROKEN, but brk_close", "UNEXPLAINED - not traced to BRI-08"], NOT8)
+_c5 = lambda l: ",MSS," in l and "HMI-REF," in l and "c5diff=-" not in l
+b8case("e05_versus255_c5diff_missing", b8pair(1, v55=one(_c5, lambda l: l.replace(",c5diff=" + l.split(",c5diff=")[1].split(",")[0], ",c5diff=-"))),
+       ["without a c5diff entry that decides it", "UNEXPLAINED - not traced to BRI-08"], NOT8)
+def _c5bad(l):
+    e = l.split(",c5diff=")[1].split(",")[0].split(";")[0]; parts = e.split("/")      # time@px / chk / close / mp / oXnY
+    parts[3] = "0" if parts[4] == "o1n0" else str(int(parts[3]) + 20)                      # make its own-margin judgement flip
+    return l.replace(",c5diff=" + e, ",c5diff=" + "/".join(parts))
+b8case("e06_versus255_c5diff_arith", b8pair(1, v55=one(_c5, _c5bad)), ["does not hold", "UNEXPLAINED - not traced to BRI-08"], NOT8)
+b8case("e07_versus255_other_row", b8pair(1, v55=one(lambda l: "HMI-ARM," in l, lambda l: l.replace("sess=60", "sess=61"))),
+       ["BRI-08 changes CISD / MSS only: this row must be the same in both builds", "UNEXPLAINED - not traced to BRI-08"], NOT8)
+b8case("e08_versus255_brk_missing", b8pair(1, v55=one(lambda l: "HMI-BRK," in l, lambda l: None)),
+       ["no HMI-BRK row for this confirmation", "UNEXPLAINED - not traced to BRI-08"], NOT8)
+# B8-SHIFT whose v2.54 row is moved EARLIER than v2.55's: not the re-cross
+_sh = B8.process(SER, 1, False)
+_t = lambda i: (__import__("datetime").datetime(2026, 9, 10) + __import__("datetime").timedelta(minutes=5 * i)).strftime("%Y.%m.%d %H:%M")
+_e4 = {(c, m): n for (c, m, n) in _sh[0]}; _e5 = {(c, m): n for (c, m, n) in B8.process(SER, 1, True)[0]}
+_k = next(k for k in _e4 if k in _e5 and _e4[k] > _e5[k])
+_row = f"OB,{_k[1]},{_t(_e4[_k] + 1)}:00"
+b8case("e09_versus255_shift_earlier", b8pair(1, v54=one(lambda l: _row in l and f",{100 + _k[0]},{100 + _k[0]}," in l,
+                                                          lambda l: l.replace(_row, f"OB,{_k[1]},{_t(_e5[_k] - 1)}:00"))),
+       ["not the later re-cross of the same reference", "UNEXPLAINED - not traced to BRI-08"], NOT8)
+b8case("e10_versus255_window_moved", b8pair(1, v55=one(lambda l: "HMI-BUILD-BEGIN," in l, lambda l: setf(l, "from", "2026.09.09 23:55"))),
+       ["NOT JUDGED - the two builds start at different bars", "NOT JUDGED (window moved), not a pass"], NOT8)
+b8case("e11_versus255_ref_missing", b8pair(1, v55=one(lambda l: "HMI-REF," in l and ",CISD," in l, lambda l: None)),
+       ["no HMI-REF CISD row for this cycle", "UNEXPLAINED - not traced to BRI-08"], NOT8)
+b8case("e12_versus255_model_level", b8pair(1, v55=one(lambda l: ",MODEL," in l and ",CISD," in l,
+                                                      lambda l: l.replace("," + l.split(",")[-4] + ",inst=", ",1.29999,inst="))),
+       ["are not HMI-REF's", "UNEXPLAINED - not traced to BRI-08"], NOT8)
+# reload (same version) and live vs build: HMI-REF / HMI-BRK are a judged category (B8)
+def trunc(n): return dict(bars=SER["bars"][:n], margin=SER["margin"][:n], armed=[a for a in SER["armed"] if a < n], A=SER["armed"][0])
+R8 = ["-Source", "USDJPY,M5"]
+b1, b2 = B8.emit_build(SER, 1, "2.55", "0C55", 2, build=1), B8.emit_build(SER, 1, "2.55", "0C55", 2, build=2)
+b8case("e13_reload255_identical", b1 + b2[1:], ["B8     IDENTICAL over", "IDENTICAL inside the comparable region"], ["MISMATCH"], R8)
+b8case("e14_reload255_ref_changed", b1 + one(lambda l: "HMI-REF," in l, lambda l: setf(l, "armed_mp", "9"))(b2[1:]),
+       ["B8     MISMATCH (2)", "differ INSIDE the comparable region"], ["IDENTICAL inside"], R8)
+X, Y = 60, 175
+lb1 = B8.emit_build(trunc(X + 1), 1, "2.55", "0C55", 2, build=1)
+lb2 = B8.emit_build(trunc(Y + 1), 1, "2.55", "0C55", 2, build=2)
+def _live(lines):
+    out = []
+    for l in lines:
+        p = l.split("  ")[-1]
+        if p.startswith(("HMI-REF,", "HMI-BRK,")):
+            t = (fld(l, "armed") if p.startswith("HMI-REF,") else fld(l, "bar"))
+            out.append((t, l.replace(",live=0,", ",live=1,")))
+        elif p.startswith("HMI-BUILD,") and ",MODEL," in p:
+            out.append((p.split(",")[7][:16], l.replace("HMI-BUILD,", "HMI-LIVE,")))
+    lo = _t(X + 1)                                            # rows of bars after build 1's last bar
+    return [l for (t, l) in out if t >= lo]
+LIVE = _live(lb2[2:-1])
+assert any("HMI-BRK," in l for l in LIVE) and any("HMI-REF," in l for l in LIVE)
+b8case("e15_live255_ok", lb1 + LIVE + lb2[1:], ["BRI-08 rows compared:", "AGREE BOTH WAYS on every covered bar"], ["MISMATCH(ES)"], ["-LiveVsBuild"])
+b8case("e16_live255_brk_missing", lb1 + one(lambda l: "HMI-BRK," in l, lambda l: None)(LIVE) + lb2[1:],
+       ["MISMATCH(ES) on covered bars", "build only [1->2] B8 HMI-BRK"], ["AGREE BOTH WAYS"], ["-LiveVsBuild"])
+
 json.dump(C, open("cases.json", "w"), indent=1)
 print(len(C), "cases")

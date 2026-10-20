@@ -6,6 +6,8 @@ categories that have a sample and the ones that do not (reviewer, v2.54r6 review
 
     MODEL  HMI-LIVE ...,MODEL,...                LIQ   HMI-LIVE ...,LIQ,...
     CTX    HMI-CTX ...,live=1,...                PROT  HMI-PROT / HMI-ANCHOR / HMI-CTX-INTERNAL ...,live=1,...
+    B8     (--ver 2.55 and later) HMI-REF / HMI-BRK ...,live=1,...  - judged on the bars MODEL rows are (their time is
+           the ARMED / confirming bar's close); cycle= is left out of the key like a MODEL row's ids
 
 Intraday: consecutive COMPLETE builds of one instance in one log file (one local day, no sleep in
 between), same params digest. The live rows logged between them, whose run/init must be the earlier
@@ -47,10 +49,15 @@ def T(s):
 def category(c):
     if c[0] in ('HMI-BUILD', 'HMI-LIVE'):
         return c[2] if len(c) > 2 and c[2] in ('MODEL', 'LIQ') else None
-    return {'HMI-CTX': 'CTX', 'HMI-PROT': 'PROT', 'HMI-ANCHOR': 'PROT', 'HMI-CTX-INTERNAL': 'PROT'}.get(c[0])
+    return {'HMI-CTX': 'CTX', 'HMI-PROT': 'PROT', 'HMI-ANCHOR': 'PROT', 'HMI-CTX-INTERNAL': 'PROT',
+            'HMI-REF': 'B8', 'HMI-BRK': 'B8'}.get(c[0])
 
 
 def event_time(c, f):
+    if c[0] == 'HMI-REF':                     # v2.55: the ARMED bar's close, as a MODEL row's time
+        return T(f['armed'])
+    if c[0] == 'HMI-BRK':                     # bar= is an M5 open time; the confirming bar closes 5 min later
+        return T(f['bar']) + dt.timedelta(minutes=5)
     return T(c[8]) if c[0] in ('HMI-BUILD', 'HMI-LIVE') else T(f['bar'])
 
 
@@ -58,7 +65,8 @@ def key(c, f, drop=()):
     if c[0] in ('HMI-BUILD', 'HMI-LIVE'):
         z = [x for x in c[1:] if not x.startswith(('inst=', 'run=', 'init='))]
         return ('MODEL/LIQ', z[1]) + tuple(z[:3] + z[5:])       # symbol, category, direction; not cycle / block id
-    return (c[0], c[2]) + tuple(sorted((k, v) for k, v in f.items() if k not in ('live', 'inst', 'run', 'init') + drop))
+    skip = ('live', 'inst', 'run', 'init') + (('cycle',) if c[0] in ('HMI-REF', 'HMI-BRK') else ())   # cycle= is init-relative
+    return (c[0], c[2]) + tuple(sorted((k, v) for k, v in f.items() if k not in skip + drop))
 
 
 class Row:
@@ -141,7 +149,7 @@ def read_log(path, ver):
 
 
 def window(cat, a_to, b_to):
-    lo = T(a_to) + (dt.timedelta(minutes=10) if cat in ('MODEL', 'LIQ') else dt.timedelta(seconds=1))
+    lo = T(a_to) + (dt.timedelta(minutes=10) if cat in ('MODEL', 'LIQ', 'B8') else dt.timedelta(seconds=1))
     return lo, T(b_to)
 
 
@@ -168,11 +176,16 @@ def main():
             print(f'  {name}: {pr}')
 
     srcs = sorted({s for _, seq, _, _ in days for s in seq})
+    try:
+        cats = CATS + (('B8',) if float(a.ver) >= 2.55 else ())   # v2.55: HMI-REF / HMI-BRK (BRI-08 diagnostics)
+    except ValueError:
+        cats = CATS
+    cols = lambda c: ' '.join(f'{c[k]:{5 if k == "MODEL" else 4}}' for k in cats)
     total = collections.defaultdict(collections.Counter)
     diffs = 0
     edges = []
     print(f'== intraday live vs build, v{a.ver} instances (rows compared per category / differences)')
-    print(f'  {"instance":14} {"day":10} pairs  {"MODEL":>5} {"LIQ":>4} {"CTX":>4} {"PROT":>4}  diff  outside')
+    print(f'  {"instance":14} {"day":10} pairs  ' + ' '.join(f'{k:>{5 if k == "MODEL" else 4}}' for k in cats) + '  diff  outside')
     for src in srcs:
         for name, seq, _, _ in days:
             bb = [b for b in seq.get(src, []) if b['status'] == 'COMPLETE']
@@ -190,7 +203,7 @@ def main():
                     continue
                 pairs += 1
                 used = set()
-                for cat in CATS:
+                for cat in cats:
                     lo, hi = window(cat, x['head']['to'], y['head']['to'])
                     inw = [r for r in x['live'] if r.cat == cat and lo <= r.time <= hi]
                     lv = [r.key() for r in inw]
@@ -209,11 +222,11 @@ def main():
             if pairs:
                 total[src].update(n)
                 diffs += d
-                print(f'  {src:14} {name:10} {pairs:5}  {n["MODEL"]:5} {n["LIQ"]:4} {n["CTX"]:4} {n["PROT"]:4}  {d:4}  {outside:7}')
+                print(f'  {src:14} {name:10} {pairs:5}  {cols(n)}  {d:4}  {outside:7}')
     print('  total')
     for src in srcs:
         t = total[src]
-        print(f'  {src:14} {"":10} {"":5}  {t["MODEL"]:5} {t["LIQ"]:4} {t["CTX"]:4} {t["PROT"]:4}')
+        print(f'  {src:14} {"":10} {"":5}  {cols(t)}')
     print(f'  differences on compared rows: {diffs}')
     print('  ("outside": live rows of a stretch whose event time is at its edges; not counted, listed below)')
     edge_bad = 0
@@ -273,15 +286,15 @@ def main():
     if not found:
         print('  none')
     for src in sorted(xs):
-        print(f'  {src}: both directions agree for ' + ', '.join(f'{c} {xs[src][c]}' for c in CATS if xs[src][c]))
+        print(f'  {src}: both directions agree for ' + ', '.join(f'{c} {xs[src][c]}' for c in cats if xs[src][c]))
 
     print(f'\n== category coverage, v{a.ver}')
     for src in srcs:
         t = total[src]
-        have = [c for c in CATS if t[c]]
-        only_x = [c for c in CATS if not t[c] and xs[src][c]]
-        only_e = [c for c in CATS if not t[c] and edge_ok[src][c]]
-        none = [c for c in CATS if not t[c] and not xs[src][c] and not edge_ok[src][c]]
+        have = [c for c in cats if t[c]]
+        only_x = [c for c in cats if not t[c] and xs[src][c]]
+        only_e = [c for c in cats if not t[c] and edge_ok[src][c]]
+        none = [c for c in cats if not t[c] and not xs[src][c] and not edge_ok[src][c]]
         print(f'  {src:14} intraday: {", ".join(have) or "-":24} across a sleep only: {", ".join(only_x) or "-":18} '
               f'edge only: {", ".join(only_e) or "-":12} no sample: {", ".join(none) or "-"}')
     if xbad:

@@ -242,6 +242,20 @@ function ProtParse([string]$msg) {
     $kn = "$tag|$ev|$body"
     [pscustomobject]@{ Tag = $tag; Ev = $ev; Bar = (PT16 $f['bar']); BarS = $f['bar']; KeyNoLeg = $kn; Key = "$kn|leg=$($f['leg'])"; F = $f }
 }
+# v2.55 (BRI-08): HMI-REF (one row per model at every ARMED) and HMI-BRK (one
+# row per CISD / MSS confirmation), judged like HMI-PROT. The key leaves out
+# live=, the identity and cycle= (an init-relative id, like a MODEL row's).
+# Time is the bar the row belongs to as a CLOSE time, as a MODEL row's: armed=
+# is one already; bar= is an M5 OPEN time (docs/02 BRI-08 B8-5), so + 5 min.
+function B8Parse([string]$msg) {
+    $c = $msg -split ','
+    if ($c.Count -lt 4) { return $null }
+    $f = @{}; foreach ($p in $c[3..($c.Count-1)]) { $kv = $p -split '=', 2; if ($kv.Count -eq 2) { $f[$kv[0]] = $kv[1] } }
+    $skip = @('live', 'inst', 'run', 'init', 'cycle')
+    $body = (@($f.Keys | Where-Object { $skip -notcontains $_ } | Sort-Object) | ForEach-Object { "$_=$($f[$_])" }) -join '|'
+    $t = $(if ($c[0] -eq 'HMI-REF') { PT16 $f['armed'] } else { (PT16 $f['bar']).AddMinutes(5) })
+    [pscustomobject]@{ Tag = $c[0]; Model = $c[2]; Cycle = $f['cycle']; F = $f; Time = $t; Key = "$($c[0])|$($c[2])|$body" }
+}
 function RowKind([string]$r) { $c = $r -split ','; if ($c.Count -gt 1) { return $c[1] } return '?' }
 function KV([string]$s) { $m = @{}; foreach ($p in ($s -split ',')) { $kv = $p -split '=', 2; if ($kv.Count -eq 2) { $m[$kv[0].Trim()] = $kv[1].Trim() } }; return $m }
 
@@ -292,7 +306,7 @@ function Close-Block($bk) {
     $bk.Status = $(if ($bk.Why.Count -eq 0) { 'COMPLETE' } else { 'INCOMPLETE' })
 }
 
-$blocks = @(); $open = @{}; $verNow = @{}; $liveAll = @(); $liveCtx = @(); $liveProt = @(); $orphanRows = 0; $orphanEnds = 0
+$blocks = @(); $open = @{}; $verNow = @{}; $liveAll = @(); $liveCtx = @(); $liveProt = @(); $liveB8 = @(); $orphanRows = 0; $orphanEnds = 0
 for ($i = 0; $i -lt $all.Count; $i++) {
     $l = $all[$i]
     if ($l -notmatch 'HMI') { continue }
@@ -354,6 +368,10 @@ for ($i = 0; $i -lt $all.Count; $i++) {
     elseif ($msg -match '^HMI-(PROT|ANCHOR|CTX-INTERNAL),') {         # v2.54: protected-level rows outside a build = live
         $pr = ProtParse $msg
         if ($pr) { $liveProt += [pscustomobject]@{ Src = $src; Idx = $i; Id = $id; P = $pr } }
+    }
+    elseif ($msg -match '^HMI-(REF|BRK),') {                          # v2.55: BRI-08 diagnostics outside a build = live
+        $br = B8Parse $msg
+        if ($br) { $liveB8 += [pscustomobject]@{ Src = $src; Idx = $i; Id = $id; X = $br } }
     }
     if ($l -match 'HMI-BUILD,(.*)$') {
         if (-not $open.ContainsKey($src)) { $orphanRows++; continue }
@@ -1027,8 +1045,9 @@ function Get-Struct($bk) {
     $poiById = @{}; $sessById = @{}; $blkById = @{}
     $poi = New-Object System.Collections.ArrayList; $sess = New-Object System.Collections.ArrayList
     $blk = New-Object System.Collections.ArrayList; $arm = New-Object System.Collections.ArrayList
-    $prot = New-Object System.Collections.ArrayList
+    $prot = New-Object System.Collections.ArrayList; $b8 = New-Object System.Collections.ArrayList
     foreach ($m in $bk.Lines) {
+        if ($m -match '^HMI-(REF|BRK),') { $br = B8Parse $m; if ($br) { [void]$b8.Add($br) }; continue }
         if ($m -match '^HMI-(PROT|ANCHOR|CTX-INTERNAL),') {
             $pr = ProtParse $m
             if ($pr) {
@@ -1097,7 +1116,7 @@ function Get-Struct($bk) {
     $blkBy = @{}; foreach ($x in $blk) { if (-not $blkBy.ContainsKey($x.B)) { $blkBy[$x.B] = $x } }
     $armOf = @{}; foreach ($x in @($arm | Sort-Object Time)) { if (-not $armOf.ContainsKey($x.BlockId)) { $armOf[$x.BlockId] = New-Object System.Collections.ArrayList }; [void]$armOf[$x.BlockId].Add($x) }
     $poiNew = @{}; foreach ($x in $poi) { if ($x.Kind -eq 'NEW' -and -not $poiNew.ContainsKey($x.P)) { $poiNew[$x.P] = $x } }
-    $s = [pscustomobject]@{ Ctx = $ctx; Proc = $proc; ProcSrc = $procSrc; DedupN = $dedupN; TDedup = $tDedup; Prot = $prot
+    $s = [pscustomobject]@{ Ctx = $ctx; Proc = $proc; ProcSrc = $procSrc; DedupN = $dedupN; TDedup = $tDedup; Prot = $prot; B8 = $b8
                             Poi = $poi; Sess = $sess; Blk = $blk; Arm = $arm; Models = $models
                             SessStart = $sessStart; SessEnd = $sessEnd; Starts = @($sess | Where-Object { $_.Kind -eq 'START' } | Sort-Object Time)
                             BlkBy = $blkBy; ArmOf = $armOf; ArmSorted = @($arm | Sort-Object Time); PoiNew = $poiNew }
@@ -1738,6 +1757,177 @@ function Show-StructAttribution($Old, $New, [datetime]$rs, [datetime]$re) {
                               Mode = $(if ($p254) { 'BRI-12' } else { 'de-dup' }) }
 }
 
+# ---- v2.54 -> v2.55 (BRI-08): CISD / MSS on the first effective close -----------------
+# docs/02 "BRI-08 修订稿 2" B8-4. Same window only. Every row but the CISD / MSS MODEL rows
+# must be the same in both builds; each CISD / MSS difference must hang on a v2.55
+# HMI-REF / HMI-BRK row whose arithmetic holds:
+#   B8-C5     MSS reference differs from the v2.54 rule's (old_*), with the c5diff entry that decides it
+#   B8-SLOW   same reference; v2.55 confirms on n while close[n-1] sat between the level and the threshold
+#   B8-SHIFT  same cycle, model, reference: v2.54 confirms later (the re-cross) than a B8-SLOW v2.55 row
+#   B8-NA     CISD N/A in v2.55: a bar in [k+1, A] closed beyond the candidate by its own margin
+# Prices are compared in integer points of the printed digits (Pts()).
+function B8Pts([string]$a, [string]$b) {
+    $d = [Math]::Max((PxDigits $a), (PxDigits $b))
+    $x = [decimal]0; $y = [decimal]0
+    if (-not [decimal]::TryParse($a, [Globalization.NumberStyles]::Float, $icx, [ref]$x) -or
+        -not [decimal]::TryParse($b, [Globalization.NumberStyles]::Float, $icx, [ref]$y)) { return $null }
+    $k = [decimal]1; for ($i = 0; $i -lt $d; $i++) { $k *= 10 }
+    return [int][Math]::Round(($x - $y) * $k)
+}
+function B8Beyond([int]$dir, [string]$close, [string]$level, [string]$mp) {
+    $p = B8Pts $close $level; $m = 0
+    if ($null -eq $p -or -not [int]::TryParse($mp, [ref]$m)) { return $null }
+    if ($dir -gt 0) { return ($p -gt $m) } return ($p -lt -$m)
+}
+function B8Zone([int]$dir, [string]$close, [string]$level, [string]$mp) {     # past the level, not past the threshold
+    $p = B8Pts $close $level; $m = 0
+    if ($null -eq $p -or -not [int]::TryParse($mp, [ref]$m)) { return $false }
+    if ($dir -gt 0) { return ($p -gt 0 -and $p -le $m) } return ($p -lt 0 -and $p -ge -$m)
+}
+function B8Model([string]$r) {     # a MODEL row (after the tag): sym,MODEL,dir,cycle,block,anchor,name,time,price,ref,level
+    $c = $r -split ','
+    $rt = [datetime]::MinValue; [void][datetime]::TryParseExact($c[9], 'yyyy.MM.dd HH:mm:ss', $icx, [Globalization.DateTimeStyles]::None, [ref]$rt)
+    [pscustomobject]@{ Row = $r; Dir = [int]$c[2]; Cycle = $c[3]; Name = $c[6]; Time = (RowTime $r); Ref = $rt; Level = $c[10]; Key = (Key $r) }
+}
+function Show-B8Attribution($Old, $New, [datetime]$rs, [datetime]$re, [bool]$moved) {
+    $lines = New-Object System.Collections.ArrayList
+    $tally = [ordered]@{ explained = 0; PENDING_ATTRIBUTION = 0; UNEXPLAINED = 0 }
+    $cls = [ordered]@{ 'B8-C5' = 0; 'B8-SLOW' = 0; 'B8-SHIFT' = 0; 'B8-NA' = 0; 'UNEXPLAINED' = 0 }
+    $say = { param([string]$c, [string]$what, [string]$why)
+        if ($c -eq 'UNEXPLAINED') { $tally.UNEXPLAINED++; $cls.UNEXPLAINED++; [void]$lines.Add(("{0,-20} {1}   <- {2}" -f 'UNEXPLAINED', $what, $why)) }
+        else { $tally.explained++; $cls[$c]++; [void]$lines.Add(("{0,-20} {1}   <- {2}: {3}" -f 'explained', $what, $c, $why)) } }
+    $sn = Get-Struct $New
+    Write-Host ("  BRI-08 attribution (v{0} -> v{1}): CISD / MSS rows only; every other row must be the same; v{1} REF {2} / BRK {3}" -f `
+                $Old.Ver, $New.Ver, @($sn.B8 | Where-Object { $_.Tag -eq 'HMI-REF' }).Count, @($sn.B8 | Where-Object { $_.Tag -eq 'HMI-BRK' }).Count)
+    if ($moved) {
+        Write-Host "    NOT JUDGED - the two builds start at different bars; BRI-08 attribution needs a fixed window (both versions in one M5 bar)" -ForegroundColor Yellow
+        return [pscustomobject]@{ Unexplained = 0; Pending = 1; Explained = 0; ModelDiff = 0; Mode = 'BRI-08' }
+    }
+
+    # 1. everything BRI-08 does not touch: the same rows, identity aside
+    $b8m = '^HMI-BUILD,[^,]*,MODEL,[^,]*,[^,]*,[^,]*,[^,]*,(CISD|MSS),'
+    $rest = { param($bk) @($bk.Lines | Where-Object { $_ -match '^HMI-' -and $_ -notmatch '^HMI-(REF|BRK),' -and $_ -notmatch $b8m } |
+                           ForEach-Object { [pscustomobject]@{ Key = ($_ -replace ',(inst|run|init)=[^,]*', '') } }) }
+    $dO = DiffKeys (& $rest $Old) (& $rest $New) 'Key'
+    foreach ($x in $dO.A) { & $say 'UNEXPLAINED' "v$($Old.Ver) only $($x.Key)" 'BRI-08 changes CISD / MSS only: this row must be the same in both builds' }
+    foreach ($x in $dO.B) { & $say 'UNEXPLAINED' "v$($New.Ver) only $($x.Key)" 'BRI-08 changes CISD / MSS only: this row must be the same in both builds' }
+    $otherN = $dO.A.Count + $dO.B.Count
+
+    # 2. the v2.55 log must agree with itself
+    $ref = @{}; $brk = @{}
+    foreach ($x in $sn.B8) {
+        $k = "$($x.Cycle)|$($x.Model)"
+        $tab = $(if ($x.Tag -eq 'HMI-REF') { $ref } else { $brk })
+        if ($tab.ContainsKey($k)) { & $say 'UNEXPLAINED' "v$($New.Ver) $($x.Tag) cycle $($x.Cycle) $($x.Model)" 'two rows for one cycle and model'; continue }
+        $tab[$k] = $x
+    }
+    $mo = @{}; $mn = @{}
+    foreach ($r in $Old.Rows) { if ((RowKind $r) -eq 'MODEL') { $m = B8Model $r; if ($m.Name -eq 'CISD' -or $m.Name -eq 'MSS') { $mo["$($m.Cycle)|$($m.Name)"] = $m } } }
+    foreach ($r in $New.Rows) { if ((RowKind $r) -eq 'MODEL') { $m = B8Model $r; if ($m.Name -eq 'CISD' -or $m.Name -eq 'MSS') { $mn["$($m.Cycle)|$($m.Name)"] = $m } } }
+    foreach ($a in @($sn.Arm)) {
+        foreach ($nm in @('CISD', 'MSS')) {
+            $x = $ref["$($a.BlockId)|$nm"]
+            if (-not $x) { & $say 'UNEXPLAINED' "v$($New.Ver) ARMED $(T16 $a.Time) block $($a.BlockId)" "no HMI-REF $nm row for this cycle" }
+            elseif ($x.F['armed'] -ne (T16 $a.Time)) { & $say 'UNEXPLAINED' "v$($New.Ver) HMI-REF cycle $($a.BlockId) $nm" "armed=$($x.F['armed']) is not the ARMED bar $(T16 $a.Time)" }
+        }
+    }
+    $okEntry = @{}                                   # c5diff entries whose arithmetic holds: "cycle|cand time@price|o1n0"
+    foreach ($k in @($ref.Keys)) {
+        $x = $ref[$k]; $f = $x.F; $d = [int]$f['dir']; $what = "v$($New.Ver) HMI-REF cycle $($x.Cycle) $($x.Model)"
+        if ($x.Model -eq 'CISD') {
+            if ($f['state'] -eq 'OK' -and $f['level'] -ne $f['cand_level']) { & $say 'UNEXPLAINED' $what "state OK but level $($f['level']) is not cand_level $($f['cand_level'])" }
+            if ($f['state'] -eq 'NA_BROKEN') {
+                $bt = PT16 $f['brk_bar']; $from = PT16 $f['run_from']; $arm = PT16 $f['armed']
+                $b = B8Beyond $d $f['brk_close'] $f['cand_level'] $f['brk_mp']
+                if (-not $b) { & $say 'UNEXPLAINED' $what "NA_BROKEN, but brk_close $($f['brk_close']) is not beyond cand_level $($f['cand_level']) by brk_mp $($f['brk_mp'])" }
+                elseif (-not ($bt -gt $from -and $bt.AddMinutes(5) -le $arm)) { & $say 'UNEXPLAINED' $what "NA_BROKEN, but brk_bar $($f['brk_bar']) is not in [k+1, A] (run_from $($f['run_from']), armed $($f['armed']))" }
+            }
+        } else {
+            foreach ($e in @(([string]$f['c5diff'] -split ';') | Where-Object { $_ -and $_ -ne '-' })) {
+                if ($e -notmatch '^(.+)@([^/]+)/([^/]+)/([^/]+)/(-?\d+)/o([01])n([01])$') { & $say 'UNEXPLAINED' $what "c5diff entry not readable: $e"; continue }
+                $cand = $Matches[1]; $px = $Matches[2]; $ct = $Matches[3]; $cc = $Matches[4]; $cm = $Matches[5]; $o = $Matches[6]; $n = $Matches[7]
+                $byOwn = B8Beyond $d $cc $px $cm; $byArm = B8Beyond $d $cc $px $f['armed_mp']
+                $tOk = ((PT16 $ct) -gt (PT16 $cand) -and (PT16 $ct).AddMinutes(5) -le (PT16 $f['armed']))
+                $good = $tOk -and ((($o -eq '1' -and $n -eq '0') -and $byArm -and -not $byOwn) -or (($o -eq '0' -and $n -eq '1') -and $byOwn -and -not $byArm))
+                if ($good) { $okEntry["$($x.Cycle)|$cand@$px|o$($o)n$($n)"] = 1 }
+                else { & $say 'UNEXPLAINED' $what "c5diff $e does not hold: close $cc vs $px is beyond by its own margin $cm = $byOwn, by armed_mp $($f['armed_mp']) = $byArm (bar after the swing and up to A: $tOk)" }
+            }
+        }
+    }
+    foreach ($k in @($mn.Keys)) {
+        $m = $mn[$k]; $x = $ref[$k]; $b = $brk[$k]; $what = "v$($New.Ver) MODEL cycle $($m.Cycle) $($m.Name) $(T16 $m.Time)"
+        if (-not $x -or $x.F['state'] -ne 'OK') { & $say 'UNEXPLAINED' $what "no HMI-REF with state OK for it"; continue }
+        if ($x.F['level'] -ne $m.Level -or (PT16 $x.F['ref']) -ne $m.Ref) { & $say 'UNEXPLAINED' $what "level / ref $($m.Level) $(T16 $m.Ref) are not HMI-REF's $($x.F['level']) $($x.F['ref'])" }
+        if (-not $b) { & $say 'UNEXPLAINED' $what 'no HMI-BRK row for this confirmation'; continue }
+        if ($b.Time -ne $m.Time -or $b.F['level'] -ne $m.Level) { & $say 'UNEXPLAINED' $what "HMI-BRK bar $($b.F['bar']) / level $($b.F['level']) do not match the MODEL row" }
+        elseif (-not (B8Beyond $m.Dir $b.F['close'] $b.F['level'] $b.F['mp'])) { & $say 'UNEXPLAINED' $what "HMI-BRK close $($b.F['close']) is not beyond $($b.F['level']) by mp $($b.F['mp'])" }
+    }
+    foreach ($k in @($brk.Keys)) { if (-not $mn.ContainsKey($k)) { & $say 'UNEXPLAINED' "v$($New.Ver) HMI-BRK cycle $(($k -split '\|')[0]) $(($k -split '\|')[1])" 'no MODEL row for this confirmation' } }
+
+    # 3. CISD / MSS rows that differ, cycle by cycle
+    $inR = { param($m) $m -and $m.Time -ge $rs -and $m.Time -le $re }
+    $mDiff = 0
+    foreach ($k in @(@($mo.Keys) + @($mn.Keys) | Sort-Object -Unique)) {
+        $o = $mo[$k]; $n = $mn[$k]
+        if (-not ((& $inR $o) -or (& $inR $n))) { continue }
+        if ($o -and $n -and $o.Key -eq $n.Key) { continue }
+        $mDiff += [int][bool]$o + [int][bool]$n
+        $x = $ref[$k]; $cyc, $nm = $k -split '\|'
+        $wo = $(if ($o) { "MODEL v$($Old.Ver) only $($o.Row)" }); $wn = $(if ($n) { "MODEL v$($New.Ver) only $($n.Row)" })
+        $both = { param([string]$c, [string]$why) if ($o) { & $say $c $wo $why }; if ($n) { & $say $c $wn $why } }
+        if (-not $x) { & $both 'UNEXPLAINED' "no v$($New.Ver) HMI-REF for cycle $cyc $nm"; continue }
+        $f = $x.F
+        if ($nm -eq 'MSS' -and ($f['state'] -ne $f['old_state'] -or $f['level'] -ne $f['old_level'] -or $f['ref'] -ne $f['old_ref'])) {
+            # B8-C5: the two rules froze different references; the deciding c5diff entry must hold
+            $need = @()
+            if ($f['old_state'] -eq 'OK' -and $f['state'] -eq 'OK') {
+                if ((PT16 $f['ref']) -gt (PT16 $f['old_ref'])) { $need += "$cyc|$($f['ref'])@$($f['level'])|o1n0" } else { $need += "$cyc|$($f['old_ref'])@$($f['old_level'])|o0n1" }
+            } elseif ($f['old_state'] -eq 'OK') { $need += "$cyc|$($f['old_ref'])@$($f['old_level'])|o0n1" }
+            elseif ($f['state'] -eq 'OK')       { $need += "$cyc|$($f['ref'])@$($f['level'])|o1n0" }
+            $miss = @($need | Where-Object { -not $okEntry.ContainsKey($_) })
+            $oFit = (-not $o) -or ($f['old_state'] -eq 'OK' -and $o.Level -eq $f['old_level'] -and $o.Ref -eq (PT16 $f['old_ref']))
+            if ($miss.Count) { & $both 'UNEXPLAINED' "references differ (v$($New.Ver) $($f['state']) $($f['level']) / old rule $($f['old_state']) $($f['old_level'])) without a c5diff entry that decides it ($($miss -join ', '))" }
+            elseif (-not $oFit) { & $both 'UNEXPLAINED' "the v$($Old.Ver) row's reference $($o.Level) is not the old rule's $($f['old_level']) in v$($New.Ver)'s HMI-REF" }
+            else { & $both 'B8-C5' ("C5 with each bar's margin froze {0} {1}; with the ARMED bar's margin ({2}) {3} {4} - c5diff {5}" -f $f['state'], $f['level'], $f['armed_mp'], $f['old_state'], $f['old_level'], ($need -join ', ')) }
+            continue
+        }
+        if ($n) {
+            $b = $brk[$k]
+            if (-not $b) { & $both 'UNEXPLAINED' "no v$($New.Ver) HMI-BRK row for this confirmation"; continue }
+            $slow = B8Zone $n.Dir $b.F['prev_close'] $b.F['level'] $b.F['prev_mp']
+            if (-not $slow) {
+                & $say 'UNEXPLAINED' $wn ("same reference, and the previous close {0} is not between the level {1} and the threshold (prev_mp {2}): v{3} would confirm on this bar too" -f $b.F['prev_close'], $b.F['level'], $b.F['prev_mp'], $Old.Ver)
+                if ($o) { & $say 'UNEXPLAINED' $wo "its v$($New.Ver) twin is not explained" }
+                continue
+            }
+            & $say 'B8-SLOW' $wn ("close[n-1] {0} ({1}) past the level {2} but within prev_mp {3}: v{4} needs the previous close on the unbroken side" -f $b.F['prev_close'], $b.F['prev_bar'], $b.F['level'], $b.F['prev_mp'], $Old.Ver)
+            if ($o) {
+                if ($o.Level -eq $n.Level -and $o.Ref -eq $n.Ref -and $o.Dir -eq $n.Dir -and $o.Time -gt $n.Time) {
+                    & $say 'B8-SHIFT' $wo ("same cycle, model and reference; v{0} confirmed already at {1}, v{2} only on the re-cross" -f $New.Ver, (T16 $n.Time), $Old.Ver)
+                } else { & $say 'UNEXPLAINED' $wo ("not the later re-cross of the same reference (v{0} {1} {2}, v{3} {4} {5})" -f $Old.Ver, $o.Level, (T16 $o.Time), $New.Ver, $n.Level, (T16 $n.Time)) }
+            }
+            continue
+        }
+        if ($nm -eq 'CISD' -and $f['state'] -eq 'NA_BROKEN' -and $o.Level -eq $f['cand_level'] -and $o.Ref -eq (PT16 $f['run_from'])) {
+            & $say 'B8-NA' $wo ("the reference {0} ({1}) was already closed beyond at {2} ({3}, own margin {4}) before ARMED {5}" -f $f['cand_level'], $f['run_from'], $f['brk_bar'], $f['brk_close'], $f['brk_mp'], $f['armed'])
+        } else { & $say 'UNEXPLAINED' $wo ("v{0} has no row for this cycle, and its HMI-REF ({1}) does not say why" -f $New.Ver, $f['state']) }
+    }
+
+    Write-Host ("    CISD / MSS rows that differ: {0}   other rows that differ: {1}" -f $mDiff, $otherN)
+    foreach ($c in $cls.Keys) { Write-Host ("    {0,-12} {1,4}" -f $c, $cls[$c]) -ForegroundColor $(if ($c -eq 'UNEXPLAINED' -and $cls[$c]) { 'Red' } else { 'Gray' }) }
+    Write-Host ("    verdicts: explained {0}   PENDING_ATTRIBUTION {1}   UNEXPLAINED {2}" -f $tally.explained, $tally.PENDING_ATTRIBUTION, $tally.UNEXPLAINED) `
+        -ForegroundColor $(if ($tally.UNEXPLAINED) { 'Red' } else { 'Gray' })
+    $show = @($lines | Where-Object { $_ -notmatch '^explained' })
+    $show | Select-Object -First 15 | ForEach-Object { Write-Host "      $_" -ForegroundColor Red }
+    if ($show.Count -gt 15) { Write-Host "      ... $($show.Count - 15) more in the file" -ForegroundColor Red }
+    if ($lines.Count) {
+        $out = Join-Path $dir ("attribution_" + ($Old.Src -replace '[^A-Za-z0-9]','_') + "__" + ($New.Src -replace '[^A-Za-z0-9]','_') + ".txt")
+        $lines | Set-Content $out
+        Write-Host "    every verdict with its reason written to $out" -ForegroundColor DarkGray
+    }
+    return [pscustomobject]@{ Unexplained = $tally.UNEXPLAINED; Pending = $tally.PENDING_ATTRIBUTION; Explained = $tally.explained; ModelDiff = $mDiff; Mode = 'BRI-08' }
+}
+
 function RowLabel([string]$r) { $c = $r -split ','; if ($c[1] -eq 'LIQ') { return "LIQ $($c[5]) $($c[6])" } return $c[6] }
 
 function Show-LiveVsBuild([string]$src) {
@@ -1759,7 +1949,7 @@ function Show-LiveVsBuild([string]$src) {
     $lv  = @($liveAll | Where-Object { $_.Src -eq $src })
     if ($sel.Count -lt 2) { Write-Host "  fewer than two builds - nothing brackets a live stretch yet." -ForegroundColor Yellow; return }
     $pairs = 0; $cmp = 0; $pend = 0; $liveN = 0; $liveCtxN = 0; $strPend = 0; $bad = @(); $okRows = @(); $pendWhy = @(); $liqPend = 0
-    $liveProtN = 0; $legPend = 0
+    $liveProtN = 0; $legPend = 0; $liveB8N = 0
     for ($k = 1; $k -lt $sel.Count; $k++) {
         $A = $sel[$k - 1]; $B = $sel[$k]
         $rows = @($lv | Where-Object { $_.Idx -gt $A.EndIdx -and $_.Idx -lt $B.BeginIdx })
@@ -1772,7 +1962,10 @@ function Show-LiveVsBuild([string]$src) {
         $bc  = @((Get-Struct $B).Ctx | Where-Object { $_.Bar -gt $A.To -and $_.Bar -le $B.To })
         $lp  = @($liveProt | Where-Object { $_.Src -eq $src -and $_.Idx -gt $A.EndIdx -and $_.Idx -lt $B.BeginIdx })
         $bp  = @((Get-Struct $B).Prot | Where-Object { $_.Bar -gt $A.To -and $_.Bar -le $B.To })
-        if ($rows.Count -eq 0 -and $bIn.Count -eq 0 -and $lc.Count -eq 0 -and $bc.Count -eq 0 -and $lp.Count -eq 0 -and $bp.Count -eq 0) { continue }
+        # v2.55: BRI-08 diagnostics, on the bars MODEL rows are judged on (their time is a close time, as a MODEL row's)
+        $lb  = @($liveB8 | Where-Object { $_.Src -eq $src -and $_.Idx -gt $A.EndIdx -and $_.Idx -lt $B.BeginIdx })
+        $bb  = @((Get-Struct $B).B8 | Where-Object { $_.Time -ge $cs -and $_.Time -le $ce })
+        if ($rows.Count -eq 0 -and $bIn.Count -eq 0 -and $lc.Count -eq 0 -and $bc.Count -eq 0 -and $lp.Count -eq 0 -and $bp.Count -eq 0 -and $lb.Count -eq 0 -and $bb.Count -eq 0) { continue }
         $pairs++
         $why = ''
         if ($A.Status -ne 'COMPLETE' -or $B.Status -ne 'COMPLETE') { $why = 'INCOMPLETE build: ' + ((@($A.Why) + @($B.Why)) -join '; ') }
@@ -1786,8 +1979,8 @@ function Show-LiveVsBuild([string]$src) {
         # lifetime that produced them), makes the pair PENDING - not a row
         # quietly set aside while the rest still passes.
         if ($A.Strict) {
-            $noId  = @(@($rows) + @($lc) + @($lp) | Where-Object { -not $_.Id }).Count
-            $alien = @(@($rows) + @($lc) + @($lp) | Where-Object { $_.Id -and $_.Id -ne $A.Id }).Count
+            $noId  = @(@($rows) + @($lc) + @($lp) + @($lb) | Where-Object { -not $_.Id }).Count
+            $alien = @(@($rows) + @($lc) + @($lp) + @($lb) | Where-Object { $_.Id -and $_.Id -ne $A.Id }).Count
             if ($noId -or $alien) {
                 $pend++
                 $pendWhy += "build $($A.Build)->$($B.Build): live rows without run/init $noId, from another run/init than build $($A.Build) $alien"
@@ -1808,7 +2001,9 @@ function Show-LiveVsBuild([string]$src) {
         # set aside is what this pair can prove. Nothing left = nothing compared.
         $lcIn = @($lc | Where-Object { $_.C.Bar -gt $A.To -and $_.C.Bar -le $B.To } | ForEach-Object { $_.C })
         $lpIn = @($lp | Where-Object { $_.P.Bar -gt $A.To -and $_.P.Bar -le $B.To } | ForEach-Object { $_.P })
-        if (($lIn.Count + $bIn.Count + $lcIn.Count + $bc.Count + $lpIn.Count + $bp.Count) -eq 0) {
+        $lbIn = @($lb | Where-Object { $_.X.Time -ge $cs -and $_.X.Time -le $ce } | ForEach-Object { $_.X })
+        if ($lb.Count -gt $lbIn.Count) { $pendWhy += "build $($A.Build)->$($B.Build): $($lb.Count - $lbIn.Count) BRI-08 row(s) on an edge bar, not provably covered" }
+        if (($lIn.Count + $bIn.Count + $lcIn.Count + $bc.Count + $lpIn.Count + $bp.Count + $lbIn.Count + $bb.Count) -eq 0) {
             $pend++
             $pendWhy += "build $($A.Build)->$($B.Build): no judged event (LIQ pending or edge rows only) - not comparable"
             continue
@@ -1835,12 +2030,18 @@ function Show-LiveVsBuild([string]$src) {
         foreach ($x in $dp.B) { $bad += [pscustomobject]@{ Side = 'build only'; Row = "PROT $($x.KeyNoLeg)"; Pair = "$($A.Build)->$($B.Build)" } }
         $ln = $dps.A.Count - $dp.A.Count
         if ($ln -gt 0) { $legPend += $ln; $pendWhy += "build $($A.Build)->$($B.Build): $ln protected-level row(s) agree but for the leg number (the rebuild's H4 history starts later)" }
+        # v2.55: BRI-08 reference / confirmation rows, both ways
+        $liveB8N += $lbIn.Count
+        $db = DiffKeys $lbIn $bb 'Key'
+        foreach ($x in $db.A) { $bad += [pscustomobject]@{ Side = 'live only';  Row = "B8 $($x.Key)"; Pair = "$($A.Build)->$($B.Build)" } }
+        foreach ($x in $db.B) { $bad += [pscustomobject]@{ Side = 'build only'; Row = "B8 $($x.Key)"; Pair = "$($A.Build)->$($B.Build)" } }
     }
     Write-Host ("  build pairs with a live stretch: {0}   comparable: {1}   pending review: {2}   liquidity pending: {3}" -f $pairs, $cmp, $pend, $liqPend)
     foreach ($w in $pendWhy) { Write-Host "    pending: $w" -ForegroundColor Yellow }
     if ($cmp -eq 0) { Write-Host "  nothing comparable yet - no PASS can be given." -ForegroundColor Yellow; return }
     Write-Host ("  live events compared: {0} (+ {1} H4 structure event(s))" -f $liveN, $liveCtxN)
     if ($liveProtN -gt 0) { Write-Host ("  protected-level rows compared: {0} (PROT / ANCHOR / INTERNAL)" -f $liveProtN) }
+    if ($liveB8N -gt 0)   { Write-Host ("  BRI-08 rows compared: {0} (REF / BRK)" -f $liveB8N) }
     if ($okRows.Count) {
         $bm = $okRows | Group-Object { RowLabel $_ } | Sort-Object Name | ForEach-Object { "$($_.Name) $($_.Count)" }
         Write-Host ("  by model: " + ($bm -join '  |  '))
@@ -1938,6 +2139,22 @@ function Compare-Builds($A, $B) {
             return
         }
         $d = @(DiffRows $mA $mB)
+        # v2.55: v2.54 -> v2.55 is BRI-08 (CISD / MSS only), judged by its own rows
+        $old = $A; $new = $B
+        if ((VerNum $A.Ver) -gt (VerNum $B.Ver)) { $old = $B; $new = $A }
+        if ((VerNum $old.Ver) -ge [decimal]2.54 -and (VerNum $old.Ver) -lt [decimal]2.55 -and (VerNum $new.Ver) -ge [decimal]2.55) {
+            $att = Show-B8Attribution $old $new $rs $re $moved
+            if ($att.Unexplained) {
+                Write-Host ("  upgrade regression: {0} MODEL difference(s) over {1} / {2} row(s); {3} difference(s) UNEXPLAINED - not traced to BRI-08" -f $d.Count, $mA.Count, $mB.Count, $att.Unexplained) -ForegroundColor Red
+            } elseif ($att.Pending) {
+                Write-Host ("  upgrade regression: {0} MODEL difference(s) over {1} / {2} row(s) - NOT JUDGED (window moved), not a pass" -f $d.Count, $mA.Count, $mB.Count) -ForegroundColor Yellow
+            } elseif ($att.Explained) {
+                Write-Host ("  upgrade regression: {0} MODEL difference(s) over {1} / {2} row(s); all {3} difference(s) traced to BRI-08 (first effective close) with a concrete link" -f $d.Count, $mA.Count, $mB.Count, $att.Explained) -ForegroundColor Yellow
+            } else {
+                Write-Host ("  upgrade regression: 0 difference(s) over {0} / {1} MODEL row(s), same window and parameters." -f $mA.Count, $mB.Count) -ForegroundColor Green
+            }
+            return
+        }
         # A-57: with structure rows on both sides, every difference gets a verdict
         $hasCtx = ((Get-Struct $A).Ctx.Count -gt 0 -and (Get-Struct $B).Ctx.Count -gt 0)
         $att = $null
@@ -2027,6 +2244,15 @@ function Compare-Builds($A, $B) {
     $showP = ($nP -gt 0 -or (VerNum $A.Ver) -ge [decimal]2.54 -or (VerNum $B.Ver) -ge [decimal]2.54)
     foreach ($x in $dP.A) { $cls += [pscustomobject]@{ Class = 'MISMATCH'; Side = 'A only'; Time = $x.Bar; Row = "PROT $($x.KeyNoLeg)" } }
     foreach ($x in $dP.B) { $cls += [pscustomobject]@{ Class = 'MISMATCH'; Side = 'B only'; Time = $x.Bar; Row = "PROT $($x.KeyNoLeg)" } }
+    # v2.55 (BRI-08): reference (HMI-REF) and confirmation (HMI-BRK) diagnostics, a judged category of their own
+    $bA = @((Get-Struct $A).B8 | Where-Object { $_.Time -ge $rs -and $_.Time -le $re })
+    $bB = @((Get-Struct $B).B8 | Where-Object { $_.Time -ge $rs -and $_.Time -le $re })
+    $dB8 = DiffKeys $bA $bB 'Key'
+    $mmB = $dB8.A.Count + $dB8.B.Count
+    $nB  = $bA.Count + $bB.Count
+    $showB = ($nB -gt 0 -or (VerNum $A.Ver) -ge [decimal]2.55 -or (VerNum $B.Ver) -ge [decimal]2.55)
+    foreach ($x in $dB8.A) { $cls += [pscustomobject]@{ Class = 'MISMATCH'; Side = 'A only'; Time = $x.Time; Row = "B8 $($x.Key)" } }
+    foreach ($x in $dB8.B) { $cls += [pscustomobject]@{ Class = 'MISMATCH'; Side = 'B only'; Time = $x.Time; Row = "B8 $($x.Key)" } }
     $mm = @($cls | Where-Object Class -eq 'MISMATCH')
     $vC = $(if ($mmC) { "MISMATCH ($mmC)" } elseif ($nC -eq 0) { 'no event on either side (nothing judged)' }
             elseif ($strC) { "same events, strength numbered differently on $strC - PENDING REVIEW" }
@@ -2044,11 +2270,16 @@ function Compare-Builds($A, $B) {
                 else { "IDENTICAL over $($pA.Count) / $($pB.Count) row(s) (PROT / ANCHOR / INTERNAL)" })
         Write-Host "    PROT   $vP" -ForegroundColor $(if ($mmP) { 'Red' } elseif ($nP -eq 0 -or $legP) { 'Yellow' } else { 'Gray' })
     }
+    if ($showB) {
+        $vB = $(if ($mmB) { "MISMATCH ($mmB)" } elseif ($nB -eq 0) { 'no row on either side (nothing judged)' }
+                else { "IDENTICAL over $($bA.Count) / $($bB.Count) row(s) (REF / BRK)" })
+        Write-Host "    B8     $vB" -ForegroundColor $(if ($mmB) { 'Red' } elseif ($nB -eq 0) { 'Yellow' } else { 'Gray' })
+    }
 
     if ($mm.Count -gt 0) {
         Write-Host "  $($mm.Count) event(s) differ INSIDE the comparable region - repaint or non-determinism:" -ForegroundColor Red
         $mm | Select-Object -First 20 | ForEach-Object { Write-Host ("    {0}  {1}" -f $_.Side, $_.Row) }
-    } elseif (($nM + $nL + $nC + $nP) -eq 0) {
+    } elseif (($nM + $nL + $nC + $nP + $nB) -eq 0) {
         Write-Host "  INSUFFICIENT SAMPLE - no judged event inside the comparable region; nothing was compared." -ForegroundColor Yellow
     } elseif ($pend.Count -gt 0 -or -not $known -or $A.WarmEst -or $B.WarmEst -or $strC -or $legP) {
         Write-Host "  no difference inside the comparable region - PENDING REVIEW, not a pass:" -ForegroundColor Yellow

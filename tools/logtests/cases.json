@@ -1481,5 +1481,248 @@
   "forbid": [
    "MISMATCH(ES)"
   ]
+ },
+ "e01_versus255_bull": {
+  "args": [
+   "-Source",
+   "USDJPY#0B54,M5",
+   "-Versus",
+   "USDJPY#0C55,M5"
+  ],
+  "expect": [
+   "verdicts: explained 23   PENDING_ATTRIBUTION 0   UNEXPLAINED 0",
+   "all 23 difference(s) traced to BRI-08 (first effective close) with a concrete link",
+   "    B8-C5           2",
+   "    B8-SLOW        15",
+   "    B8-SHIFT        2",
+   "    B8-NA           4",
+   "other rows that differ: 0"
+  ],
+  "forbid": [
+   "UNEXPLAINED - not traced",
+   "NOT JUDGED"
+  ]
+ },
+ "e02_versus255_bear": {
+  "args": [
+   "-Source",
+   "USDJPY#0B54,M5",
+   "-Versus",
+   "USDJPY#0C55,M5"
+  ],
+  "expect": [
+   "verdicts: explained 23   PENDING_ATTRIBUTION 0   UNEXPLAINED 0",
+   "all 23 difference(s) traced to BRI-08 (first effective close) with a concrete link",
+   "    B8-C5           2",
+   "    B8-SLOW        15",
+   "    B8-SHIFT        2",
+   "    B8-NA           4",
+   "other rows that differ: 0"
+  ],
+  "forbid": [
+   "UNEXPLAINED - not traced",
+   "NOT JUDGED"
+  ]
+ },
+ "e03_versus255_prev_not_in_zone": {
+  "args": [
+   "-Source",
+   "USDJPY#0B54,M5",
+   "-Versus",
+   "USDJPY#0C55,M5"
+  ],
+  "expect": [
+   "is not between the level",
+   "v2.54 would confirm on this bar too",
+   "UNEXPLAINED - not traced to BRI-08"
+  ],
+  "forbid": [
+   "traced to BRI-08 (first effective close) with a concrete link"
+  ]
+ },
+ "e04_versus255_na_brk_not_beyond": {
+  "args": [
+   "-Source",
+   "USDJPY#0B54,M5",
+   "-Versus",
+   "USDJPY#0C55,M5"
+  ],
+  "expect": [
+   "NA_BROKEN, but brk_close",
+   "UNEXPLAINED - not traced to BRI-08"
+  ],
+  "forbid": [
+   "traced to BRI-08 (first effective close) with a concrete link"
+  ]
+ },
+ "e05_versus255_c5diff_missing": {
+  "args": [
+   "-Source",
+   "USDJPY#0B54,M5",
+   "-Versus",
+   "USDJPY#0C55,M5"
+  ],
+  "expect": [
+   "without a c5diff entry that decides it",
+   "UNEXPLAINED - not traced to BRI-08"
+  ],
+  "forbid": [
+   "traced to BRI-08 (first effective close) with a concrete link"
+  ]
+ },
+ "e06_versus255_c5diff_arith": {
+  "args": [
+   "-Source",
+   "USDJPY#0B54,M5",
+   "-Versus",
+   "USDJPY#0C55,M5"
+  ],
+  "expect": [
+   "does not hold",
+   "UNEXPLAINED - not traced to BRI-08"
+  ],
+  "forbid": [
+   "traced to BRI-08 (first effective close) with a concrete link"
+  ]
+ },
+ "e07_versus255_other_row": {
+  "args": [
+   "-Source",
+   "USDJPY#0B54,M5",
+   "-Versus",
+   "USDJPY#0C55,M5"
+  ],
+  "expect": [
+   "BRI-08 changes CISD / MSS only: this row must be the same in both builds",
+   "UNEXPLAINED - not traced to BRI-08"
+  ],
+  "forbid": [
+   "traced to BRI-08 (first effective close) with a concrete link"
+  ]
+ },
+ "e08_versus255_brk_missing": {
+  "args": [
+   "-Source",
+   "USDJPY#0B54,M5",
+   "-Versus",
+   "USDJPY#0C55,M5"
+  ],
+  "expect": [
+   "no HMI-BRK row for this confirmation",
+   "UNEXPLAINED - not traced to BRI-08"
+  ],
+  "forbid": [
+   "traced to BRI-08 (first effective close) with a concrete link"
+  ]
+ },
+ "e09_versus255_shift_earlier": {
+  "args": [
+   "-Source",
+   "USDJPY#0B54,M5",
+   "-Versus",
+   "USDJPY#0C55,M5"
+  ],
+  "expect": [
+   "not the later re-cross of the same reference",
+   "UNEXPLAINED - not traced to BRI-08"
+  ],
+  "forbid": [
+   "traced to BRI-08 (first effective close) with a concrete link"
+  ]
+ },
+ "e10_versus255_window_moved": {
+  "args": [
+   "-Source",
+   "USDJPY#0B54,M5",
+   "-Versus",
+   "USDJPY#0C55,M5"
+  ],
+  "expect": [
+   "NOT JUDGED - the two builds start at different bars",
+   "NOT JUDGED (window moved), not a pass"
+  ],
+  "forbid": [
+   "traced to BRI-08 (first effective close) with a concrete link"
+  ]
+ },
+ "e11_versus255_ref_missing": {
+  "args": [
+   "-Source",
+   "USDJPY#0B54,M5",
+   "-Versus",
+   "USDJPY#0C55,M5"
+  ],
+  "expect": [
+   "no HMI-REF CISD row for this cycle",
+   "UNEXPLAINED - not traced to BRI-08"
+  ],
+  "forbid": [
+   "traced to BRI-08 (first effective close) with a concrete link"
+  ]
+ },
+ "e12_versus255_model_level": {
+  "args": [
+   "-Source",
+   "USDJPY#0B54,M5",
+   "-Versus",
+   "USDJPY#0C55,M5"
+  ],
+  "expect": [
+   "are not HMI-REF's",
+   "UNEXPLAINED - not traced to BRI-08"
+  ],
+  "forbid": [
+   "traced to BRI-08 (first effective close) with a concrete link"
+  ]
+ },
+ "e13_reload255_identical": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "B8     IDENTICAL over",
+   "IDENTICAL inside the comparable region"
+  ],
+  "forbid": [
+   "MISMATCH"
+  ]
+ },
+ "e14_reload255_ref_changed": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "B8     MISMATCH (2)",
+   "differ INSIDE the comparable region"
+  ],
+  "forbid": [
+   "IDENTICAL inside"
+  ]
+ },
+ "e15_live255_ok": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "BRI-08 rows compared:",
+   "AGREE BOTH WAYS on every covered bar"
+  ],
+  "forbid": [
+   "MISMATCH(ES)"
+  ]
+ },
+ "e16_live255_brk_missing": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "MISMATCH(ES) on covered bars",
+   "build only [1->2] B8 HMI-BRK"
+  ],
+  "forbid": [
+   "AGREE BOTH WAYS"
+  ]
  }
 }

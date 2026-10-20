@@ -57,33 +57,59 @@ def detect_swings(bars, L=2, R=2):
     return out
 
 
-def cisd_ref(bars, d, A, look, margin, v255):
+def cisd_detail(bars, d, A, look, margin):
+    """Rule 19 run and the BRI-08 check: state OK / NA_NONE / NA_BROKEN, k (oldest run bar), j, b (first break)"""
     lo = max(0, A - look + 1)
     j = next((k for k in range(A, lo - 1, -1) if cdir(bars[k]) == -d), None)
     if j is None:
-        return None
+        return dict(state='NA_NONE', k=None, j=None, b=None, cand=None)
     k = j
     while k - 1 >= lo and cdir(bars[k - 1]) == -d:
         k -= 1
     level = bars[k][0]
-    if v255 and any(brk(d, bars[m][3], level, margin[m]) for m in range(k + 1, A + 1)):
+    b = next((m for m in range(k + 1, A + 1) if brk(d, bars[m][3], level, margin[m])), None)
+    return dict(state='OK' if b is None else 'NA_BROKEN', k=k, j=j, b=b, cand=level)
+
+
+def cisd_ref(bars, d, A, look, margin, v255):
+    x = cisd_detail(bars, d, A, look, margin)
+    if x['state'] == 'NA_NONE' or (v255 and x['state'] == 'NA_BROKEN'):
         return None
-    return level
+    return x['cand']
 
 
-def mss_ref(bars, d, A, swings, window, margin, v255):
+def mss_detail(bars, d, A, swings, window, margin):
+    """The MQL scan: newest swing first, C2 ends it, C3 / C1 / C4 skip; C5 both ways (each bar's own margin = v2.55,
+    the ARMED bar's = v2.54). -> pick, pick_old (swing tuples or None), entries [(swing, check bar, o, n)] where the
+    two C5 judgements differ, scanning until both picks are found."""
     lo = max(0, A - window + 1)
-    best = None
-    for (i, price, conf, sd) in swings:
-        if i < lo or sd != d or conf > A:                     # C2, C3, C1
+    pick = old = None
+    entries = []
+    for sw in reversed(swings):                               # confirm order, newest first
+        if pick is not None and old is not None:
+            break
+        i, price, conf, sd = sw
+        if i < lo:                                            # C2
+            break
+        if sd != d or conf > A:                               # C3, C1
             continue
         if (d > 0 and price <= bars[A][1]) or (d < 0 and price >= bars[A][2]):   # C4
             continue
-        if any(brk(d, bars[m][3], price, margin[m] if v255 else margin[A]) for m in range(i + 1, A + 1)):   # C5
-            continue
-        if best is None or i > best[0]:
-            best = (i, price)
-    return None if best is None else best[1]
+        bn = next((m for m in range(i + 1, A + 1) if brk(d, bars[m][3], price, margin[m])), None)
+        bo = next((m for m in range(i + 1, A + 1) if brk(d, bars[m][3], price, margin[A])), None)
+        if (bn is None) != (bo is None):
+            entries.append((sw, bo if bo is not None else bn, int(bo is not None), int(bn is not None)))
+        if pick is None and bn is None:
+            pick = sw
+        if old is None and bo is None:
+            old = sw
+    return dict(pick=pick, old=old, entries=entries)
+
+
+def mss_ref(bars, d, A, swings, window, margin, v255):
+    x = mss_detail(bars, d, A, swings, window, margin)
+    sw = x['pick'] if v255 else x['old']
+    return None if sw is None else sw[1]
 
 
 def process(sc, d, v255):
@@ -108,7 +134,8 @@ def process(sc, d, v255):
         if n in armed:
             act = dict(no=len(cycles) + 1, A=n, done=set(),
                        CISD=cisd_ref(bars, d, n, 12, margin, v255),
-                       MSS=mss_ref(bars, d, n, swings, 60, margin, v255))
+                       MSS=mss_ref(bars, d, n, swings, 60, margin, v255),
+                       cisd=cisd_detail(bars, d, n, 12, margin), mss=mss_detail(bars, d, n, swings, 60, margin))
             cycles.append(act)
     return ev, cycles, swings
 
@@ -228,6 +255,124 @@ SCEN = [
          bars=RUN + [B(95, 99), B(99, 104), B(104, 98), B(98, 105), B(105, 97), B(97, 106)], armed=[3],
          models=('CISD',), events={'v2.54': [(1, 'CISD', 4)], 'v2.55': [(1, 'CISD', 4)]}),
 ]
+
+
+# ---- log emitter for tools/logtests (ReloadTest -Versus BRI-08 mode) -----------------------------------------------
+# One bull series made of the scenarios, each `step` points below the previous one behind `gap` flat doji bars at its
+# highest high: no run, no swing high, no bull break of an earlier level, and the 60-bar MSS window never reaches back
+# into the previous scenario. The bear series is its mirror. ladder_check() proves every scenario gives in the series
+# exactly what it gives alone, so the expected verdicts come from the scenario table, not from the series.
+def ladder(scens, step=1000, gap=70):
+    bars, margin, armed, spans = [], [], [], []
+    off = 0
+    for sc in scens:
+        sb = [(o + off, h + off, l + off, c + off) for (o, h, l, c) in sc['bars']]
+        top = max(b[1] for b in sb)
+        start = len(bars) + gap
+        bars += [(top, top, top, top)] * gap + sb
+        margin += [3] * gap + list(sc.get('margin') or [3] * len(sb))
+        armed += [start + a for a in (sc.get('armed') or [sc['A']])]
+        spans.append((sc, start))
+        off -= step
+    return dict(bars=bars, margin=margin, armed=armed, A=armed[0]), spans
+
+
+def ladder_check(series, spans, d):
+    for v255 in (False, True):
+        ev, cycles, _ = process(series, d, v255)
+        for sc, start in spans:
+            ev1, cyc1, _ = process(sc, d, v255)
+            n0 = sum(1 for c in cycles if c['A'] < start)
+            mine = [(c - n0, m, n - start) for (c, m, n) in ev if n0 < c <= n0 + len(cyc1)]
+            assert mine == ev1, (sc['id'], d, v255, mine, ev1)
+            for a, b in zip(cycles[n0:n0 + len(cyc1)], cyc1):
+                assert (a['CISD'] is None) == (b['CISD'] is None) and (a['MSS'] is None) == (b['MSS'] is None), sc['id']
+    return True
+
+
+def expected_verdicts(series, d):
+    """B8-4 categories, cycle by cycle, from the two runs (the oracle for the log tests)"""
+    e4, c4, _ = process(series, d, False)
+    e5, c5, _ = process(series, d, True)
+    at4 = {(c, m): n for (c, m, n) in e4}
+    at5 = {(c, m): n for (c, m, n) in e5}
+    out = dict(C5=0, SLOW=0, SHIFT=0, NA=0)
+    for cy4, cy5 in zip(c4, c5):
+        for m in MODELS:
+            k = (cy4['no'], m)
+            n4, n5 = at4.get(k), at5.get(k)
+            if n4 == n5 and cy4[m] == cy5[m]:
+                continue
+            if m == 'MSS' and cy4[m] != cy5[m]:
+                out['C5'] += (n4 is not None) + (n5 is not None)
+            elif n5 is not None and n4 is None:
+                out['SLOW'] += 1
+            elif n5 is not None and n4 > n5:
+                out['SLOW'] += 1
+                out['SHIFT'] += 1
+            elif n5 is None and n4 is not None and cy5['cisd']['state'] == 'NA_BROKEN':
+                out['NA'] += 1
+            else:
+                raise AssertionError((k, n4, n5))
+    return out
+
+
+def emit_build(series, d, ver, inst, init, sym='USDJPY', src='USDJPY,M5', build=1):
+    """the build block one version writes: ARM, HMI-REF (v2.55), MODEL, HMI-BRK (v2.55) rows; MQL formats"""
+    import datetime as dt
+    from decimal import Decimal
+    v255 = ver >= '2.55'
+    ev, cycles, swings = process(series, d, v255)
+    bars = series['bars'] if d > 0 else [(-o, -l, -h, -c) for (o, h, l, c) in series['bars']]
+    mg = series['margin']
+    base = dt.datetime(2026, 9, 10)
+    T = lambda i: (base + dt.timedelta(minutes=5 * i)).strftime('%Y.%m.%d %H:%M')
+    px = lambda p: f"{Decimal('1.20000') + Decimal(p) / Decimal(100000):.5f}"
+    idt = f',inst={inst},run=7,init={init}'
+    L = lambda payload: f'2026.10.02 10:00:00.000  H4M5_Identification ({src})  {payload}'
+    cid = lambda c: 100 + c['no']
+    out = [L(f'HMI v{ver} starting on {sym} PERIOD_M5  instance={inst} run=7 init={init}'),
+           L(f'HMI-BUILD-BEGIN,{sym},m5_bars=5000,h4_bars=500,from={T(0)},to={T(len(bars) - 1)},ver={ver},params=461F006E,'
+             f'inst={inst},build={build},warmup_end={T(0)},run=7,init={init}')]
+    marks = 0
+    byA = {c['A']: c for c in cycles}
+    evAt = {}
+    for (c, m, n) in ev:
+        evAt.setdefault(n, []).append((cycles[c - 1], m))
+    for n in range(len(bars)):
+        for cy, m in evAt.get(n, []):                        # Phase 4: HMI-BRK, then the MODEL row (Phase 7)
+            if m == 'CISD':
+                lvl, ref = cy['cisd']['cand'], cy['cisd']['k']
+            else:
+                sw = cy['mss']['pick'] if v255 else cy['mss']['old']
+                lvl, ref = sw[1], sw[0]
+            if v255:
+                out.append(L(f'HMI-BRK,{sym},{m},cycle={cid(cy)},dir={d},live=0,bar={T(n)},close={px(bars[n][3])},mp={mg[n]},'
+                             f'prev_bar={T(n - 1)},prev_close={px(bars[n - 1][3])},prev_mp={mg[n - 1]},level={px(lvl)},ref={T(ref)}{idt}'))
+            cfm = bars[n][2] if d > 0 else bars[n][1]
+            out.append(L(f'HMI-BUILD,{sym},MODEL,{d},{cid(cy)},{cid(cy)},OB,{m},{T(n + 1)}:00,{px(cfm)},{T(ref)}:00,{px(lvl)}{idt}'))
+            marks += 1
+        cy = byA.get(n)
+        if cy is None:
+            continue
+        A = n                                                # Phase 5: ARMED (close of bar A = open of A + 1)
+        if v255:
+            x = cy['cisd']
+            ok, has, b = x['state'] == 'OK', x['k'] is not None, x['b']
+            out.append(L(f"HMI-REF,{sym},CISD,cycle={cid(cy)},dir={d},live=0,armed={T(A + 1)},armed_mp={mg[A]},state={x['state']},"
+                         f"level={px(x['cand']) if ok else 'NA'},ref={T(x['k']) if ok else '-'},cand_level={px(x['cand']) if has else 'NA'},"
+                         f"run_from={T(x['k']) if has else '-'},run_to={T(x['j']) if has else '-'},brk_bar={T(b) if b is not None else '-'},"
+                         f"brk_close={px(bars[b][3]) if b is not None else 'NA'},brk_mp={mg[b] if b is not None else 'NA'}{idt}"))
+            y = cy['mss']
+            ent = ';'.join(f'{T(sw[0])}@{px(sw[1])}/{T(m)}/{px(bars[m][3])}/{mg[m]}/o{o}n{nn}' for (sw, m, o, nn) in y['entries'])
+            st = lambda sw: ('OK', px(sw[1]), T(sw[0])) if sw else ('NA_NONE', 'NA', '-')
+            s5, s4 = st(y['pick']), st(y['old'])
+            out.append(L(f'HMI-REF,{sym},MSS,cycle={cid(cy)},dir={d},live=0,armed={T(A + 1)},armed_mp={mg[A]},state={s5[0]},'
+                         f'level={s5[1]},ref={s5[2]},old_state={s4[0]},old_level={s4[1]},old_ref={s4[2]},c5diff={ent or "-"}{idt}'))
+        out.append(L(f'HMI-ARM,{sym},block={cid(cy)},sess=60,dir={d},bar={T(A + 1)}{idt}'))
+    out.append(L(f'HMI-BUILD-END,{sym},marks={marks},cycles={len(cycles)},pois=0,blocks={len(cycles)},build={build},liq=READY,'
+                 f'liqev=0,unknown=0,liqwait=0{idt}'))
+    return out
 
 
 def main():
