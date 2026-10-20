@@ -862,23 +862,23 @@ step 3: cisd_level          = open[k]          // 连续反方向 Delivery Run *
 **冻结含义：** `cisd_level` 在本 Cycle 生命周期内永不改变，
 不因新的 Delivery Run 出现而移动（Rule 19 明确要求）。
 
+**v2.55（BRI-08，docs/02 修订稿 2）：** step 3 之后检查 `[k+1, A]`（含 ARMED 当根）：若某根 i 的收盘以**当根余量**
+`MarginM5Pts(i)` 有效越过 `open[k]`（多头 `Pts(close[i], open[k]) > m(i)`，空头 `< -m(i)`），参考在 Cycle 存在前已被突破 ——
+本 Cycle CISD = N/A，**不**另找 run。收在参考价与阈值之间不算越过。
+
 ### 10.2 Confirmation (Rule 20 / 21 / 23 — FROZEN)
 
-只在已关闭 K 线 `n > A` 上检查：
+只在已关闭 K 线 `n > A` 上检查（v2.55 起，BRI-08「首次有效收盘」）：
 
 ```
-Bullish:
-   close[n-1] <= cisd_level                          // Previous Close 在未突破侧
-   close[n]   >  cisd_level + BreakMargin            // Current Close 正式上穿
-
-Bearish:
-   close[n-1] >= cisd_level
-   close[n]   <  cisd_level − BreakMargin
+Bullish:   close[n] > cisd_level + BreakMargin(n)     // 本根收盘首次有效越过；上一根收盘在哪一侧不看
+Bearish:   close[n] < cisd_level − BreakMargin(n)
 ```
 
-- **必须 Close 确认**，High/Low 刺穿一律无效（Rule 23）
-- `n-1` 可以等于 `A`（bar A 的 close 作为"前一根收盘"是完全已知的，不是未来函数）
+- **必须 Close 确认**，High/Low 刺穿一律无效（Rule 23）；等于阈值不算；BreakMargin 逐根（ATR_FRAC 下不冻结）
+- 收在 `cisd_level` 与阈值之间不算越过、不消费参考；之后首次有效越过可以确认
 - 每 Cycle 最多 1 次（Rule 43）；`cisd_done = true` 之后不再检测
+- v2.54 及以前另要求 `close[n-1]` 在未突破侧（`<= cisd_level` / `>= cisd_level`）—— v2.55 删除
 
 ### 10.3 显示 (Rule 24 — FROZEN)
 
@@ -912,8 +912,9 @@ Bullish Cycle → 找 Swing High；Bearish Cycle → 找 Swing Low
   C4 Bullish: swing.price > high[A]             // 必须在上方，才可能被「向上突破」
      Bearish: swing.price < low[A]
   C5 未被提前吃掉：不存在 bar m ∈ (swing.bar_index, A] 使
-     Bullish: close[m] > swing.price + BreakMargin
-     Bearish: close[m] < swing.price − BreakMargin
+     Bullish: close[m] > swing.price + BreakMargin(m)
+     Bearish: close[m] < swing.price − BreakMargin(m)
+     （v2.55：每根用自己的余量；v2.54 及以前用 bar A 的余量。固定余量模式下相同）
   C6 swing 不属于任何已结束 Cycle 的 reference 缓存（结构上由 9.4 保证）
 
 选择：满足 C1..C5 的候选中，取 **bar_time 最大** 者（最近的）
@@ -926,19 +927,14 @@ Bullish Cycle → 找 Swing High；Bearish Cycle → 找 Swing Low
 
 ### 11.2 Confirmation (Rule 27 — FROZEN)
 
-只在已关闭 K 线 `n > A` 上检查：
+只在已关闭 K 线 `n > A` 上检查（v2.55 起，BRI-08「首次有效收盘」）：
 
 ```
-Bullish:
-   close[n-1] <= mss_level
-   close[n]   >  mss_level + BreakMargin
-
-Bearish:
-   close[n-1] >= mss_level
-   close[n]   <  mss_level − BreakMargin
+Bullish:   close[n] > mss_level + BreakMargin(n)
+Bearish:   close[n] < mss_level − BreakMargin(n)
 ```
 
-Wick Break 无效。每 Cycle 最多 1 次。
+Wick Break 无效；等于阈值不算。每 Cycle 最多 1 次。v2.54 及以前另要求 `close[n-1]` 在未突破侧 —— v2.55 删除。
 
 ### 11.3 显示 (Rule 28)
 

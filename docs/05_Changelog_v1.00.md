@@ -1956,3 +1956,28 @@ docs/02                BRI-08 修订稿 1：范围（只改 CISD / MSS 确认；
 tools/bri08_sim.py     离线模型：v2.54 / v2.55 两套规则 × 多空镜像，100/100
 ```
 
+## v2.55 开发版 —— BRI-08：CISD / MSS 首次有效收盘（未编译）
+
+```
+Date:     2026-10-20
+来源:     验收方「HMI v2.55 定义稿审核与工程师补充要求」（2026-10-20）；docs/02 BRI-08 修订稿 2
+基线:     v2.54（MQL 3813868 + 工具 r8）
+
+MQL5
+  HMI_Defs.mqh / H4M5_Identification.mq5   HMI_VERSION / #property version 2.55
+  HMI_CISDEngine.mqh / HMI_MSSEngine.mqh    确认：本根收盘以本根余量首次有效越过即确认；去掉「上一根在未突破侧」；确认时写 HMI-BRK
+  HMI_CycleManager.mqh                      CISD 参考：Rule 19 选 run 不变，[k+1, A] 内有一根以当根余量有效越过 open[k] → N/A；
+                                            MSS 参考：C5 逐根余量，旧规则（bar A 余量）选择只算出来写日志；HMI-REF（每 ARMED 每模型一行）
+  不变                                      H4 BOS / CHOCH、保护点与锚点、POI、Session、区块、ARMED、周期、BPR、PA、流动性；输入（461F006E）
+日志
+  HMI-REF / HMI-BRK                         字段见 docs/02 B8-5；MODEL 行格式不变
+工具
+  ReloadTest.ps1        B8 判定类别（重载、实时 vs 重建）；-Versus v2.54 → v2.55 BRI-08 归因模式
+  bri08_sim.py          合法摆动点（SwingDetect）、S20 SHIFT、C01–C03 周期切换与事件计数（372/372）；梯形序列与两版日志生成
+  logtests              e01–e16（126 组）
+  live_coverage.py      --ver 2.55 计 B8；live_coverage_tests.py 16/16、--workdir
+文档
+  docs/01 §10.1 / §10.2 / §11.1 C5 / §11.2；docs/02 BRI-08 修订稿 2；docs/04 v2.55 验收清单；docs/06 Audit Round 30
+Compile Status:  NOT COMPILE VERIFIED
+```
+

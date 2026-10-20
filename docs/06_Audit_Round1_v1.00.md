@@ -2127,3 +2127,34 @@ P2（工具）身份异常:      实时行 run/init 与所属构建不同只打�
 下一步:                  v2.55 只做 BRI-08：先写明缓慢穿越、影线、恰等于余量、ATR 余量变化等边界与 BOS / CHOCH / CISD / MSS 范围，
                          形成多空成对场景；定义明确后再实现，并与 v2.54 基线逐条解释信号差异。v2.56 强度、v2.57 质量、v2.58 趋势面板
 ```
+
+
+## Audit Round 30 —— v2.55 定义稿审核（2026-10-20）与 v2.55 开发版
+
+```
+来源:                    验收方「HMI v2.55 定义稿审核与工程师补充要求」（2026-10-20；包 SHA256 15766D88…5072）
+结论:                    BRI-08 核心定义确认（只改 CISD / MSS；首次有效收盘；CISD [k+1, A] 越过 → N/A 不另找 run；MSS C5 逐根余量；
+                         区间含 A；余量逐根不冻结）；按补充意见进入实现，无需另开业务选项确认
+补充一（合法摆动点）:    M04 / M05 原夹具的摆动高点 100 右侧第 3 根最高 105，按 SwingDetect（左右 2）不可能确认 —— 只测了算式。
+                         修正：bri08_sim.py 的 MSS 场景一律由 detect_swings()（与 HMI_SwingEngine.mqh 相同：左严格、右不严格）
+                         生成摆动点，并声明 A 时已确认的摆动点，不符即失败；M04 / M05 换成验收方可达夹具（高点 100 于第 2 根、
+                         第 4 根确认，第 5 根收 104，第 6 根新高未确认，A = 7）；M01–M03、M06 重造为合法摆动点
+                         新增 S20 B8-SHIFT（A 99 → 101 → 104 → 98 → 104：v2.55 第 5 根、v2.54 第 7 根）；
+                         C01–C03 逐根按 Phase 4 → Phase 5 顺序运行并计数事件（周期切换当根先查旧周期；同一 run 不被两个周期各确认；
+                         整段每周期每模型一次）—— 372/372
+补充二（诊断日志）:      HMI-BRK 加 prev_bar / prev_mp 与 live；HMI-REF 加 armed_mp；CISD 的 NA 保留 cand_level、run_from / run_to、
+                         brk_bar / brk_close / brk_mp；MSS 的 c5diff 两个方向都记（o1n0 旧排新留、o0n1 旧留新排，含候选、检查根、
+                         收盘、检查根余量），另记旧规则参考 old_state / old_level / old_ref（只读）；时间口径：armed 为 ARMED 根收盘，
+                         其余为 M5 开盘；余量都取所记那一根自己的 —— docs/02 BRI-08 修订稿 2 B8-5
+归因顺序:                B8-C5（冻结参考不同）→ B8-SLOW（同一参考，prev_close 在区间内）→ B8-SHIFT（同一周期 / 模型 / 方向 / 参考，
+                         v2.54 在之后的再穿越确认）→ B8-NA（CISD NA_BROKEN 有越过证据）；其余各类行任何差异都是 UNEXPLAINED
+实现（v2.55 开发版）:    MQL d0f4268：HMI_VERSION 2.55；CISD_Check / MSS_Check 去掉上一根条件；Cycle_FreezeCISDReference 增 [k+1, A]
+                         逐根余量检查（NA_BROKEN）；Cycle_FreezeMSSReference C5 逐根余量，旧规则选择只用于日志；HMI-REF / HMI-BRK；
+                         不新增输入（params 461F006E）；未编译（本环境无 MetaEditor）
+                         工具 dad8046：ReloadTest B8 类别（重载、实时 vs 重建）与 -Versus BRI-08 模式（其余行须逐行相同、v2.55 日志
+                         自洽与算式复核、四类归因；窗口不同 NOT JUDGED）；日志用例 e01–e16（126/126）；live_coverage.py --ver 2.55
+                         计 B8；live_coverage_tests.py 16/16，并加 --workdir（R29 环境说明）
+                         离线对照：bri08_sim.py 把全部场景排成一条梯形序列生成两版日志，ladder_check() 证明每个场景在序列中与单独
+                         运行结果相同；工具归因（多空各 23 条：C5 2、SLOW 15、SHIFT 2、NA 4）与场景表推出的预期逐类相同
+待办:                    编译（验收方）→ MT5：v2.55 与 v2.54 同品种并排、同一根 M5 内重建，-Versus 归因；同窗口重载五类；实时 vs 重建五类
+```
