@@ -7,7 +7,54 @@
 #define HMI_CYCLE_MQH
 #include "HMI_M5BlockEngine.mqh"
 
+//--- BRI-08 diagnostics (v2.55, log only; docs/02 "BRI-08 修订稿 2" B8-5) ----
+// Times: armed = ARMED bar CLOSE; every other time = M5 bar OPEN. Each margin is
+// MarginM5Pts() of the bar it is printed next to - never the confirming or the
+// ARMED bar's margin standing in for another bar's.
+string B8Px(const double v) { return(DoubleToString(v, _Digits)); }
+
+bool B8Beyond(const int dir, const double close, const double level, const int mp)
+  {
+   return(dir == DIR_BULL ? BreakUp(close, level, mp) : BreakDown(close, level, mp));
+  }
+
+void B8LogRefCISD(const IdentificationCycle &cy, const int A, const string state,
+                  const int k, const int j, const int b)
+  {
+   if(!InpLogSignals) return;
+   bool   has  = (k >= 0);
+   double cand = (has ? g_m5[k].open : 0.0);
+   bool   ok   = (state == "OK");
+   PrintFormat("HMI-REF,%s,CISD,cycle=%I64d,dir=%d,live=%d,armed=%s,armed_mp=%d,state=%s,level=%s,ref=%s," +
+               "cand_level=%s,run_from=%s,run_to=%s,brk_bar=%s,brk_close=%s,brk_mp=%s,inst=%s,run=%I64d,init=%d",
+               _Symbol, cy.cycle_id, cy.dir, (g_live ? 1 : 0), DiagT(cy.armed_time), MarginM5Pts(A), state,
+               (ok ? B8Px(cand) : "NA"), (ok ? DiagT(g_m5[k].time) : "-"),
+               (has ? B8Px(cand) : "NA"), (has ? DiagT(g_m5[k].time) : "-"), (has ? DiagT(g_m5[j].time) : "-"),
+               (b >= 0 ? DiagT(g_m5[b].time) : "-"), (b >= 0 ? B8Px(g_m5[b].close) : "NA"),
+               (b >= 0 ? IntegerToString(MarginM5Pts(b)) : "NA"),
+               g_inst, g_run_id, g_init_seq);
+  }
+
+// One HMI-BRK row per CISD / MSS confirmation: the confirming bar and the bar
+// before it, each with its own margin (B8-SLOW is read from prev_close / prev_mp).
+void B8LogBreak(const IdentificationCycle &cy, const string model, const int n,
+                const double level, const datetime ref)
+  {
+   if(!InpLogSignals || n < 1) return;
+   PrintFormat("HMI-BRK,%s,%s,cycle=%I64d,dir=%d,live=%d,bar=%s,close=%s,mp=%d,prev_bar=%s,prev_close=%s,prev_mp=%d," +
+               "level=%s,ref=%s,inst=%s,run=%I64d,init=%d",
+               _Symbol, model, cy.cycle_id, cy.dir, (g_live ? 1 : 0),
+               DiagT(g_m5[n].time), B8Px(g_m5[n].close), MarginM5Pts(n),
+               DiagT(g_m5[n-1].time), B8Px(g_m5[n-1].close), MarginM5Pts(n-1),
+               B8Px(level), DiagT(ref), g_inst, g_run_id, g_init_seq);
+  }
+
 //--- Rule 19: freeze the CISD reference once, at ARMED --------------
+// BRI-08 (v2.55): the run is chosen exactly as before; if any bar i in
+// [k+1, A] - the ARMED bar included - already closed beyond open[k] by its own
+// margin, the reference was broken before the cycle existed: CISD is N/A for
+// this cycle (no other run is searched). A close between the level and the
+// threshold is not a break (guard 3).
 void Cycle_FreezeCISDReference(IdentificationCycle &cy, const int A)
   {
    cy.cisd_level    = 0.0;
@@ -22,18 +69,38 @@ void Cycle_FreezeCISDReference(IdentificationCycle &cy, const int A)
    int j = -1;
    for(int k = A; k >= lo; k--)
       if(CandleDir(g_m5[k]) == opp) { j = k; break; }
-   if(j < 0) { cy.result[MDL_CISD] = MR_NA; return; }
+   if(j < 0) { cy.result[MDL_CISD] = MR_NA; B8LogRefCISD(cy, A, "NA_NONE", -1, -1, -1); return; }
 
    int k2 = j;
    while(k2 - 1 >= lo && CandleDir(g_m5[k2-1]) == opp) k2--;
 
-   cy.cisd_level    = g_m5[k2].open;      // OPEN of the OLDEST bar of the run
+   double cand = g_m5[k2].open;          // OPEN of the OLDEST bar of the run
+   int b = -1;
+   for(int i = k2 + 1; i <= A && b < 0; i++)
+      if(B8Beyond(cy.dir, g_m5[i].close, cand, MarginM5Pts(i))) b = i;
+   if(b >= 0) { cy.result[MDL_CISD] = MR_NA; B8LogRefCISD(cy, A, "NA_BROKEN", k2, j, b); return; }
+
+   cy.cisd_level    = cand;
    cy.cisd_ref_time = g_m5[k2].time;
    cy.cisd_run_from = g_m5[k2].time;
    cy.cisd_run_to   = g_m5[j].time;
+   B8LogRefCISD(cy, A, "OK", k2, j, -1);
+  }
+
+// C5: first bar m in (swing, A] whose close is beyond the swing, each bar with its
+// own margin (BRI-08) or, for the v2.54 diagnostic, with the ARMED bar's margin.
+int MSS_C5Break(const int dir, const int si, const int A, const bool per_bar, const int mpA)
+  {
+   for(int m = g_m5sw[si].bar_index + 1; m <= A; m++)
+      if(B8Beyond(dir, g_m5[m].close, g_m5sw[si].price, (per_bar ? MarginM5Pts(m) : mpA)))
+         return(m);
+   return(-1);
   }
 
 //--- Rule 25 / 26 / 29: freeze the MSS reference once, at ARMED -----
+// BRI-08 (v2.55): C5 judges each bar with its own margin. The v2.54 choice (C5
+// with the ARMED bar's margin) is worked out alongside for the log only - it is
+// never written into the cycle and decides nothing.
 void Cycle_FreezeMSSReference(IdentificationCycle &cy, const int A)
   {
    cy.mss_level    = 0.0;
@@ -42,10 +109,12 @@ void Cycle_FreezeMSSReference(IdentificationCycle &cy, const int A)
    int W  = MathMax(5, InpSetupWindowBars);
    int lo = MathMax(0, A - W + 1);
    datetime armed_close = CloseTimeOf(g_m5[A].time, PERIOD_M5);
-   int mp = MarginM5Pts(A);
+   int mpA  = MarginM5Pts(A);
    int want = cy.dir;                      // bull cycle -> swing HIGH
 
-   for(int i = g_m5sw_n - 1; i >= 0; i--)
+   int pick = -1, pick_old = -1;
+   string c5diff = "";
+   for(int i = g_m5sw_n - 1; i >= 0 && (pick < 0 || pick_old < 0); i--)
      {
       if(g_m5sw[i].bar_index < lo) break;                     // C2 window
       if(g_m5sw[i].dir != want) continue;                     // C3
@@ -53,19 +122,38 @@ void Cycle_FreezeMSSReference(IdentificationCycle &cy, const int A)
       if(cy.dir == DIR_BULL && Pts(g_m5sw[i].price, g_m5[A].high) <= 0) continue;  // C4
       if(cy.dir == DIR_BEAR && Pts(g_m5sw[i].price, g_m5[A].low)  >= 0) continue;
 
-      bool taken = false;                                     // C5 already consumed?
-      for(int m = g_m5sw[i].bar_index + 1; m <= A && !taken; m++)
+      int bn = MSS_C5Break(cy.dir, i, A, true,  mpA);         // C5, BRI-08
+      int bo = MSS_C5Break(cy.dir, i, A, false, mpA);         // C5, v2.54 (diagnostic)
+      if((bn >= 0) != (bo >= 0))
         {
-         if(cy.dir == DIR_BULL && BreakUp  (g_m5[m].close, g_m5sw[i].price, mp)) taken = true;
-         if(cy.dir == DIR_BEAR && BreakDown(g_m5[m].close, g_m5sw[i].price, mp)) taken = true;
+         int m = (bo >= 0 ? bo : bn);                         // the decisive bar of the side that took it
+         if(c5diff != "") c5diff += ";";
+         c5diff += StringFormat("%s@%s/%s/%s/%d/o%dn%d", DiagT(g_m5sw[i].bar_time), B8Px(g_m5sw[i].price),
+                                DiagT(g_m5[m].time), B8Px(g_m5[m].close), MarginM5Pts(m),
+                                (bo >= 0 ? 1 : 0), (bn >= 0 ? 1 : 0));
         }
-      if(taken) continue;
-
-      cy.mss_level    = g_m5sw[i].price;
-      cy.mss_ref_time = g_m5sw[i].bar_time;
-      return;
+      if(pick < 0 && bn < 0)     pick = i;
+      if(pick_old < 0 && bo < 0) pick_old = i;
      }
-   cy.result[MDL_MSS] = MR_NA;             // bounded search failed: no MSS this cycle
+
+   if(pick >= 0)
+     {
+      cy.mss_level    = g_m5sw[pick].price;
+      cy.mss_ref_time = g_m5sw[pick].bar_time;
+     }
+   else
+      cy.result[MDL_MSS] = MR_NA;          // bounded search failed: no MSS this cycle
+
+   if(InpLogSignals)
+      PrintFormat("HMI-REF,%s,MSS,cycle=%I64d,dir=%d,live=%d,armed=%s,armed_mp=%d,state=%s,level=%s,ref=%s," +
+                  "old_state=%s,old_level=%s,old_ref=%s,c5diff=%s,inst=%s,run=%I64d,init=%d",
+                  _Symbol, cy.cycle_id, cy.dir, (g_live ? 1 : 0), DiagT(cy.armed_time), mpA,
+                  (pick >= 0 ? "OK" : "NA_NONE"),
+                  (pick >= 0 ? B8Px(g_m5sw[pick].price) : "NA"), (pick >= 0 ? DiagT(g_m5sw[pick].bar_time) : "-"),
+                  (pick_old >= 0 ? "OK" : "NA_NONE"),
+                  (pick_old >= 0 ? B8Px(g_m5sw[pick_old].price) : "NA"),
+                  (pick_old >= 0 ? DiagT(g_m5sw[pick_old].bar_time) : "-"),
+                  (c5diff == "" ? "-" : c5diff), g_inst, g_run_id, g_init_seq);
   }
 
 //--- cycle storage --------------------------------------------------

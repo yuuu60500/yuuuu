@@ -12,17 +12,11 @@ bool MSS_Check(IdentificationCycle &cy, const int n)
    if(cy.mss_ref_time == 0) return(false);
    if(n < 1 || !SafeIdx(n, g_m5_n)) return(false);
 
-   int    mp   = MarginM5Pts(n);
-   double prev = g_m5[n-1].close;
-   double cur  = g_m5[n].close;
-
-   bool ok;
-   if(cy.dir == DIR_BULL)
-      ok = (Pts(prev, cy.mss_level) <= 0) && BreakUp(cur, cy.mss_level, mp);
-   else
-      ok = (Pts(prev, cy.mss_level) >= 0) && BreakDown(cur, cy.mss_level, mp);
-
-   if(!ok) return(false);
+   // BRI-08 (v2.55): the FIRST close beyond the level by this bar's margin
+   // confirms; where the previous close was is not looked at. A close between
+   // the level and the threshold is not a break and consumes nothing.
+   if(!B8Beyond(cy.dir, g_m5[n].close, cy.mss_level, MarginM5Pts(n))) return(false);
+   B8LogBreak(cy, "MSS", n, cy.mss_level, cy.mss_ref_time);
    ModelConfirm(cy, MDL_MSS, n);
    return(true);
   }
