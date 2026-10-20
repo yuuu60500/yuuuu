@@ -1929,3 +1929,18 @@ tools/live_coverage.py  只读证据工具：同一日志文件内相邻完整�
 docs                    Audit Round 27（含 Round 26 更正）；证据 docs/evidence/v2.54_live_coverage_20261016.txt；
                         v2.54 验收清单第 6 项的运行状态与补测方法
 ```
+
+## v2.54r8 —— 覆盖工具修正（r7 复核 P2 × 2）；v2.54 冻结为受限基线 —— MQL5 与 r2 相同
+
+```
+Date:     2026-10-20
+来源:     验收方「HMI v2.54r7 验收复核与收尾建议」（2026-10-20）
+MQL5:     与 v2.54r2（3813868）字节相同（0/0）；ReloadTest.ps1 与 r5 相同
+
+tools/live_coverage.py        MODEL / LIQ 键保留方向（z[:3] + z[5:]）；读取时逐行核对实时行与所属构建的 run/init；
+                              构建不完整 / 未结束 / END 无 BEGIN / 行无法解析 / 身份不符 → 退出 1，末行 RESULT: NOT PASSED
+tools/live_coverage_tests.py  13 例回归（含验收方 5 个反例）
+docs                          Audit Round 28；docs/baselines/v2.54.md（受限基线：源码指纹、证据、实例 × 类别覆盖范围、保留限制）；
+                              07 基线表；04 第 6 项状态；证据 docs/evidence/v2.54_live_coverage_20261020.txt
+```
+
