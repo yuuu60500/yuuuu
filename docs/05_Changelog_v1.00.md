@@ -1944,3 +1944,15 @@ docs                          Audit Round 28；docs/baselines/v2.54.md（受限�
                               07 基线表；04 第 6 项状态；证据 docs/evidence/v2.54_live_coverage_20261020.txt
 ```
 
+## v2.55 定义稿（BRI-08，未实现）—— MQL5 与 v2.54 基线相同
+
+```
+Date:     2026-10-20
+来源:     验收方「HMI v2.54r8 验收通过与基线确认」：v2.55 只做 BRI-08，先写定义与成对场景，确认后再实现
+
+docs/02                BRI-08 修订稿 1：范围（只改 CISD / MSS 确认；CISD 参考增 ARMED 前已越过 → N/A；MSS C5 逐根余量；
+                       H4 / POI / block / BPR / PA / 流动性不动）、定义、25 个成对场景、v2.54 → v2.55 差异四类、日志提案、
+                       5 项待确认选择
+tools/bri08_sim.py     离线模型：v2.54 / v2.55 两套规则 × 多空镜像，100/100
+```
+
