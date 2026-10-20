@@ -1,0 +1,306 @@
+# v2.55 MT5 run, log 20261020 (user terminal, server = local + 2 h), ReloadTest v2.55r2, live_coverage.py (B8)
+# sha256 1b0cfdbdeb2d7064268c83f0753cccb9c3d47d142f19ccb260b41e949cf59eb0  20261020.log  (09:13 .. 15:34 local)
+# v2.55 attached 14:56-14:57 local: EURUSD#0442 (default), EURUSD#B605 (ATR_FRAC, A047970C), USDJPY#D61E, XAUUSD#DA59 (margin 0 pt),
+#   AUDUSD#BB16; "starting on v2.55", BEGIN ver=2.55, params=461F006E (ATR: A047970C). USDJPY's v2.55 carries D61E, the id the
+#   v2.53 USDJPY chart had (same chart): its source holds v2.53 builds until 12:28 and v2.55 builds from 14:57; every comparison
+#   below uses v2.55 builds only (a version change between two builds is PENDING in live vs build, never paired).
+# Same-window pairs (v2.54 and v2.55 of a symbol rebuilt in one M5 bar): 14:58 local (to 16:50 server) and 15:33 (to 17:25).
+
+## 1. v2.54 -> v2.55, BRI-08 attribution, 15:33 pairs (last complete build of each)
+--- EURUSD#DBFD,M5  vs  EURUSD#0442,M5 : last complete build of each ---
+  A  v2.54 params=461F006E build=35 id=1791818856/9 liq=READY from=2026.09.25 08:35 to=2026.10.20 17:25 warmup_end=2026.09.25 16:55 rows=89 MODEL + 40 LIQ
+  B  v2.55 params=461F006E build=9 id=1791818856/14 liq=READY from=2026.09.25 08:35 to=2026.10.20 17:25 warmup_end=2026.09.25 16:55 rows=89 MODEL + 40 LIQ
+  common region: 2026.09.25 17:00 .. 2026.10.20 17:30  (same window)
+  DIFFERENT VERSIONS (2.54 / 2.55) - not a repaint test; MODEL upgrade regression only.
+    CISD / MSS rows that differ: 6   other rows that differ: 0
+    B8-C5           0
+    B8-SLOW         3
+    B8-SHIFT        2
+    B8-NA           1
+    UNEXPLAINED     0
+    verdicts: explained 6   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 6 MODEL difference(s) over 89 / 89 row(s); all 6 difference(s) traced to BRI-08 (first effective close) with a concrete link
+--- EURUSD#C901,M5  vs  EURUSD#B605,M5 : last complete build of each ---
+  A  v2.54 params=A047970C build=35 id=1791818856/13 liq=READY from=2026.09.25 08:35 to=2026.10.20 17:25 warmup_end=2026.09.25 16:55 rows=90 MODEL + 40 LIQ
+  B  v2.55 params=A047970C build=9 id=1791818856/18 liq=READY from=2026.09.25 08:35 to=2026.10.20 17:25 warmup_end=2026.09.25 16:55 rows=89 MODEL + 40 LIQ
+  common region: 2026.09.25 17:00 .. 2026.10.20 17:30  (same window)
+  DIFFERENT VERSIONS (2.54 / 2.55) - not a repaint test; MODEL upgrade regression only.
+    CISD / MSS rows that differ: 3   other rows that differ: 0
+    B8-C5           0
+    B8-SLOW         1
+    B8-SHIFT        1
+    B8-NA           1
+    UNEXPLAINED     0
+    verdicts: explained 3   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 3 MODEL difference(s) over 90 / 89 row(s); all 3 difference(s) traced to BRI-08 (first effective close) with a concrete link
+--- USDJPY#EB67,M5  vs  USDJPY#D61E,M5 : last complete build of each ---
+  A  v2.54 params=461F006E build=25 id=1791818856/10 liq=READY from=2026.09.25 08:35 to=2026.10.20 17:25 warmup_end=2026.09.25 16:55 rows=124 MODEL + 44 LIQ
+  B  v2.55 params=461F006E build=5 id=1791818856/15 liq=READY from=2026.09.25 08:35 to=2026.10.20 17:25 warmup_end=2026.09.25 16:55 rows=124 MODEL + 44 LIQ
+  common region: 2026.09.25 17:00 .. 2026.10.20 17:30  (same window)
+  DIFFERENT VERSIONS (2.54 / 2.55) - not a repaint test; MODEL upgrade regression only.
+    CISD / MSS rows that differ: 6   other rows that differ: 0
+    B8-C5           0
+    B8-SLOW         3
+    B8-SHIFT        1
+    B8-NA           2
+    UNEXPLAINED     0
+    verdicts: explained 6   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 6 MODEL difference(s) over 124 / 124 row(s); all 6 difference(s) traced to BRI-08 (first effective close) with a concrete link
+--- XAUUSD#2896,M5  vs  XAUUSD#DA59,M5 : last complete build of each ---
+  A  v2.54 params=461F006E build=33 id=1791818856/12 liq=READY from=2026.09.24 14:50 to=2026.10.20 17:25 warmup_end=2026.09.24 23:10 rows=109 MODEL + 46 LIQ
+  B  v2.55 params=461F006E build=5 id=1791818856/16 liq=READY from=2026.09.24 14:50 to=2026.10.20 17:25 warmup_end=2026.09.24 23:10 rows=107 MODEL + 46 LIQ
+  common region: 2026.09.24 23:15 .. 2026.10.20 17:30  (same window)
+  DIFFERENT VERSIONS (2.54 / 2.55) - not a repaint test; MODEL upgrade regression only.
+    CISD / MSS rows that differ: 2   other rows that differ: 0
+    B8-C5           0
+    B8-SLOW         0
+    B8-SHIFT        0
+    B8-NA           2
+    UNEXPLAINED     0
+    verdicts: explained 2   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 2 MODEL difference(s) over 109 / 107 row(s); all 2 difference(s) traced to BRI-08 (first effective close) with a concrete link
+--- AUDUSD#92D1,M5  vs  AUDUSD#BB16,M5 : last complete build of each ---
+  A  v2.54 params=461F006E build=26 id=1791818856/11 liq=READY from=2026.09.25 08:30 to=2026.10.20 17:25 warmup_end=2026.09.25 16:50 rows=102 MODEL + 45 LIQ
+  B  v2.55 params=461F006E build=5 id=1791818856/17 liq=READY from=2026.09.25 08:30 to=2026.10.20 17:25 warmup_end=2026.09.25 16:50 rows=102 MODEL + 45 LIQ
+  common region: 2026.09.25 16:55 .. 2026.10.20 17:30  (same window)
+  DIFFERENT VERSIONS (2.54 / 2.55) - not a repaint test; MODEL upgrade regression only.
+    CISD / MSS rows that differ: 6   other rows that differ: 0
+    B8-C5           0
+    B8-SLOW         3
+    B8-SHIFT        2
+    B8-NA           1
+    UNEXPLAINED     0
+    verdicts: explained 6   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 6 MODEL difference(s) over 102 / 102 row(s); all 6 difference(s) traced to BRI-08 (first effective close) with a concrete link
+
+## 1b. second sample: the log cut at 14:59:00 local (14:58 pairs)
+--- EURUSD#DBFD,M5  vs  EURUSD#0442,M5 : last complete build of each ---
+  common region: 2026.09.25 16:25 .. 2026.10.20 16:55  (same window)
+  DIFFERENT VERSIONS (2.54 / 2.55) - not a repaint test; MODEL upgrade regression only.
+    CISD / MSS rows that differ: 6   other rows that differ: 0
+    B8-C5           0
+    B8-SLOW         3
+    B8-SHIFT        2
+    B8-NA           1
+    UNEXPLAINED     0
+    verdicts: explained 6   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 6 MODEL difference(s) over 89 / 89 row(s); all 6 difference(s) traced to BRI-08 (first effective close) with a concrete link
+--- EURUSD#C901,M5  vs  EURUSD#B605,M5 : last complete build of each ---
+  common region: 2026.09.25 16:25 .. 2026.10.20 16:55  (same window)
+  DIFFERENT VERSIONS (2.54 / 2.55) - not a repaint test; MODEL upgrade regression only.
+    CISD / MSS rows that differ: 3   other rows that differ: 0
+    B8-C5           0
+    B8-SLOW         1
+    B8-SHIFT        1
+    B8-NA           1
+    UNEXPLAINED     0
+    verdicts: explained 3   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 3 MODEL difference(s) over 90 / 89 row(s); all 3 difference(s) traced to BRI-08 (first effective close) with a concrete link
+--- USDJPY#EB67,M5  vs  USDJPY#D61E,M5 : last complete build of each ---
+  common region: 2026.09.25 16:25 .. 2026.10.20 16:55  (same window)
+  DIFFERENT VERSIONS (2.54 / 2.55) - not a repaint test; MODEL upgrade regression only.
+    CISD / MSS rows that differ: 6   other rows that differ: 0
+    B8-C5           0
+    B8-SLOW         3
+    B8-SHIFT        1
+    B8-NA           2
+    UNEXPLAINED     0
+    verdicts: explained 6   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 6 MODEL difference(s) over 124 / 124 row(s); all 6 difference(s) traced to BRI-08 (first effective close) with a concrete link
+--- XAUUSD#2896,M5  vs  XAUUSD#DA59,M5 : last complete build of each ---
+  common region: 2026.09.24 22:40 .. 2026.10.20 16:55  (same window)
+  DIFFERENT VERSIONS (2.54 / 2.55) - not a repaint test; MODEL upgrade regression only.
+    CISD / MSS rows that differ: 2   other rows that differ: 0
+    B8-C5           0
+    B8-SLOW         0
+    B8-SHIFT        0
+    B8-NA           2
+    UNEXPLAINED     0
+    verdicts: explained 2   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 2 MODEL difference(s) over 109 / 107 row(s); all 2 difference(s) traced to BRI-08 (first effective close) with a concrete link
+--- AUDUSD#92D1,M5  vs  AUDUSD#BB16,M5 : last complete build of each ---
+  common region: 2026.09.25 16:20 .. 2026.10.20 16:55  (same window)
+  DIFFERENT VERSIONS (2.54 / 2.55) - not a repaint test; MODEL upgrade regression only.
+    CISD / MSS rows that differ: 6   other rows that differ: 0
+    B8-C5           0
+    B8-SLOW         3
+    B8-SHIFT        2
+    B8-NA           1
+    UNEXPLAINED     0
+    verdicts: explained 6   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+  upgrade regression: 6 MODEL difference(s) over 102 / 102 row(s); all 6 difference(s) traced to BRI-08 (first effective close) with a concrete link
+
+## 2. v2.55 same-window reload (last two builds, 15:33 local)
+--- EURUSD#0442,M5 : comparing the last two builds ---
+  A  v2.55 params=461F006E build=8 id=1791818856/14 liq=READY from=2026.09.25 08:35 to=2026.10.20 17:25 warmup_end=2026.09.25 16:55 rows=89 MODEL + 40 LIQ
+  B  v2.55 params=461F006E build=9 id=1791818856/14 liq=READY from=2026.09.25 08:35 to=2026.10.20 17:25 warmup_end=2026.09.25 16:55 rows=89 MODEL + 40 LIQ
+  common region: 2026.09.25 17:00 .. 2026.10.20 17:30  (same window)
+  events inside it: A 89 MODEL + 40 LIQ / B 89 MODEL + 40 LIQ
+    MODEL  IDENTICAL over 89 / 89 row(s)
+    LIQ    IDENTICAL over 40 / 40 row(s)
+    CTX    IDENTICAL over 9 / 9 event(s)
+    PROT   IDENTICAL over 20 / 20 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 74 / 74 row(s) (REF / BRK)
+  IDENTICAL inside the comparable region (89 MODEL + 40 LIQ) - no repaint found there.
+--- EURUSD#B605,M5 : comparing the last two builds ---
+  A  v2.55 params=A047970C build=8 id=1791818856/18 liq=READY from=2026.09.25 08:35 to=2026.10.20 17:25 warmup_end=2026.09.25 16:55 rows=89 MODEL + 40 LIQ
+  B  v2.55 params=A047970C build=9 id=1791818856/18 liq=READY from=2026.09.25 08:35 to=2026.10.20 17:25 warmup_end=2026.09.25 16:55 rows=89 MODEL + 40 LIQ
+  common region: 2026.09.25 17:00 .. 2026.10.20 17:30  (same window)
+  events inside it: A 89 MODEL + 40 LIQ / B 89 MODEL + 40 LIQ
+    MODEL  IDENTICAL over 89 / 89 row(s)
+    LIQ    IDENTICAL over 40 / 40 row(s)
+    CTX    IDENTICAL over 9 / 9 event(s)
+    PROT   IDENTICAL over 20 / 20 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 74 / 74 row(s) (REF / BRK)
+  IDENTICAL inside the comparable region (89 MODEL + 40 LIQ) - no repaint found there.
+--- USDJPY#D61E,M5 : comparing the last two builds ---
+  A  v2.55 params=461F006E build=4 id=1791818856/15 liq=READY from=2026.09.25 08:35 to=2026.10.20 17:25 warmup_end=2026.09.25 16:55 rows=124 MODEL + 44 LIQ
+  B  v2.55 params=461F006E build=5 id=1791818856/15 liq=READY from=2026.09.25 08:35 to=2026.10.20 17:25 warmup_end=2026.09.25 16:55 rows=124 MODEL + 44 LIQ
+  common region: 2026.09.25 17:00 .. 2026.10.20 17:30  (same window)
+  events inside it: A 124 MODEL + 44 LIQ / B 124 MODEL + 44 LIQ
+    MODEL  IDENTICAL over 124 / 124 row(s)
+    LIQ    IDENTICAL over 44 / 44 row(s)
+    CTX    IDENTICAL over 8 / 8 event(s)
+    PROT   IDENTICAL over 20 / 20 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 109 / 109 row(s) (REF / BRK)
+  IDENTICAL inside the comparable region (124 MODEL + 44 LIQ) - no repaint found there.
+--- XAUUSD#DA59,M5 : comparing the last two builds ---
+  A  v2.55 params=461F006E build=4 id=1791818856/16 liq=READY from=2026.09.24 14:50 to=2026.10.20 17:25 warmup_end=2026.09.24 23:10 rows=107 MODEL + 46 LIQ
+  B  v2.55 params=461F006E build=5 id=1791818856/16 liq=READY from=2026.09.24 14:50 to=2026.10.20 17:25 warmup_end=2026.09.24 23:10 rows=107 MODEL + 46 LIQ
+  common region: 2026.09.24 23:15 .. 2026.10.20 17:30  (same window)
+  events inside it: A 107 MODEL + 46 LIQ / B 107 MODEL + 46 LIQ
+    MODEL  IDENTICAL over 107 / 107 row(s)
+    LIQ    IDENTICAL over 46 / 46 row(s)
+    CTX    IDENTICAL over 11 / 11 event(s)
+    PROT   IDENTICAL over 22 / 22 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 93 / 93 row(s) (REF / BRK)
+  IDENTICAL inside the comparable region (107 MODEL + 46 LIQ) - no repaint found there.
+--- AUDUSD#BB16,M5 : comparing the last two builds ---
+  A  v2.55 params=461F006E build=4 id=1791818856/17 liq=READY from=2026.09.25 08:30 to=2026.10.20 17:25 warmup_end=2026.09.25 16:50 rows=102 MODEL + 45 LIQ
+  B  v2.55 params=461F006E build=5 id=1791818856/17 liq=READY from=2026.09.25 08:30 to=2026.10.20 17:25 warmup_end=2026.09.25 16:50 rows=102 MODEL + 45 LIQ
+  common region: 2026.09.25 16:55 .. 2026.10.20 17:30  (same window)
+  events inside it: A 102 MODEL + 45 LIQ / B 102 MODEL + 45 LIQ
+    MODEL  IDENTICAL over 102 / 102 row(s)
+    LIQ    IDENTICAL over 45 / 45 row(s)
+    CTX    IDENTICAL over 12 / 12 event(s)
+    PROT   IDENTICAL over 25 / 25 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 97 / 97 row(s) (REF / BRK)
+  IDENTICAL inside the comparable region (102 MODEL + 45 LIQ) - no repaint found there.
+
+## 3. live vs rebuild, 20261020 alone (ReloadTest -LiveVsBuild)
+--- AUDUSD#92D1,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  protected-level rows compared: 2 (PROT / ANCHOR / INTERNAL)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- AUDUSD#BB16,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- AUDUSD#F40A,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- EURUSD#0442,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- EURUSD#7877,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- EURUSD#B605,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- EURUSD#C901,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- EURUSD#DBFD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- GBPUSD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 2   comparable: 2   pending review: 0   liquidity pending: 0
+  live events compared: 2 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- NZDUSD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- USDCAD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDCHF,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 2   comparable: 2   pending review: 0   liquidity pending: 0
+  live events compared: 7 (+ 0 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDJPY#D61E,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- USDJPY#EB67,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- XAUUSD#0051,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- XAUUSD#2896,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 1 H4 structure event(s))
+  protected-level rows compared: 2 (PROT / ANCHOR / INTERNAL)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- XAUUSD#DA59,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+
+## 4. python3 tools/live_coverage.py --ver 2.55 20261020.log   (exit 0)
+== intraday live vs build, v2.55 instances (rows compared per category / differences)
+  instance       day        pairs  MODEL  LIQ  CTX PROT   B8  diff  outside
+  AUDUSD#BB16    20261020full     4      0    0    0    0    0     0        0
+  EURUSD#0442    20261020full     8      0    0    0    0    0     0        0
+  EURUSD#B605    20261020full     8      0    0    0    0    0     0        0
+  USDJPY#D61E    20261020full     4      0    0    0    0    0     0        0
+  XAUUSD#DA59    20261020full     4      0    0    0    0    0     0        0
+  total
+  AUDUSD#BB16                          0    0    0    0    0
+  EURUSD#0442                          0    0    0    0    0
+  EURUSD#B605                          0    0    0    0    0
+  USDJPY#D61E                          0    0    0    0    0
+  XAUUSD#DA59                          0    0    0    0    0
+  differences on compared rows: 0
+  ("outside": live rows of a stretch whose event time is at its edges; not counted, listed below)
+
+== across a sleep (A-60) - rows logged after the last build of a day, checked against the next first build
+  none
+
+== category coverage, v2.55
+  AUDUSD#BB16    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  EURUSD#0442    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  EURUSD#B605    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  USDJPY#D61E    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  XAUUSD#DA59    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+
+RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+
+## 5. v2.55 diagnostic rows in the last build of each instance (15:33)
+  0442 (EURUSD)      REF CISD OK 23 / NA_BROKEN 2; REF MSS OK 25; BRK CISD 14, MSS 10; c5diff entries 0
+  B605 (EURUSD ATR)  REF CISD OK 23 / NA_BROKEN 2; REF MSS OK 25; BRK CISD 14, MSS 10; c5diff entries 0 (old rule = new rule everywhere)
+  D61E (USDJPY)      REF CISD OK 36 / NA_BROKEN 3; REF MSS OK 37 / NA_NONE 2; BRK CISD 17, MSS 14; c5diff entries 0
+  DA59 (XAUUSD)      REF CISD OK 29 / NA_BROKEN 4; REF MSS OK 31 / NA_NONE 2; BRK CISD 15, MSS 12; c5diff entries 0
+  BB16 (AUDUSD)      REF CISD OK 32 / NA_BROKEN 2; REF MSS OK 31 / NA_NONE 3; BRK CISD 19, MSS 10; c5diff entries 0
+  B8-C5 is therefore not exercised by these windows (ATR instance included): only the offline model and log cases cover it.
+
+## 6. v2.54 baseline, live coverage updated with the full 20261020.log (python3 tools/live_coverage.py 20261014 .. 20261020, exit 0)
+  total
+  AUDUSD#92D1                         15    5    3    4
+  EURUSD#C901                          1    2    2    2
+  EURUSD#DBFD                          1    2    2    2
+  USDJPY#EB67                          0    5    2    4
+  XAUUSD#2896                          0    2    1    2
+  differences on compared rows: 0
+== category coverage, v2.54
+  AUDUSD#92D1    intraday: MODEL, LIQ, CTX, PROT    across a sleep only: -                  edge only: -            no sample: -
+  EURUSD#C901    intraday: MODEL, LIQ, CTX, PROT    across a sleep only: -                  edge only: -            no sample: -
+  EURUSD#DBFD    intraday: MODEL, LIQ, CTX, PROT    across a sleep only: -                  edge only: -            no sample: -
+  USDJPY#EB67    intraday: LIQ, CTX, PROT           across a sleep only: MODEL              edge only: MODEL        no sample: -
+  XAUUSD#2896    intraday: LIQ, CTX, PROT           across a sleep only: -                  edge only: -            no sample: MODEL
+
+RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+  10-20 adds: XAUUSD#2896 CTX 1 (BOS DOWN bar 2026.10.20 12:00) + PROT 2 (KEEP_WORSE, ANCHOR MOVE), stretch 09:26 -> 11:02 local;
+              AUDUSD#92D1 CTX 1 + PROT 2. XAUUSD v2.54 now has intraday LIQ / CTX / PROT; MODEL still has no sample.

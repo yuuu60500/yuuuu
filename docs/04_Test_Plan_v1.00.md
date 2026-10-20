@@ -1009,5 +1009,7 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           判据：other rows that differ 0；verdicts UNEXPLAINED 0、PENDING 0；每条差异归 B8-C5 / SLOW / SHIFT / NA 之一；
           r2 起两版每条 CISD / MSS MODEL 先过周期时序（n > A，不晚于下一次 ARMED）与每周期每模型一行
           窗口不同 → NOT JUDGED，不作通过
+7  运行状态（2026-10-20，Audit Round 32）：第 0 项 0 / 0；第 1 项 ver=2.55、461F006E / A047970C；第 6 项两组同窗口样本（14:58、15:33）
+          五对各 23 条全部可归因，其余行 0 差异（B8-C5 在真实窗口中为 0）；第 4 项 v2.55 五实例五类 IDENTICAL；
+          第 5 项 v2.55 实时仅 35 分钟、无实时行 —— 待补
 ```
-

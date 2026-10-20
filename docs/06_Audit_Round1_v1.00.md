@@ -2179,3 +2179,22 @@ P2-2 重复 MODEL:         $mo / $mn 以 cycle|model 为键直接赋值，第二
                          与验收方候选补丁等价（同一检查与 pending 提示），按仓库代码风格并入（b8cef89）；MQL 未改
 待办:                    MT5：v2.55 与 v2.54 同品种并排、同一根 M5 内重建 → -Versus；同窗口重载五类；实时 vs 重建五类（--ver 2.55）
 ```
+
+
+## Audit Round 32 —— v2.55 首次 MT5 运行（用户日志 2026-10-20）
+
+```
+证据:                    docs/evidence/v2.55_mt5_run_20261020.txt（ReloadTest v2.55r2、live_coverage.py）
+挂图:                    10-20 14:56–14:57 本地挂 v2.55：EURUSD 默认 0442、EURUSD ATR B605、USDJPY D61E、XAUUSD DA59（余量 0）、AUDUSD BB16；
+                         v2.54 五实例照常。USDJPY 的 v2.55 沿用该图原 v2.53 实例号 D61E（同一张图）—— 比较只取 v2.55 构建
+版本与参数:              starting on v2.55；BEGIN ver=2.55；params=461F006E（ATR 实例 A047970C），与旁边 v2.54 图相同
+v2.54 → v2.55:           两组同窗口样本（14:58、15:33 本地），五对各自 same window：
+                         EURUSD 默认 6（SLOW 3 / SHIFT 2 / NA 1）、EURUSD ATR 3（1 / 1 / 1）、USDJPY 6（3 / 1 / 2）、XAUUSD 2（NA 2）、
+                         AUDUSD 6（3 / 2 / 1）—— 每组 23 条 CISD / MSS 差异全部可归因，other rows that differ 0，PENDING 0，UNEXPLAINED 0；
+                         B8-C5 两组都是 0：五个实例（含 ATR）最后一次构建的 MSS c5diff 都为空，C5 逐根余量在这些窗口里没有改变任何参考
+同窗口重载:              15:33 的两次 v2.55 重建，五实例 MODEL / LIQ / CTX / PROT / B8 全部 IDENTICAL（B8 74 / 74 / 109 / 93 / 97 行）
+实时 vs 重建（v2.55）:   只有 14:58 → 15:33 约 35 分钟实时，期间五实例都没有实时行 —— 五类均无样本，不写通过
+v2.54 基线覆盖更新:      10-20 全天：XAUUSD#2896 当日区间新增 CTX 1（BOS）、PROT 2；AUDUSD#92D1 CTX 1、PROT 2；0 差异。
+                         黄金 v2.54 日内现有 LIQ / CTX / PROT，MODEL 仍无样本（docs/baselines/v2.54.md 第 4 节随之更新）
+待办:                    v2.55 继续运行补实时样本（五类，--ver 2.55）；之后交验收方确定 v2.55 覆盖范围
+```
