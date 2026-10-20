@@ -1981,3 +1981,15 @@ MQL5
 Compile Status:  NOT COMPILE VERIFIED
 ```
 
+## v2.55r2 —— 工具：BRI-08 归因前核对周期时序与唯一性（MQL5 与 v2.55 开发版相同）
+
+```
+Date:     2026-10-20
+来源:     验收方「HMI v2.55 开发版审核报告」（2026-10-20）P2-1 / P2-2；编译 0 / 0（验收方）
+
+tools/ReloadTest.ps1   Show-B8Attribution：两版每条 CISD / MSS MODEL 先过 ChainLife（n > A；不晚于下一次 ARMED，等于允许；
+                       缺 ARMED → PENDING_ATTRIBUTION）与每周期每模型一行（重复 → UNEXPLAINED）；pending 时总结行写 NOT JUDGED 与行数
+tools/logtests         e17–e21（131 组）
+docs                   Audit Round 31；docs/04 v2.55 清单第 0 / 3 / 6 项
+```
+

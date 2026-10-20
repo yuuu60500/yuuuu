@@ -991,7 +991,7 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
 ### v2.55 验收清单（BRI-08：CISD / MSS 首次有效收盘；基线 v2.54 受限基线）
 
 ```
-0  编译 0 errors / 0 warnings（v2.55 开发版：待验收方编译）
+0  编译 0 errors / 0 warnings（v2.55 开发版：验收方 2026-10-20 MetaEditor X64 0 / 0；r2 只改工具，MQL 相同）
 1  版本：starting on v2.55；BEGIN ver=2.55；默认参数下 params=461F006E（无新输入）
 2  新日志行（InpLogSignals = true；docs/02 BRI-08 修订稿 2 B8-5）：
           HMI-REF 每个 ARMED 每模型一行（CISD / MSS），与 HMI-ARM 同一 cycle、armed 相同；
@@ -999,13 +999,15 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           CISD：state=OK 时 level = cand_level；NA_BROKEN 时 brk_bar ∈ [run_from 后一根, A]，brk_close 按 brk_mp 越过 cand_level
           MSS：c5diff 每条按 armed_mp 与检查根余量复核 o / n 两种判定；old_* 只读，与 v2.54 同窗口 MODEL 行一致
 3  离线：python3 tools/bri08_sim.py → 372/372（29 场景 × 多空 × v2.54 / v2.55；每周期每模型一次；MSS 摆动点由 SwingDetect 生成）
-          ReloadTest 日志用例 126/126（e01–e16：多空两向全部可归因；BRK / REF / c5diff / 其余行 / SHIFT / 窗口篡改须 UNEXPLAINED
-          或 NOT JUDGED；B8 类别的重载与实时）；python3 tools/live_coverage_tests.py → 16/16
+          ReloadTest 日志用例 131/131（e01–e16：多空两向全部可归因；BRK / REF / c5diff / 其余行 / SHIFT / 窗口篡改须 UNEXPLAINED
+          或 NOT JUDGED；B8 类别的重载与实时。r2 e17–e21：确认在本周期 ARMED 当根、在下一次 ARMED 之后、同周期同模型两行
+          → UNEXPLAINED；缺 ARMED → PENDING；在下一次 ARMED 当根确认 → 允许）；python3 tools/live_coverage_tests.py → 16/16
 4  同窗口重载（同一根 M5 内刷新两次）：MODEL / LIQ / CTX / PROT / B8 五类 IDENTICAL
 5  实时 vs 重建：五类分别计数（`python3 tools/live_coverage.py --ver 2.55 <日志>`，B8 = REF / BRK），已覆盖行 0 差异；
           未覆盖的类别写「无样本」，不写通过
 6  跨版本 v2.54 vs v2.55（同品种两张图，同一根 M5 内各重建一次）：`-Source <v2.54> -Versus <v2.55>`（BRI-08 模式）
-          判据：other rows that differ 0；verdicts UNEXPLAINED 0、PENDING 0；每条差异归 B8-C5 / SLOW / SHIFT / NA 之一
+          判据：other rows that differ 0；verdicts UNEXPLAINED 0、PENDING 0；每条差异归 B8-C5 / SLOW / SHIFT / NA 之一；
+          r2 起两版每条 CISD / MSS MODEL 先过周期时序（n > A，不晚于下一次 ARMED）与每周期每模型一行
           窗口不同 → NOT JUDGED，不作通过
 ```
 

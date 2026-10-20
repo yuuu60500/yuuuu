@@ -2158,3 +2158,24 @@ P2（工具）身份异常:      实时行 run/init 与所属构建不同只打�
                          运行结果相同；工具归因（多空各 23 条：C5 2、SLOW 15、SHIFT 2、NA 4）与场景表推出的预期逐类相同
 待办:                    编译（验收方）→ MT5：v2.55 与 v2.54 同品种并排、同一根 M5 内重建，-Versus 归因；同窗口重载五类；实时 vs 重建五类
 ```
+
+
+## Audit Round 31 —— 验收方 v2.55 开发版审核（2026-10-20）；工具 r2
+
+```
+来源:                    验收方「HMI v2.55 开发版审核报告」（2026-10-20；包 SHA256 A7A95DEB…2B25）
+结论:                    指标实现可进入 MT5 运行验证；编译 0 errors / 0 warnings（X64）；参数摘要 37 项 461F006E；18 / 23 文件与 v2.54r8
+                         相同，5 个有改动（主程序与 Defs 只改版本号）；372/372、126/126、16/16 复跑通过；CISD / MSS 核心实现无须修改。
+                         归因工具两处 P2，须在正式跨版本验收前修复；不冻结 v2.55，不开始 v2.56；工具修补与 MT5 日志收集并行
+P2-1 周期时序:           Show-B8Attribution 未调用 ChainLife —— 把 MODEL 与 BRK 一起移到本周期 ARMED 当根（n = A）或下一次 ARMED
+                         之后，仍归为 B8-SLOW（23 / 0 / 0）。修正：归因前对两版每条 CISD / MSS MODEL 调 ChainLife 'MODEL'：
+                         n > A；不晚于关闭本周期的下一次 ARMED（等于允许 —— Phase 4 先查旧周期，Phase 5 再建新周期）；缺 ARMED 行 →
+                         PENDING_ATTRIBUTION（总结行 NOT JUDGED，写明 pending 行数）；违反 → UNEXPLAINED
+P2-2 重复 MODEL:         $mo / $mn 以 cycle|model 为键直接赋值，第二行覆盖第一行 —— 复制一行并把 marks 加 1 仍 23 / 0 / 0。
+                         修正：写入前逐行检查，同一构建内同周期同模型的第二条 CISD / MSS MODEL（含完全相同的行）→ UNEXPLAINED，两版都查
+回归:                    logtests e17（确认在本周期 ARMED 当根）、e18（在下一次 ARMED 之后）、e19（重复行）→ UNEXPLAINED；
+                         e20（两版都缺该周期 ARMED）→ PENDING / NOT JUDGED；e21（C01 单独：旧周期在下一次 ARMED 当根确认）→ 全部可归因。
+                         131/131；验收方三份反例日志用 r2：UNEXPLAINED 1 / 1 / 1，未改对照 23 / 0 / 0
+                         与验收方候选补丁等价（同一检查与 pending 提示），按仓库代码风格并入（b8cef89）；MQL 未改
+待办:                    MT5：v2.55 与 v2.54 同品种并排、同一根 M5 内重建 → -Versus；同窗口重载五类；实时 vs 重建五类（--ver 2.55）
+```
