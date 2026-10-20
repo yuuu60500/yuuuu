@@ -1724,5 +1724,86 @@
   "forbid": [
    "AGREE BOTH WAYS"
   ]
+ },
+ "e17_versus255_confirm_on_armed": {
+  "args": [
+   "-Source",
+   "USDJPY#0B54,M5",
+   "-Versus",
+   "USDJPY#0C55,M5"
+  ],
+  "expect": [
+   "CISD on its cycle's ARMED bar",
+   "Phase 4 needs n > A",
+   "UNEXPLAINED - not traced to BRI-08"
+  ],
+  "forbid": [
+   "traced to BRI-08 (first effective close) with a concrete link"
+  ]
+ },
+ "e18_versus255_confirm_after_next_armed": {
+  "args": [
+   "-Source",
+   "USDJPY#0B54,M5",
+   "-Versus",
+   "USDJPY#0C55,M5"
+  ],
+  "expect": [
+   "after the ARMED",
+   "that closed its cycle (Rule 15",
+   "UNEXPLAINED - not traced to BRI-08"
+  ],
+  "forbid": [
+   "traced to BRI-08 (first effective close) with a concrete link"
+  ]
+ },
+ "e19_versus255_duplicate_model": {
+  "args": [
+   "-Source",
+   "USDJPY#0B54,M5",
+   "-Versus",
+   "USDJPY#0C55,M5"
+  ],
+  "expect": [
+   "a second CISD row for this cycle",
+   "one per cycle and model (Rule 43)",
+   "UNEXPLAINED - not traced to BRI-08"
+  ],
+  "forbid": [
+   "traced to BRI-08 (first effective close) with a concrete link"
+  ]
+ },
+ "e20_versus255_armed_missing": {
+  "args": [
+   "-Source",
+   "USDJPY#0B54,M5",
+   "-Versus",
+   "USDJPY#0C55,M5"
+  ],
+  "expect": [
+   "its cycle's ARMED row (block 101) is not in the log",
+   "row(s) PENDING_ATTRIBUTION), not a pass"
+  ],
+  "forbid": [
+   "traced to BRI-08 (first effective close) with a concrete link",
+   "UNEXPLAINED - not traced"
+  ]
+ },
+ "e21_versus255_confirm_on_next_armed_ok": {
+  "args": [
+   "-Source",
+   "USDJPY#0B54,M5",
+   "-Versus",
+   "USDJPY#0C55,M5"
+  ],
+  "expect": [
+   "verdicts: explained 3   PENDING_ATTRIBUTION 0   UNEXPLAINED 0",
+   "    B8-SHIFT        1",
+   "same cycle, model and reference; v2.55 confirmed already"
+  ],
+  "forbid": [
+   "UNEXPLAINED - not traced",
+   "NOT JUDGED"
+  ]
  }
 }

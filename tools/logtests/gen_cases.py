@@ -609,5 +609,48 @@ b8case("e15_live255_ok", lb1 + LIVE + lb2[1:], ["BRI-08 rows compared:", "AGREE 
 b8case("e16_live255_brk_missing", lb1 + one(lambda l: "HMI-BRK," in l, lambda l: None)(LIVE) + lb2[1:],
        ["MISMATCH(ES) on covered bars", "build only [1->2] B8 HMI-BRK"], ["AGREE BOTH WAYS"], ["-LiveVsBuild"])
 
+# r2 (review of the v2.55 dev, 2026-10-20): a CISD / MSS MODEL row must sit inside its cycle and be the only one
+# of its model in that cycle - in both builds - before anything is attributed (ChainLife + one row per cycle and model)
+import datetime as _dt
+def _plus(t16, m): return (_dt.datetime.strptime(t16, "%Y.%m.%d %H:%M") + _dt.timedelta(minutes=m)).strftime("%Y.%m.%d %H:%M")
+_b55 = B8.emit_build(SER, 1, "2.55", "0C55", 2)
+_arm = {fld(l, "block"): fld(l, "bar") for l in _b55 if "HMI-ARM," in l}
+_m101 = next(l for l in _b55 if ",MODEL,1,101,101,OB,CISD," in l)
+_t101 = _m101.split("  ")[-1].split(",")[8]                    # the confirming bar's close, with seconds
+def move101(close16):                                          # move cycle 101's v2.55 CISD (MODEL + BRK) to another bar
+    def f(lines):
+        out = []
+        for l in lines:
+            if l == _m101:
+                l = l.replace(_t101, close16 + ":00")
+            elif "HMI-BRK," in l and "cycle=101," in l and ",CISD," in l:
+                l = setf(setf(l, "bar", _plus(close16, -5)), "prev_bar", _plus(close16, -10))
+            out.append(l)
+        return out
+    return f
+b8case("e17_versus255_confirm_on_armed", b8pair(1, v55=move101(_arm["101"])),
+       ["CISD on its cycle's ARMED bar", "Phase 4 needs n > A", "UNEXPLAINED - not traced to BRI-08"], NOT8)
+b8case("e18_versus255_confirm_after_next_armed", b8pair(1, v55=move101(_plus(_arm["102"], 5))),
+       ["after the ARMED", "that closed its cycle (Rule 15", "UNEXPLAINED - not traced to BRI-08"], NOT8)
+def dup101(lines):
+    out = []
+    for l in lines:
+        out.append(l)
+        if l == _m101: out.append(l)
+    return [setf(l, "marks", str(int(fld(l, "marks")) + 1)) if "HMI-BUILD-END," in l else l for l in out]
+b8case("e19_versus255_duplicate_model", b8pair(1, v55=dup101),
+       ["a second CISD row for this cycle", "one per cycle and model (Rule 43)", "UNEXPLAINED - not traced to BRI-08"], NOT8)
+_noarm = lambda lines: [l for l in lines if not ("HMI-ARM," in l and ",block=101," in l)]
+b8case("e20_versus255_armed_missing", b8pair(1, v54=_noarm, v55=_noarm),
+       ["its cycle's ARMED row (block 101) is not in the log", "row(s) PENDING_ATTRIBUTION), not a pass"], NOT8 + ["UNEXPLAINED - not traced"])
+# the bound itself: the old cycle may confirm ON the bar whose ARMED closes it (Phase 4 before Phase 5) - C01 alone
+SER1, SP1 = B8.ladder([s_ for s_ in B8.SCEN if s_["id"] == "C01"])
+B8.ladder_check(SER1, SP1, 1)
+_ev1 = B8.expected_verdicts(SER1, 1)
+_c01 = lambda d: B8.emit_build(SER1, d, "2.54", "0B54", 1) + B8.emit_build(SER1, d, "2.55", "0C55", 2)
+b8case("e21_versus255_confirm_on_next_armed_ok", _c01(1),
+       [f"verdicts: explained {sum(_ev1.values())}   PENDING_ATTRIBUTION 0   UNEXPLAINED 0", f"    {'B8-SHIFT':<12} {_ev1['SHIFT']:>4}",
+        "same cycle, model and reference; v2.55 confirmed already"], ["UNEXPLAINED - not traced", "NOT JUDGED"])
+
 json.dump(C, open("cases.json", "w"), indent=1)
 print(len(C), "cases")

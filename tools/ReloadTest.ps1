@@ -1794,7 +1794,8 @@ function Show-B8Attribution($Old, $New, [datetime]$rs, [datetime]$re, [bool]$mov
     $tally = [ordered]@{ explained = 0; PENDING_ATTRIBUTION = 0; UNEXPLAINED = 0 }
     $cls = [ordered]@{ 'B8-C5' = 0; 'B8-SLOW' = 0; 'B8-SHIFT' = 0; 'B8-NA' = 0; 'UNEXPLAINED' = 0 }
     $say = { param([string]$c, [string]$what, [string]$why)
-        if ($c -eq 'UNEXPLAINED') { $tally.UNEXPLAINED++; $cls.UNEXPLAINED++; [void]$lines.Add(("{0,-20} {1}   <- {2}" -f 'UNEXPLAINED', $what, $why)) }
+        if ($c -eq 'PENDING_ATTRIBUTION') { $tally.PENDING_ATTRIBUTION++; [void]$lines.Add(("{0,-20} {1}   <- {2}" -f $c, $what, $why)) }
+        elseif ($c -eq 'UNEXPLAINED') { $tally.UNEXPLAINED++; $cls.UNEXPLAINED++; [void]$lines.Add(("{0,-20} {1}   <- {2}" -f 'UNEXPLAINED', $what, $why)) }
         else { $tally.explained++; $cls[$c]++; [void]$lines.Add(("{0,-20} {1}   <- {2}: {3}" -f 'explained', $what, $c, $why)) } }
     $sn = Get-Struct $New
     Write-Host ("  BRI-08 attribution (v{0} -> v{1}): CISD / MSS rows only; every other row must be the same; v{1} REF {2} / BRK {3}" -f `
@@ -1821,9 +1822,25 @@ function Show-B8Attribution($Old, $New, [datetime]$rs, [datetime]$re, [bool]$mov
         if ($tab.ContainsKey($k)) { & $say 'UNEXPLAINED' "v$($New.Ver) $($x.Tag) cycle $($x.Cycle) $($x.Model)" 'two rows for one cycle and model'; continue }
         $tab[$k] = $x
     }
+    # every CISD / MSS MODEL row of BOTH builds, before anything is attributed (r2, review of the v2.55 dev):
+    # one row per cycle and model (Rule 43) - an identical second row too - and inside its cycle's lifetime,
+    # judged by ChainLife: after its own ARMED bar (Rule 18, n > A), not after the ARMED that closes the cycle
+    # (Rule 15; on that bar itself is allowed - Phase 4 checks the old cycle before Phase 5 arms the new one).
+    # No ARMED row for the cycle in the log -> PENDING_ATTRIBUTION, a broken bound -> UNEXPLAINED.
     $mo = @{}; $mn = @{}
-    foreach ($r in $Old.Rows) { if ((RowKind $r) -eq 'MODEL') { $m = B8Model $r; if ($m.Name -eq 'CISD' -or $m.Name -eq 'MSS') { $mo["$($m.Cycle)|$($m.Name)"] = $m } } }
-    foreach ($r in $New.Rows) { if ((RowKind $r) -eq 'MODEL') { $m = B8Model $r; if ($m.Name -eq 'CISD' -or $m.Name -eq 'MSS') { $mn["$($m.Cycle)|$($m.Name)"] = $m } } }
+    foreach ($side in @(@($Old, $mo), @($New, $mn))) {
+        $bk = $side[0]; $tab = $side[1]; $st = Get-Struct $bk
+        foreach ($r in $bk.Rows) {
+            if ((RowKind $r) -ne 'MODEL') { continue }
+            $m = B8Model $r
+            if ($m.Name -ne 'CISD' -and $m.Name -ne 'MSS') { continue }
+            $k = "$($m.Cycle)|$($m.Name)"; $what = "MODEL v$($bk.Ver) cycle $($m.Cycle) $($m.Name) $(T16 $m.Time)"
+            if ($tab.ContainsKey($k)) { & $say 'UNEXPLAINED' $what "a second $($m.Name) row for this cycle (first at $(T16 $tab[$k].Time)): one per cycle and model (Rule 43)"; continue }
+            $tab[$k] = $m
+            $life = ChainLife $st 'MODEL' ([pscustomobject]@{ Time = $m.Time; BlockId = ($r -split ',')[4]; Name = $m.Name; Dir = $m.Dir })
+            if ($life) { & $say $life.V $what $life.Why }
+        }
+    }
     foreach ($a in @($sn.Arm)) {
         foreach ($nm in @('CISD', 'MSS')) {
             $x = $ref["$($a.BlockId)|$nm"]
@@ -1918,7 +1935,7 @@ function Show-B8Attribution($Old, $New, [datetime]$rs, [datetime]$re, [bool]$mov
     Write-Host ("    verdicts: explained {0}   PENDING_ATTRIBUTION {1}   UNEXPLAINED {2}" -f $tally.explained, $tally.PENDING_ATTRIBUTION, $tally.UNEXPLAINED) `
         -ForegroundColor $(if ($tally.UNEXPLAINED) { 'Red' } else { 'Gray' })
     $show = @($lines | Where-Object { $_ -notmatch '^explained' })
-    $show | Select-Object -First 15 | ForEach-Object { Write-Host "      $_" -ForegroundColor Red }
+    $show | Select-Object -First 15 | ForEach-Object { Write-Host "      $_" -ForegroundColor $(if ($_ -match '^UNEXPLAINED') { 'Red' } else { 'Yellow' }) }
     if ($show.Count -gt 15) { Write-Host "      ... $($show.Count - 15) more in the file" -ForegroundColor Red }
     if ($lines.Count) {
         $out = Join-Path $dir ("attribution_" + ($Old.Src -replace '[^A-Za-z0-9]','_') + "__" + ($New.Src -replace '[^A-Za-z0-9]','_') + ".txt")
@@ -2147,7 +2164,7 @@ function Compare-Builds($A, $B) {
             if ($att.Unexplained) {
                 Write-Host ("  upgrade regression: {0} MODEL difference(s) over {1} / {2} row(s); {3} difference(s) UNEXPLAINED - not traced to BRI-08" -f $d.Count, $mA.Count, $mB.Count, $att.Unexplained) -ForegroundColor Red
             } elseif ($att.Pending) {
-                Write-Host ("  upgrade regression: {0} MODEL difference(s) over {1} / {2} row(s) - NOT JUDGED (window moved), not a pass" -f $d.Count, $mA.Count, $mB.Count) -ForegroundColor Yellow
+                Write-Host ("  upgrade regression: {0} MODEL difference(s) over {1} / {2} row(s) - NOT JUDGED ({3}), not a pass" -f $d.Count, $mA.Count, $mB.Count, $(if ($moved) { 'window moved' } else { "$($att.Pending) row(s) PENDING_ATTRIBUTION" })) -ForegroundColor Yellow
             } elseif ($att.Explained) {
                 Write-Host ("  upgrade regression: {0} MODEL difference(s) over {1} / {2} row(s); all {3} difference(s) traced to BRI-08 (first effective close) with a concrete link" -f $d.Count, $mA.Count, $mB.Count, $att.Explained) -ForegroundColor Yellow
             } else {
