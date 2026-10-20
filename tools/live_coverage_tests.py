@@ -1,0 +1,123 @@
+"""Regression cases for tools/live_coverage.py (reviewer, v2.54r7 review, 2026-10-20: keep the counterexamples).
+
+Two synthetic UTF-16 log days of one v2.54 instance, written like the MT5 Experts log:
+  day 1  build 1 (to 11:55) - live MODEL 12:10, LIQ 12:20, CTX + PROT bar 12:00, edge MODEL 12:30 -
+         build 2 (to 12:25, holds all of them) - live LIQ 12:40 before the sleep - last line 11:00 local
+  day 2  first build (holds the LIQ 12:40)
+Each case alters one thing in a copy and states the exit status the tool must give.
+
+    python3 tools/live_coverage_tests.py
+"""
+import os, subprocess, sys, tempfile
+
+TOOL = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'live_coverage.py')
+ID = 'inst=T1,run=100,init=7'
+
+
+def line(local, msg):
+    return f'AB\t0\t{local}\tH4M5_Identification (AUDUSD,M5)\t{msg}'
+
+
+MODEL = 'AUDUSD,MODEL,1,30,30,OB,MSS,2026.10.19 12:10:00,0.69783,2026.10.19 10:30:00,0.69785'
+LIQ = 'AUDUSD,LIQ,-1,0,0,SSL,SWEEP,2026.10.19 12:20:00,0.69700,2026.10.19 12:05:00,0'
+EDGE = 'AUDUSD,MODEL,-1,31,31,OB,CISD,2026.10.19 12:30:00,0.69801,2026.10.19 11:50:00,0.69810'
+LATE = 'AUDUSD,LIQ,1,0,0,BSL,SWEEP,2026.10.19 12:40:00,0.69900,2026.10.19 12:30:00,0'
+CTX = 'HMI-CTX,AUDUSD,BOS,dir=UP,live={},ctx=BULLISH,str=2,messy=0,bar=2026.10.19 12:00,swing=2026.10.15 00:00,' \
+      'swing_px=0.69805,close=0.69819,also=0'
+PROT = 'HMI-PROT,AUDUSD,ADVANCE,dir=UP,live={},leg=10,bar=2026.10.19 12:00,level=0.69364,swing=2026.10.16 20:00,' \
+       'confirm=2026.10.19 08:00,bos=2026.10.19 12:00,age=1,prev=0.69300,cand=0.69364'
+
+
+def begin(n, to):
+    return f'HMI-BUILD-BEGIN,AUDUSD,m5_bars=5000,h4_bars=500,from=2026.09.23 04:00,to={to},ver=2.54,params=461F006E,' \
+           f'inst=T1,build={n},warmup_end=2026.09.23 12:20,run=100,init=7'
+
+
+def end(n, marks, liqev):
+    return f'HMI-BUILD-END,AUDUSD,marks={marks},cycles=1,pois=1,blocks=1,build={n},liq=READY,liqev={liqev},unknown=0,' \
+           f'liqwait=0,{ID}'
+
+
+def days():
+    d1 = [line('10:00:00.000', begin(1, '2026.10.19 11:55')), line('10:00:00.010', end(1, 0, 0)),
+          line('10:05:00.000', CTX.format(1) + ',' + ID), line('10:05:00.000', PROT.format(1) + ',' + ID),
+          line('10:10:00.000', 'HMI-LIVE,' + MODEL + ',' + ID), line('10:20:00.000', 'HMI-LIVE,' + LIQ + ',' + ID),
+          line('10:30:00.000', 'HMI-LIVE,' + EDGE + ',' + ID),
+          line('10:31:00.000', begin(2, '2026.10.19 12:25')),
+          line('10:31:00.001', CTX.format(0) + ',' + ID), line('10:31:00.002', PROT.format(0) + ',' + ID),
+          line('10:31:00.003', 'HMI-BUILD,' + MODEL + ',' + ID), line('10:31:00.004', 'HMI-BUILD,' + LIQ + ',' + ID),
+          line('10:31:00.005', 'HMI-BUILD,' + EDGE + ',' + ID), line('10:31:00.010', end(2, 2, 1)),
+          line('10:40:00.000', 'HMI-LIVE,' + LATE + ',' + ID),
+          line('11:00:00.000', 'HMI-POI,AUDUSD,TOUCH,id=1,dir=1,bar=2026.10.19 13:00,' + ID)]
+    d2 = [line('09:00:00.000', begin(3, '2026.10.20 10:55')),
+          line('09:00:00.001', 'HMI-BUILD,' + LATE + ',' + ID), line('09:00:00.010', end(3, 0, 1))]
+    return d1, d2
+
+
+def sub(old, new, which=0):
+    def f(d):
+        d = list(d)
+        hits = [i for i, x in enumerate(d[which]) if old in x]
+        assert len(hits) == 1, (old, hits)
+        d[which] = list(d[which])
+        d[which][hits[0]] = d[which][hits[0]].replace(old, new)
+        return d
+    return f
+
+
+def drop(old, which=0):
+    def f(d):
+        d = list(d)
+        d[which] = [x for x in d[which] if old not in x]
+        return d
+    return f
+
+
+LIVE_M = '10:10:00.000'
+CASES = [
+    ('unaltered', lambda d: d, 0),
+    ('live MODEL direction flipped', sub('HMI-LIVE,AUDUSD,MODEL,1,30', 'HMI-LIVE,AUDUSD,MODEL,-1,30'), 1),
+    ('live LIQ direction flipped', sub('HMI-LIVE,AUDUSD,LIQ,-1,0,0,SSL', 'HMI-LIVE,AUDUSD,LIQ,1,0,0,SSL'), 1),
+    ('live MODEL price changed', sub('HMI-LIVE,AUDUSD,MODEL,1,30,30,OB,MSS,2026.10.19 12:10:00,0.69783',
+                                     'HMI-LIVE,AUDUSD,MODEL,1,30,30,OB,MSS,2026.10.19 12:10:00,0.69784'), 1),
+    ('live MODEL run changed', sub(LIVE_M + '\tH4M5_Identification (AUDUSD,M5)\tHMI-LIVE,' + MODEL + ',inst=T1,run=100',
+                                   LIVE_M + '\tH4M5_Identification (AUDUSD,M5)\tHMI-LIVE,' + MODEL + ',inst=T1,run=101'), 1),
+    ('live PROT leg changed', sub('ADVANCE,dir=UP,live=1,leg=10', 'ADVANCE,dir=UP,live=1,leg=11'), 1),
+    ('live CTX missing from the later build', drop('HMI-CTX,AUDUSD,BOS,dir=UP,live=0'), 1),
+    ('edge MODEL direction flipped', sub('HMI-LIVE,AUDUSD,MODEL,-1,31', 'HMI-LIVE,AUDUSD,MODEL,1,31'), 1),
+    ('pre-sleep LIQ direction flipped', sub('HMI-LIVE,AUDUSD,LIQ,1,0,0,BSL', 'HMI-LIVE,AUDUSD,LIQ,-1,0,0,BSL'), 1),
+    ('pre-sleep LIQ init changed', sub('BSL,SWEEP,2026.10.19 12:40:00,0.69900,2026.10.19 12:30:00,0,inst=T1,run=100,init=7',
+                                       'BSL,SWEEP,2026.10.19 12:40:00,0.69900,2026.10.19 12:30:00,0,inst=T1,run=100,init=8'), 1),
+    ('build END marks wrong', sub('marks=2,', 'marks=3,'), 1),
+    ('build never closed', drop('HMI-BUILD-END', 1), 1),
+    ('live row cannot be parsed', sub('HMI-LIVE,' + LIQ, 'HMI-LIVE,AUDUSD,LIQ,-1,0,0,SSL,SWEEP,not-a-time'), 1),
+]
+
+
+def main():
+    ok = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        for name, alter, want in CASES:
+            d1, d2 = alter(days())
+            paths = []
+            for n, d in (('20261019.log', d1), ('20261020.log', d2)):
+                p = os.path.join(tmp, n)
+                with open(p, 'wb') as fh:
+                    fh.write(('\r\n'.join(d) + '\r\n').encode('utf-16'))
+                paths.append(p)
+            r = subprocess.run([sys.executable, '-I', TOOL] + paths, capture_output=True, text=True)
+            last = (r.stdout.strip().splitlines() or [''])[-1]
+            good = r.returncode == want and (want == 1) == last.startswith('RESULT: NOT PASSED') and not r.stderr
+            if name == 'unaltered':
+                good = good and 'AUDUSD#T1      20261019       1      1    1    1    1     0        1' in r.stdout \
+                    and 'in the later build' in r.stdout and 'both directions agree for LIQ 1' in r.stdout
+            ok += good
+            print(f'  {"ok  " if good else "FAIL"} {name:40} exit {r.returncode} (want {want})  {last[:70]}')
+            if not good:
+                print(r.stdout[-1500:], r.stderr[-800:])
+    print(f'{ok}/{len(CASES)}')
+    return 0 if ok == len(CASES) else 1
+
+
+if __name__ == '__main__':
+    sys.exit(main())

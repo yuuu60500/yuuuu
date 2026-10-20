@@ -12,8 +12,9 @@ between), same params digest. The live rows logged between them, whose run/init 
 build's, are compared both ways with the later build's rows of the same window:
     MODEL / LIQ  event time >= earlier 'to' + 10 min (the earlier build covers up to 'to' + 5) and <= later 'to'
     CTX / PROT   bar > earlier 'to' and <= later 'to'
-Keys drop live= / inst= / run= / init= and, for MODEL / LIQ, the cycle and block ids (as the reviewer's
-independent parser does); str= and leg= are kept.
+Keys drop live= / inst= / run= / init= and, for MODEL / LIQ, only the cycle and block ids (init-relative) -
+symbol, category and direction stay, as in the reviewer's independent parser; str= and leg= are kept.
+Every live row must carry the run/init of the build it follows (checked when the log is read).
 
 Across a sleep (A-60): a stretch from the last build of a day to the first build of the next log file
 is not live evidence. For the rows logged before the sleep it is still checked, and printed apart:
@@ -23,8 +24,10 @@ is not live evidence. For the rows logged before the sleep it is still checked, 
 It is reported as cross-sleep evidence for the reviewer to weigh, never as an intraday PASS.
 Live rows at the edges of a stretch (an event stamped after the later build's 'to', which a build still holds up to
 'to' + 5 min) are not counted; they are listed with the build that holds them.
-Exit status 1 when a compared intraday row differs, an edge row is in neither build, or a cross-sleep row is not matched (a leg-only match counts as
-not matched here; ReloadTest treats it as PENDING REVIEW).
+Exit status 1, and a last line RESULT: NOT PASSED, when the input has a problem (a build that is incomplete or never
+closed, an END without BEGIN, a live row whose run/init is not its build's, a row that cannot be parsed), a compared
+intraday row differs, an edge row is in neither build, or a cross-sleep row is not matched (a leg-only match counts as
+not matched here; ReloadTest treats it as PENDING REVIEW). Zero differences on the compared rows alone is not a pass.
 
     python3 tools/live_coverage.py [--ver 2.54] [--offset 2] LOG [LOG ...]    (logs in date order)
 """
@@ -54,7 +57,7 @@ def event_time(c, f):
 def key(c, f, drop=()):
     if c[0] in ('HMI-BUILD', 'HMI-LIVE'):
         z = [x for x in c[1:] if not x.startswith(('inst=', 'run=', 'init='))]
-        return ('MODEL/LIQ', z[1]) + tuple(z[:1] + z[5:])
+        return ('MODEL/LIQ', z[1]) + tuple(z[:3] + z[5:])       # symbol, category, direction; not cycle / block id
     return (c[0], c[2]) + tuple(sorted((k, v) for k, v in f.items() if k not in ('live', 'inst', 'run', 'init') + drop))
 
 
@@ -117,11 +120,22 @@ def read_log(path, ver):
         cat = category(c)
         if not cat:
             continue
-        r = Row(p[2], c, f, msg)
+        live = src not in open_b and (c[0] == 'HMI-LIVE' or f.get('live') == '1')
+        if src not in open_b and not (live and seq.get(src)):
+            continue
+        try:
+            r = Row(p[2], c, f, msg)
+        except (IndexError, KeyError, ValueError):
+            problems.append(f'{src}: row at {p[2]} cannot be parsed: {msg[:80]}')
+            continue
         if src in open_b:
             open_b[src]['rows'].append(r)
-        elif seq.get(src) and (c[0] == 'HMI-LIVE' or f.get('live') == '1'):
-            seq[src][-1]['live'].append(r)
+        else:
+            b = seq[src][-1]
+            if (f.get('run'), f.get('init')) != (b['head'].get('run'), b['head'].get('init')):
+                problems.append(f'{src}: live row at {p[2]} run/init {f.get("run")}/{f.get("init")} is not its build\'s '
+                                f'{b["head"].get("run")}/{b["head"].get("init")} (build {b["head"].get("build")} at {b["local"]})')
+            b['live'].append(r)
     problems += [f'{s}: BEGIN at {b["local"]} never closed' for s, b in open_b.items()]
     return seq, last_local, problems
 
@@ -144,10 +158,12 @@ def main():
     a = ap.parse_args()
 
     days = []
+    input_bad = 0
     for path in a.logs:
         seq, last_local, problems = read_log(path, a.ver)
         name = re.sub(r'\.log$', '', path.replace('\\', '/').rsplit('/', 1)[-1])
         days.append((name, seq, last_local, problems))
+        input_bad += len(problems)
         for pr in problems:
             print(f'  {name}: {pr}')
 
@@ -270,7 +286,11 @@ def main():
               f'edge only: {", ".join(only_e) or "-":12} no sample: {", ".join(none) or "-"}')
     if xbad:
         print(f'  across a sleep: {xbad} row(s) not matched - see above')
-    return 0 if diffs == 0 and xbad == 0 and edge_bad == 0 else 1
+    bad = [f'{n} {w}' for n, w in ((input_bad, 'input problem(s)'), (diffs, 'difference(s) on compared rows'),
+                                    (edge_bad, 'edge row(s) in neither build'), (xbad, 'cross-sleep row(s) not matched')) if n]
+    print('\nRESULT: ' + ('NOT PASSED - ' + '; '.join(bad) if bad else
+                          'inputs complete, 0 differences (categories without a sample are listed above, not passed)'))
+    return 1 if bad else 0
 
 
 if __name__ == '__main__':
