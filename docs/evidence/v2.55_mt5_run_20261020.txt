@@ -304,3 +304,120 @@ RESULT: inputs complete, 0 differences (categories without a sample are listed a
 RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
   10-20 adds: XAUUSD#2896 CTX 1 (BOS DOWN bar 2026.10.20 12:00) + PROT 2 (KEEP_WORSE, ANCHOR MOVE), stretch 09:26 -> 11:02 local;
               AUDUSD#92D1 CTX 1 + PROT 2. XAUUSD v2.54 now has intraday LIQ / CTX / PROT; MODEL still has no sample.
+
+## 7. supplement: full 20261020.log (to 17:17 local, sent as a RAR; the 15:34 upload is its byte prefix) and 20261021.log (09:09 .. 09:14)
+# sha256 36b42f2a539f3f050a008b524518c2d6ddac2614071f5ad898d654e43edbac12  20261020.log (full day)
+# sha256 acaf177461849075608478aec0995fef0f5378aafad7b929915a3eba2cac36fd  20261021.log (morning only)
+# later refreshes of all ten v2.54 / v2.55 charts: 10-20 16:38, 17:17 local; 10-21 09:09 (wake), 09:13, 09:14
+### 7a. third same-window v2.54 -> v2.55 sample: 10-21 09:14 local (to 2026.10.21 11:05 server)
+--- EURUSD#DBFD,M5  vs  EURUSD#0442,M5 : last complete build of each ---
+  common region: 2026.09.28 10:40 .. 2026.10.21 11:10  (same window)
+    CISD / MSS rows that differ: 6   other rows that differ: 0
+    verdicts: explained 6   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+--- EURUSD#C901,M5  vs  EURUSD#B605,M5 : last complete build of each ---
+  common region: 2026.09.28 10:40 .. 2026.10.21 11:10  (same window)
+    CISD / MSS rows that differ: 3   other rows that differ: 0
+    verdicts: explained 3   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+--- USDJPY#EB67,M5  vs  USDJPY#D61E,M5 : last complete build of each ---
+  common region: 2026.09.28 10:40 .. 2026.10.21 11:10  (same window)
+    CISD / MSS rows that differ: 6   other rows that differ: 0
+    verdicts: explained 6   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+--- XAUUSD#2896,M5  vs  XAUUSD#DA59,M5 : last complete build of each ---
+  common region: 2026.09.25 16:55 .. 2026.10.21 11:10  (same window)
+    CISD / MSS rows that differ: 2   other rows that differ: 0
+    verdicts: explained 2   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+--- AUDUSD#92D1,M5  vs  AUDUSD#BB16,M5 : last complete build of each ---
+  common region: 2026.09.28 10:35 .. 2026.10.21 11:10  (same window)
+    CISD / MSS rows that differ: 6   other rows that differ: 0
+    verdicts: explained 6   PENDING_ATTRIBUTION 0   UNEXPLAINED 0
+### 7b. v2.55 same-window reload, 10-21 09:14
+--- EURUSD#0442,M5 : comparing the last two builds ---
+  common region: 2026.09.28 10:40 .. 2026.10.21 11:10  (same window)
+    MODEL  IDENTICAL over 89 / 89 row(s)
+    LIQ    IDENTICAL over 40 / 40 row(s)
+    CTX    IDENTICAL over 10 / 10 event(s)
+    PROT   IDENTICAL over 20 / 20 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 74 / 74 row(s) (REF / BRK)
+  IDENTICAL inside the comparable region (89 MODEL + 40 LIQ) - no repaint found there.
+--- EURUSD#B605,M5 : comparing the last two builds ---
+  common region: 2026.09.28 10:40 .. 2026.10.21 11:10  (same window)
+    MODEL  IDENTICAL over 89 / 89 row(s)
+    LIQ    IDENTICAL over 40 / 40 row(s)
+    CTX    IDENTICAL over 10 / 10 event(s)
+    PROT   IDENTICAL over 20 / 20 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 74 / 74 row(s) (REF / BRK)
+  IDENTICAL inside the comparable region (89 MODEL + 40 LIQ) - no repaint found there.
+--- USDJPY#D61E,M5 : comparing the last two builds ---
+  common region: 2026.09.28 10:40 .. 2026.10.21 11:10  (same window)
+    MODEL  IDENTICAL over 118 / 118 row(s)
+    LIQ    IDENTICAL over 44 / 44 row(s)
+    CTX    IDENTICAL over 8 / 8 event(s)
+    PROT   IDENTICAL over 20 / 20 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 105 / 105 row(s) (REF / BRK)
+  IDENTICAL inside the comparable region (118 MODEL + 44 LIQ) - no repaint found there.
+--- XAUUSD#DA59,M5 : comparing the last two builds ---
+  common region: 2026.09.25 16:55 .. 2026.10.21 11:10  (same window)
+    MODEL  IDENTICAL over 107 / 107 row(s)
+    LIQ    IDENTICAL over 46 / 46 row(s)
+    CTX    IDENTICAL over 11 / 11 event(s)
+    PROT   IDENTICAL over 22 / 22 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 93 / 93 row(s) (REF / BRK)
+  IDENTICAL inside the comparable region (107 MODEL + 46 LIQ) - no repaint found there.
+--- AUDUSD#BB16,M5 : comparing the last two builds ---
+  common region: 2026.09.28 10:35 .. 2026.10.21 11:10  (same window)
+    MODEL  IDENTICAL over 102 / 102 row(s)
+    LIQ    IDENTICAL over 49 / 49 row(s)
+    CTX    IDENTICAL over 12 / 12 event(s)
+    PROT   IDENTICAL over 25 / 25 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 97 / 97 row(s) (REF / BRK)
+  IDENTICAL inside the comparable region (102 MODEL + 49 LIQ) - no repaint found there.
+### 7c. python3 tools/live_coverage.py --ver 2.55 20261020.log 20261021.log   (exit 0)
+== intraday live vs build, v2.55 instances (rows compared per category / differences)
+  instance       day        pairs  MODEL  LIQ  CTX PROT   B8  diff  outside
+  AUDUSD#BB16    20261020       8      0    2    0    0    0     0        0
+  AUDUSD#BB16    20261021       2      0    0    0    0    0     0        0
+  EURUSD#0442    20261020      16      0    0    0    0    0     0        0
+  EURUSD#0442    20261021       4      0    0    0    0    0     0        0
+  EURUSD#B605    20261020      16      0    0    0    0    0     0        0
+  EURUSD#B605    20261021       4      0    0    0    0    0     0        0
+  USDJPY#D61E    20261020       8      0    0    0    0    0     0        0
+  USDJPY#D61E    20261021       3      0    0    0    0    0     0        0
+  XAUUSD#DA59    20261020       8      0    0    0    0    0     0        0
+  XAUUSD#DA59    20261021       2      0    0    0    0    0     0        0
+  total
+  AUDUSD#BB16                          0    2    0    0    0
+  EURUSD#0442                          0    0    0    0    0
+  EURUSD#B605                          0    0    0    0    0
+  USDJPY#D61E                          0    0    0    0    0
+  XAUUSD#DA59                          0    0    0    0    0
+  differences on compared rows: 0
+  ("outside": live rows of a stretch whose event time is at its edges; not counted, listed below)
+
+== across a sleep (A-60) - rows logged after the last build of a day, checked against the next first build
+  none
+
+== category coverage, v2.55
+  AUDUSD#BB16    intraday: LIQ                      across a sleep only: -                  edge only: -            no sample: MODEL, CTX, PROT, B8
+  EURUSD#0442    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  EURUSD#B605    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  USDJPY#D61E    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  XAUUSD#DA59    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+
+RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+### 7d. v2.54: python3 tools/live_coverage.py 20261014 .. 20261021 (exit 0) - totals and coverage
+  total
+  AUDUSD#92D1                         15    7    3    4
+  EURUSD#C901                          1    2    2    2
+  EURUSD#DBFD                          1    2    2    2
+  USDJPY#EB67                          0    5    2    4
+  XAUUSD#2896                          0    2    1    2
+  differences on compared rows: 0
+== category coverage, v2.54
+  AUDUSD#92D1    intraday: MODEL, LIQ, CTX, PROT    across a sleep only: -                  edge only: -            no sample: -
+  EURUSD#C901    intraday: MODEL, LIQ, CTX, PROT    across a sleep only: -                  edge only: -            no sample: -
+  EURUSD#DBFD    intraday: MODEL, LIQ, CTX, PROT    across a sleep only: -                  edge only: -            no sample: -
+  USDJPY#EB67    intraday: LIQ, CTX, PROT           across a sleep only: MODEL              edge only: MODEL        no sample: -
+  XAUUSD#2896    intraday: LIQ, CTX, PROT           across a sleep only: -                  edge only: -            no sample: MODEL
+
+RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+  14:58 -> 17:17 local, both versions: no MODEL / CTX / PROT event on any chart; AUDUSD LIQ 2 in both, live = rebuild.
