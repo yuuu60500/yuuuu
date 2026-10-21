@@ -95,6 +95,20 @@ def days255():
     return d1, d2
 
 
+def restart(drop_row=None):
+    """the terminal restarted between build 1 and build 2: build 2 onwards carries run=101"""
+    def f(d):
+        d1, d2 = d
+        i = next(k for k, x in enumerate(d1) if 'HMI-BUILD-BEGIN' in x and 'build=2,' in x)
+        d1 = d1[:i] + [x.replace(',run=100,', ',run=101,') for x in d1[i:]]
+        d2 = [x.replace(',run=100,', ',run=101,') for x in d2]
+        if drop_row:                                 # the row goes, and build 2's END counts one MODEL row less
+            d1 = [x.replace('marks=2,', 'marks=1,') if 'HMI-BUILD-END' in x and 'build=2,' in x else x
+                  for x in d1 if drop_row not in x]
+        return [d1, d2]
+    return f
+
+
 LIVE_M = '10:10:00.000'
 CASES = [
     ('unaltered', lambda d: d, 0),
@@ -113,6 +127,10 @@ CASES = [
     ('build END marks wrong', sub('marks=2,', 'marks=3,'), 1),
     ('build never closed', drop('HMI-BUILD-END', 1), 1),
     ('live row cannot be parsed', sub('HMI-LIVE,' + LIQ, 'HMI-LIVE,AUDUSD,LIQ,-1,0,0,SSL,SWEEP,not-a-time'), 1),
+    # a terminal restart between two builds of one day (run= changes) is not intraday evidence (A-60): the live rows
+    # before it are only checked forward against the build after it
+    ('restart between the builds', restart(), 0),
+    ('restart, a live row missing from the build after it', restart('HMI-BUILD,' + MODEL), 1),
     # v2.55 (--ver 2.55): HMI-REF / HMI-BRK are a category of their own (B8); cycle= is init-relative, not compared
     ('v2.55 unaltered (cycle ids differ)', lambda d: d, 0, '2.55'),
     ('v2.55 live HMI-BRK prev_mp changed', sub('cycle=30,dir=1,live=1,bar=2026.10.19 12:15,close=0.69785,mp=3,'
@@ -145,6 +163,10 @@ def main():
             if name == 'unaltered':
                 good = good and 'AUDUSD#T1      20261019       1      1    1    1    1     0        1' in r.stdout \
                     and 'in the later build' in r.stdout and 'both directions agree for LIQ 1' in r.stdout
+            if name.startswith('restart, a live row missing'):
+                good = good and 'MISSING' in r.stdout and 'input problem' not in last
+            if name == 'restart between the builds':
+                good = good and 'across a terminal restart' in r.stdout and 'AUDUSD#T1      20261019' not in r.stdout
             if name.startswith('v2.55 unaltered'):
                 good = good and 'AUDUSD#T1      20261019       1      1    0    0    0    2     0        0' in r.stdout \
                     and 'intraday: MODEL, B8' in r.stdout

@@ -421,3 +421,65 @@ RESULT: inputs complete, 0 differences (categories without a sample are listed a
 
 RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
   14:58 -> 17:17 local, both versions: no MODEL / CTX / PROT event on any chart; AUDUSD LIQ 2 in both, live = rebuild.
+
+## 8. 20261021.log, full (09:09 .. 14:00 local) - terminal restart and the v2.55 charts set up again
+# sha256 fbec848f00abf7b0be485e130356d58ceccd0dfd327bcdea6b62cec6afb0372f  20261021.log (the 09:14 upload is its prefix)
+# 09:09 .. 11:39 local: run 1791818856, all ten v2.54 / v2.55 instances as before (last builds 11:39).
+# 11:53 and 12:17: the terminal restarted twice (new run= each time); only EURUSD#0442 (v2.55, default) came back on a chart;
+#   no v2.54 instance after the restart.
+# 12:50 - 13:01 (run 1792585034): EURUSD#0442 re-initialised with InpBreakMarginMode = MARGIN_ATR_FRAC (init 2, A047970C);
+#   new charts EURUSD#3F83 (default), XAUUSD#159A, AUDUSD#F657; USDJPY#D61E again. Five v2.55 instances, as asked:
+#   default EURUSD / USDJPY / XAUUSD / AUDUSD 461F006E, EURUSD ATR A047970C. Instance ids changed with the new charts;
+#   0442 carries default builds before 12:50 and ATR builds after - only builds with the same params are ever paired.
+# Tools (this commit): a stretch between two builds of one day whose run= differs (a terminal restart) is no longer
+#   intraday evidence - live_coverage.py lists it apart with a forward check, ReloadTest -LiveVsBuild makes it PENDING.
+### python3 tools/live_coverage.py --ver 2.55 20261020.log 20261021.log   (exit 0)
+== intraday live vs build, v2.55 instances (rows compared per category / differences)
+  instance       day        pairs  MODEL  LIQ  CTX PROT   B8  diff  outside
+  AUDUSD#BB16    20261020       8      0    2    0    0    0     0        0
+  AUDUSD#BB16    20261021       5      0    0    1    2    0     0        0
+  AUDUSD#F657    20261021       1      0    0    0    0    0     0        0
+  EURUSD#0442    20261020      16      0    0    0    0    0     0        0
+  EURUSD#0442    20261021      15      0    0    0    0    0     0        0
+  EURUSD#3F83    20261021       3      0    0    0    0    0     0        0
+  EURUSD#B605    20261020      16      0    0    0    0    0     0        0
+  EURUSD#B605    20261021       9      0    0    0    0    0     0        0
+  USDJPY#D61E    20261020       8      0    0    0    0    0     0        0
+  USDJPY#D61E    20261021       7      0    0    0    0    0     0        0
+  XAUUSD#159A    20261021       2      0    0    0    0    0     0        0
+  XAUUSD#DA59    20261020       8      0    0    0    0    0     0        0
+  XAUUSD#DA59    20261021       5      0    0    0    0    0     0        0
+  total
+  AUDUSD#BB16                          0    2    1    2    0
+  AUDUSD#F657                          0    0    0    0    0
+  EURUSD#0442                          0    0    0    0    0
+  EURUSD#3F83                          0    0    0    0    0
+  EURUSD#B605                          0    0    0    0    0
+  USDJPY#D61E                          0    0    0    0    0
+  XAUUSD#159A                          0    0    0    0    0
+  XAUUSD#DA59                          0    0    0    0    0
+  differences on compared rows: 0
+  ("outside": live rows of a stretch whose event time is at its edges; not counted, listed below)
+
+== across a terminal restart (A-60) - two builds of one day with another run= in between: not intraday evidence;
+   the live rows before the restart are checked forward against the build after it
+  EURUSD#0442 20261021: build 27 11:39:35.162 (run 1791818856) -> build 1 11:53:24.006 (run 1792583599): 0 live row(s)
+  EURUSD#0442 20261021: build 4 12:16:50.057 (run 1792583599) -> build 1 12:17:16.287 (run 1792585034): 0 live row(s)
+  USDJPY#D61E 20261021: build 16 11:39:27.723 (run 1791818856) -> build 1 13:01:39.473 (run 1792585034): 0 live row(s)
+
+== across a sleep (A-60) - rows logged after the last build of a day, checked against the next first build
+  none
+
+== category coverage, v2.55
+  AUDUSD#BB16    intraday: LIQ, CTX, PROT           across a sleep only: -                  edge only: -            no sample: MODEL, B8
+  AUDUSD#F657    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  EURUSD#0442    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  EURUSD#3F83    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  EURUSD#B605    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  USDJPY#D61E    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  XAUUSD#159A    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  XAUUSD#DA59    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+
+RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+  v2.55 live so far (10-20 14:58 .. 10-21 14:00, restarts excluded): AUDUSD LIQ 2 / CTX 1 / PROT 2, 0 differences;
+  MODEL and B8 none on any instance - the rebuilds have no MODEL row in those stretches either (quiet market, not missed).

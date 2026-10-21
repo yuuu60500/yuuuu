@@ -19,7 +19,8 @@ symbol, category and direction stay, as in the reviewer's independent parser; st
 Every live row must carry the run/init of the build it follows (checked when the log is read).
 
 Across a sleep (A-60): a stretch from the last build of a day to the first build of the next log file
-is not live evidence. For the rows logged before the sleep it is still checked, and printed apart:
+is not live evidence; nor is a stretch between two builds of one day whose run= differs (the terminal was
+restarted in between) - its live rows are only checked forward against the build after the restart. For the rows logged before the sleep it is still checked, and printed apart:
     forward  every live row after the day's last build is in the next first build (exact / leg only / missing)
     reverse  next first build rows with event time after the day's last 'to' and at least 10 min before the
              day's last log line (+ server offset) - the part the terminal provably ran - are all live rows
@@ -184,6 +185,7 @@ def main():
     total = collections.defaultdict(collections.Counter)
     diffs = 0
     edges = []
+    restarts = []
     print(f'== intraday live vs build, v{a.ver} instances (rows compared per category / differences)')
     print(f'  {"instance":14} {"day":10} pairs  ' + ' '.join(f'{k:>{5 if k == "MODEL" else 4}}' for k in cats) + '  diff  outside')
     for src in srcs:
@@ -197,6 +199,9 @@ def main():
             outside = 0
             for x, y in zip(bb, bb[1:]):
                 if x['head']['params'] != y['head']['params']:
+                    continue
+                if x['head'].get('run') != y['head'].get('run'):     # the terminal restarted in between: like a sleep (A-60)
+                    restarts.append((src, name, x, y))
                     continue
                 if any((r.f.get('run'), r.f.get('init')) != (x['head']['run'], x['head']['init']) for r in x['live']):
                     print(f'  {src} {name}: live row run/init differs from build {x["head"]["build"]} - stretch skipped')
@@ -239,6 +244,18 @@ def main():
             edge_ok[src][r.cat] += 1
         print(f'  {src} {name}  live {r.local}  {r.cat:5} {v:20} later build {y["local"]} local to={y["head"]["to"]}  {r.msg[:90]}')
 
+    rbad = 0
+    if restarts:
+        print('\n== across a terminal restart (A-60) - two builds of one day with another run= in between: not intraday evidence;')
+        print('   the live rows before the restart are checked forward against the build after it')
+    for src, name, x, y in restarts:
+        exact = collections.Counter(r.key() for r in y['rows'])
+        print(f'  {src} {name}: build {x["head"].get("build")} {x["local"]} (run {x["head"].get("run")}) -> build {y["head"].get("build")} '
+              f'{y["local"]} (run {y["head"].get("run")}): {len(x["live"])} live row(s)')
+        for r in x['live']:
+            v = 'exact' if exact[r.key()] else 'MISSING'
+            rbad += v == 'MISSING'
+            print(f'    forward  {r.local}  {r.cat:5} {v:8}  {r.msg[:110]}')
     print(f'\n== across a sleep (A-60) - rows logged after the last build of a day, checked against the next first build')
     xs = collections.defaultdict(collections.Counter)
     found = False
@@ -299,8 +316,9 @@ def main():
               f'edge only: {", ".join(only_e) or "-":12} no sample: {", ".join(none) or "-"}')
     if xbad:
         print(f'  across a sleep: {xbad} row(s) not matched - see above')
+    xbad += rbad
     bad = [f'{n} {w}' for n, w in ((input_bad, 'input problem(s)'), (diffs, 'difference(s) on compared rows'),
-                                    (edge_bad, 'edge row(s) in neither build'), (xbad, 'cross-sleep row(s) not matched')) if n]
+                                    (edge_bad, 'edge row(s) in neither build'), (xbad, 'cross-sleep / restart row(s) not matched')) if n]
     print('\nRESULT: ' + ('NOT PASSED - ' + '; '.join(bad) if bad else
                           'inputs complete, 0 differences (categories without a sample are listed above, not passed)'))
     return 1 if bad else 0

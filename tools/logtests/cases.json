@@ -1805,5 +1805,17 @@
    "UNEXPLAINED - not traced",
    "NOT JUDGED"
   ]
+ },
+ "e22_live255_restart_between_builds": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "terminal restarted between the builds (run 7 -> 8)",
+   "nothing comparable yet - no PASS can be given"
+  ],
+  "forbid": [
+   "AGREE BOTH WAYS"
+  ]
  }
 }

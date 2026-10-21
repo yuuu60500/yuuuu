@@ -1987,6 +1987,8 @@ function Show-LiveVsBuild([string]$src) {
         $why = ''
         if ($A.Status -ne 'COMPLETE' -or $B.Status -ne 'COMPLETE') { $why = 'INCOMPLETE build: ' + ((@($A.Why) + @($B.Why)) -join '; ') }
         elseif ($A.Ver -ne $B.Ver)                       { $why = "version $($A.Ver) -> $($B.Ver)" }
+        elseif ($A.Id -and $B.Id -and ($A.Id -split '/')[0] -ne ($B.Id -split '/')[0]) {
+            $why = "terminal restarted between the builds (run $(($A.Id -split '/')[0]) -> $(($B.Id -split '/')[0])): not a continuous live stretch (A-60)" }
         elseif ($A.Params -eq '?' -or $B.Params -eq '?') { $why = 'parameter digest not logged (pre-v2.44)' }
         elseif ($A.Params -ne $B.Params)                 { $why = "parameters changed ($($A.Params) -> $($B.Params))" }
         if ($ce -lt $cs)                                 { $why = 'no fully covered bar between the two builds' }

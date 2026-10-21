@@ -652,5 +652,10 @@ b8case("e21_versus255_confirm_on_next_armed_ok", _c01(1),
        [f"verdicts: explained {sum(_ev1.values())}   PENDING_ATTRIBUTION 0   UNEXPLAINED 0", f"    {'B8-SHIFT':<12} {_ev1['SHIFT']:>4}",
         "same cycle, model and reference; v2.55 confirmed already"], ["UNEXPLAINED - not traced", "NOT JUDGED"])
 
+# a terminal restart between two builds (run= changes): not a continuous live stretch - PENDING, never compared (A-60)
+_rs = lambda lines: [l.replace(",run=7,", ",run=8,").replace(" run=7 init=", " run=8 init=") for l in lines]
+b8case("e22_live255_restart_between_builds", lb1 + LIVE + _rs(lb2[1:]),
+       ["terminal restarted between the builds (run 7 -> 8)", "nothing comparable yet - no PASS can be given"], ["AGREE BOTH WAYS"], ["-LiveVsBuild"])
+
 json.dump(C, open("cases.json", "w"), indent=1)
 print(len(C), "cases")
