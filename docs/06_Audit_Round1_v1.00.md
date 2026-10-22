@@ -2208,3 +2208,27 @@ v2.54 基线覆盖更新:      10-20 全天：XAUUSD#2896 当日区间新增 CTX
                          回归：live_coverage_tests 18/18（+2）；logtests e22，132/132
 待办:                    v2.55 继续运行补实时样本（五类，--ver 2.55）；之后交验收方确定 v2.55 覆盖范围
 ```
+
+
+## Audit Round 33 —— XAUUSD 10-09 之后无 MODEL 的原因（用户 2026-10-22 提出）
+
+```
+现象:                    XAUUSD 最近一个 MODEL 在 10-09，到 10-21 的构建（v2.54 #2896、v2.55 #DA59 / #159A）10-10 之后 0 个；
+                         实时与重建一致（不是漏记）。同期 v2.53 #0051 在 10-13 .. 10-16 有 6 个；其他品种也有长空白
+                         （EURUSD v2.54 / v2.55 09-30 → 10-13）
+v2.53 与 v2.54 同一段（10-20 15:30 构建，CTX / PROT / SESS / ARM 行）:
+  10-09 12:00            v2.54 CHOCH UP（收 4187.82 越过保护点 4184.50）→ TRANSITION；v2.53 08:00 已 CHOCH
+  10-12 04:00            v2.53 TRANS_OK → BULLISH（之后 10-13 多头 POI、session、ARMED → 10-13 .. 10-16 的 6 个 MODEL）；
+                         v2.54 TRANS_SAMELEG：确认用的摆动 10-09 08:00 形成于 CHOCH（12:00）之前 —— BRI-12 P-5，仍 TRANSITION
+  10-14 12:00 .. 10-16   v2.54 TRANS_FAIL → BEARISH、BOS；这一段没有新的空头 POI（无 POI NEW）→ 无 session
+  10-16 00:00            v2.54 CHOCH UP：收盘 4170.52 只比保护点 4170.44 高 0.08 美元（8 point）—— XAUUSD 有效余量 0 point
+                         （默认 MARGIN_PIPS 0.3 pip 在 2 位小数品种上退化为 0，BRI-03 / D-6，启动日志 WARNING）→ TRANSITION 3.8 天
+  10-19 20:00            TRANS_FAIL → BEARISH；空头 POI 4165.65–4184.83 生成；10-20 12:00 BOS 收 4120.59，10-21 价格 4110 附近，
+                         离 POI 40–70 美元，未回到 POI → 无 session / ARMED / MODEL
+结论:                    不是程序错误：每一步都是已确认规则（BRI-07 TRANSITION 不开 session、BRI-12 P-5、Rule 22 余量）的结果，
+                         跨版本归因已逐条解释。其中 10-16 的 CHOCH 是 BRI-03 预见的问题：黄金默认余量为 0，8 point 的收盘越过
+                         就让趋势进入 TRANSITION —— 业务参数问题（D-6 默认 PIPS 不变），由用户 / 验收方决定是否对 XAUUSD 用
+                         MARGIN_ATR_FRAC 或 MARGIN_POINTS；不改代码，不为凑样本改规则
+建议:                    默认参数图照常运行（验收按默认参数）；另挂一张 XAUUSD v2.55 MARGIN_ATR_FRAC 作为单列观察样本
+                         （参数摘要不同，另列，不与默认图合并）
+```
