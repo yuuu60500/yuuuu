@@ -2232,3 +2232,16 @@ v2.53 与 v2.54 同一段（10-20 15:30 构建，CTX / PROT / SESS / ARM 行）:
 建议:                    默认参数图照常运行（验收按默认参数）；另挂一张 XAUUSD v2.55 MARGIN_ATR_FRAC 作为单列观察样本
                          （参数摘要不同，另列，不与默认图合并）
 ```
+
+```
+补充（10-22、10-23，Round 33 之后）:
+  挂图                   10-22 15:14 加 XAUUSD#8C1C（v2.55，MARGIN_ATR_FRAC，A047970C）作单列观察；无重启
+  v2.55 实时累计          EURUSD 两实例 LIQ 5 / CTX 1 / PROT 2、AUDUSD LIQ 2 / CTX 1 / PROT 2、USDJPY CTX 1、XAUUSD 默认 LIQ 1；0 差异；
+                         MODEL 与 B8 仍无样本
+  无 MODEL 的原因         最新重建中 10-12 以来的 MODEL（AUDUSD 102、EURUSD 43、USDJPY 27、XAUUSD 0）没有一个落在终端运行时段内：
+                         终端每天约运行本地 09:00–17:00（全天约三分之一），MODEL 分布在全天各时段；10-20 之后各品种 H4 多处于
+                         TRANSITION / RANGE（BRI-07 不开 session）。重建与实时一致，不是漏记
+  黄金 ATR 观察           8C1C 在 10-16 08:00 进入 TRANSITION（默认图 00:00 的 8 point CHOCH 被过滤，8 小时后更大的越过仍成立），
+                         之后同一空头段、POI 在价格上方 —— 这次长空白主要是行情结构，不只是余量
+```
+

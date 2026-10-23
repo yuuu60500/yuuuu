@@ -483,3 +483,77 @@ RESULT: inputs complete, 0 differences (categories without a sample are listed a
 RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
   v2.55 live so far (10-20 14:58 .. 10-21 14:00, restarts excluded): AUDUSD LIQ 2 / CTX 1 / PROT 2, 0 differences;
   MODEL and B8 none on any instance - the rebuilds have no MODEL row in those stretches either (quiet market, not missed).
+
+## 9. 20261022.log (09:12 .. 17:02 local) and 20261023.log (09:05 .. 11:03 local)
+# sha256 2a76ce85fa888b063a2ddb9f650352823f736928bda5d6e2623b18e713c9abf1  20261022.log
+# sha256 e25028fcf0a6192b296b509de7b9b93b072435a8f1ba511d793a4d39725d68fc  20261023.log
+# run 1792585034 throughout (no restart since 10-21 12:17). 10-22 15:14 local: a sixth v2.55 chart, XAUUSD#8C1C with
+#   InpBreakMarginMode = MARGIN_ATR_FRAC (A047970C) - an observation sample, listed apart from the default XAUUSD#159A.
+### python3 tools/live_coverage.py --ver 2.55 20261020.log 20261021.log 20261022.log 20261023.log   (exit 0)
+== intraday live vs build, v2.55 instances (rows compared per category / differences)
+  instance       day        pairs  MODEL  LIQ  CTX PROT   B8  diff  outside
+  AUDUSD#BB16    20261020       8      0    2    0    0    0     0        0
+  AUDUSD#BB16    20261021       5      0    0    1    2    0     0        0
+  AUDUSD#F657    20261021       1      0    0    0    0    0     0        0
+  AUDUSD#F657    20261022       8      0    0    0    0    0     0        0
+  AUDUSD#F657    20261023       3      0    0    0    0    0     0        0
+  EURUSD#0442    20261020      16      0    0    0    0    0     0        0
+  EURUSD#0442    20261021      15      0    0    0    0    0     0        0
+  EURUSD#0442    20261022      11      0    3    1    2    0     0        0
+  EURUSD#0442    20261023       6      0    2    0    0    0     0        0
+  EURUSD#3F83    20261021       3      0    0    0    0    0     0        0
+  EURUSD#3F83    20261022      11      0    3    1    2    0     0        0
+  EURUSD#3F83    20261023       6      0    2    0    0    0     0        0
+  EURUSD#B605    20261020      16      0    0    0    0    0     0        0
+  EURUSD#B605    20261021       9      0    0    0    0    0     0        0
+  USDJPY#D61E    20261020       8      0    0    0    0    0     0        0
+  USDJPY#D61E    20261021       7      0    0    0    0    0     0        0
+  USDJPY#D61E    20261022       6      0    0    1    0    0     0        0
+  USDJPY#D61E    20261023       3      0    0    0    0    0     0        0
+  XAUUSD#159A    20261021       2      0    0    0    0    0     0        0
+  XAUUSD#159A    20261022      12      0    1    0    0    0     0        0
+  XAUUSD#159A    20261023       5      0    0    0    0    0     0        0
+  XAUUSD#8C1C    20261022       7      0    0    0    0    0     0        0
+  XAUUSD#8C1C    20261023       5      0    0    0    0    0     0        0
+  XAUUSD#DA59    20261020       8      0    0    0    0    0     0        0
+  XAUUSD#DA59    20261021       5      0    0    0    0    0     0        0
+  total
+  AUDUSD#BB16                          0    2    1    2    0
+  AUDUSD#F657                          0    0    0    0    0
+  EURUSD#0442                          0    5    1    2    0
+  EURUSD#3F83                          0    5    1    2    0
+  EURUSD#B605                          0    0    0    0    0
+  USDJPY#D61E                          0    0    1    0    0
+  XAUUSD#159A                          0    1    0    0    0
+  XAUUSD#8C1C                          0    0    0    0    0
+  XAUUSD#DA59                          0    0    0    0    0
+  differences on compared rows: 0
+  ("outside": live rows of a stretch whose event time is at its edges; not counted, listed below)
+
+== across a terminal restart (A-60) - two builds of one day with another run= in between: not intraday evidence;
+   the live rows before the restart are checked forward against the build after it
+  EURUSD#0442 20261021: build 27 11:39:35.162 (run 1791818856) -> build 1 11:53:24.006 (run 1792583599): 0 live row(s)
+  EURUSD#0442 20261021: build 4 12:16:50.057 (run 1792583599) -> build 1 12:17:16.287 (run 1792585034): 0 live row(s)
+  USDJPY#D61E 20261021: build 16 11:39:27.723 (run 1791818856) -> build 1 13:01:39.473 (run 1792585034): 0 live row(s)
+== across a sleep (A-60) - rows logged after the last build of a day, checked against the next first build
+  none
+== category coverage, v2.55
+  AUDUSD#BB16    intraday: LIQ, CTX, PROT           across a sleep only: -                  edge only: -            no sample: MODEL, B8
+  AUDUSD#F657    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  EURUSD#0442    intraday: LIQ, CTX, PROT           across a sleep only: -                  edge only: -            no sample: MODEL, B8
+  EURUSD#3F83    intraday: LIQ, CTX, PROT           across a sleep only: -                  edge only: -            no sample: MODEL, B8
+  EURUSD#B605    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  USDJPY#D61E    intraday: CTX                      across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, PROT, B8
+  XAUUSD#159A    intraday: LIQ                      across a sleep only: -                  edge only: -            no sample: MODEL, CTX, PROT, B8
+  XAUUSD#8C1C    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  XAUUSD#DA59    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+### why no live MODEL yet: MODEL rows of each instance's last build (10-23 11:02 local) since 10-12, against the hours the
+### terminal ran with v2.55 (server time: 10-20 16:57-19:17, 10-21 11:09-16:00, 10-22 11:12-19:02, 10-23 11:05-13:03)
+  AUDUSD   102 since 10-12, 0 inside the running hours (10-19 / 10-20 rows: before v2.55 was attached or while asleep)
+  EURUSD    43 (both instances), 0 inside; none after 10-15 - H4 TRANSITION 10-16, RANGE 10-21 04:00, BEARISH 10-22 16:00
+  USDJPY    27, 0 inside; last 10-19 15:35 - TRANSITION 10-15 .. 10-19 and 10-22 08:00 .. 10-23 04:00
+  XAUUSD     0 (default and ATR) - see Audit Round 33; the ATR instance enters TRANSITION at 10-16 08:00 instead of 00:00
+             (the 8-point CHOCH is filtered, a larger one 8 h later is not), then the same BEARISH leg with the POI above price
+  By server hour MODEL rows spread over the whole day; the terminal runs about a third of it (local 09:00-17:00).
+  The rebuilds agree: no MODEL row falls in any live stretch, so nothing was missed - the samples have not happened yet.
