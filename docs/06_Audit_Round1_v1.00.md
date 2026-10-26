@@ -2330,10 +2330,18 @@ P2-3 RELOAD 等待         SA_RELOAD 只置 g_ready = false 后返回，面板�
                          10-24 00:00 新空头 POI 4020.12–4032.39；10-26 11:55 Session START；ARMED 13:55、16:35、17:15（服务器时间）
 实时（日内区间）:        MODEL 7（BPR 14:00 / 17:10、CISD 14:15、PA ENGULFING 14:40 / 16:35、PA BREAK-RETEST 16:05、MSS 16:35）、
                          B8 8（REF 6、BRK 2）；live_coverage.py 与 ReloadTest -LiveVsBuild 都 0 差异
-                         B8 细节：cycle 3003 的 CISD 为 NA_BROKEN（候选 4007.07 在 ARMED 16:35 前被 16:30 收盘越过）—— 首个实时 B8-NA；
+                         B8 细节：cycle 3003 的 CISD 为 NA_BROKEN（候选 4007.07 在 ARMED 当根已被有效越过：brk_bar=16:30 是 M5 开盘时间、收盘 16:35，
+                         与 armed=16:35 同一根，检查区间 [k+1, A] 含 A）—— 首个实时 B8-NA（原稿写成「16:30 收盘」，验收方指正）；
                          cycle 2981 的 MSS 在下一次 ARMED（16:35）当根确认，允许（Phase 4 先于 Phase 5，ChainLife）；余量 0（黄金默认）
 黄金 ATR 观察（8C1C）:   同样 MODEL 7 / B8 8、0 差异；参数 A047970C，单列
 其他品种:                GBPUSD B8 2（首个日内样本）、USDCHF MODEL 1 / LIQ 3、EURUSD 两实例 LIQ 各 4、NZDUSD LIQ 2、AUDUSD / USDCAD LIQ 各 1
 基线记录:                docs/baselines/v2.55.md 第 3 节追加、第 5 节「XAUUSD MODEL 实时路径未覆盖」解除；B8-C5 仍只有离线覆盖（全日 c5diff 为空）
                          与 v2.56 无关：这些是 v2.55 图（用户尚未换 v2.56）
+```
+
+```
+验收方确认（「HMI v2.55 黄金实时样本补充验收结论」，2026-10-26，包 06F35E5D…34BD）:
+                         「黄金 MODEL 实时路径没有样本」解除；默认 159A MODEL 7 / B8 8、ATR 8C1C MODEL 7 / B8 8，双向差异 0（冻结工具复跑 +
+                         独立解析）；两图为同一行情的对应事件，不合计、不合并。B8-C5 原生差异分支仍未覆盖；跨周末 USDCAD 两行仍 PENDING
+                         REVIEW。v2.55 规则与参数不改，受限基线继续成立。本补交不代替 v2.56r2 的运行验收
 ```
