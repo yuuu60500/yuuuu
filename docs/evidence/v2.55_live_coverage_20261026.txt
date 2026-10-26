@@ -1,0 +1,110 @@
+# v2.55 MT5 run 2026-10-26 (full day file, user terminal, server = local + 2 h) - XAUUSD first live MODEL
+# log sha256: 7c34fb6389ff11dec2de201e539dbeb1176787b84597bd8a79a548de6585e78d  20261026.log (28961 lines, local 09:08 .. 14:31)
+#   its first 19689 lines are byte-identical to the 20261026.log of the v2.55r3 package (sha256 20a56587...0356, up to 09:28 local),
+#   which had no intraday stretch; every count below is new
+# tools: live_coverage.py a4017ca, ReloadTest.ps1 a4017ca
+
+## python3 tools/live_coverage.py --ver 2.55 20261026.log
+== intraday live vs build, v2.55 instances (rows compared per category / differences)
+  instance       day        pairs  MODEL  LIQ  CTX PROT   B8  diff  outside
+  AUDUSD#F657    20261026       3      0    1    0    0    0     0        0
+  EURUSD#0442    20261026       5      0    4    0    0    0     0        0
+  EURUSD#3F83    20261026       5      0    4    0    0    0     0        0
+  GBPUSD#3674    20261026       3      0    0    0    0    2     0        0
+  NZDUSD#58F3    20261026       3      0    2    0    0    0     0        0
+  USDCAD#9646    20261026       3      0    1    0    0    0     0        0
+  USDCHF#209F    20261026       3      1    3    0    0    0     0        0
+  USDJPY#D61E    20261026       3      0    0    0    0    0     0        0
+  XAUUSD#159A    20261026       6      7    0    0    0    8     0        0
+  XAUUSD#8C1C    20261026       6      7    0    0    0    8     0        0
+  total
+  AUDUSD#F657                          0    1    0    0    0
+  EURUSD#0442                          0    4    0    0    0
+  EURUSD#3F83                          0    4    0    0    0
+  GBPUSD#3674                          0    0    0    0    2
+  NZDUSD#58F3                          0    2    0    0    0
+  USDCAD#9646                          0    1    0    0    0
+  USDCHF#209F                          1    3    0    0    0
+  USDJPY#D61E                          0    0    0    0    0
+  XAUUSD#159A                          7    0    0    0    8
+  XAUUSD#8C1C                          7    0    0    0    8
+  differences on compared rows: 0
+  ("outside": live rows of a stretch whose event time is at its edges; not counted, listed below)
+
+== across a sleep (A-60) - rows logged after the last build of a day, checked against the next first build
+  none
+
+== category coverage, v2.55
+  AUDUSD#F657    intraday: LIQ                      across a sleep only: -                  edge only: -            no sample: MODEL, CTX, PROT, B8
+  EURUSD#0442    intraday: LIQ                      across a sleep only: -                  edge only: -            no sample: MODEL, CTX, PROT, B8
+  EURUSD#3F83    intraday: LIQ                      across a sleep only: -                  edge only: -            no sample: MODEL, CTX, PROT, B8
+  GBPUSD#3674    intraday: B8                       across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT
+  NZDUSD#58F3    intraday: LIQ                      across a sleep only: -                  edge only: -            no sample: MODEL, CTX, PROT, B8
+  USDCAD#9646    intraday: LIQ                      across a sleep only: -                  edge only: -            no sample: MODEL, CTX, PROT, B8
+  USDCHF#209F    intraday: MODEL, LIQ               across a sleep only: -                  edge only: -            no sample: CTX, PROT, B8
+  USDJPY#D61E    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  XAUUSD#159A    intraday: MODEL, B8                across a sleep only: -                  edge only: -            no sample: LIQ, CTX, PROT
+  XAUUSD#8C1C    intraday: MODEL, B8                across a sleep only: -                  edge only: -            no sample: LIQ, CTX, PROT
+
+RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+
+## ReloadTest.ps1 -LiveVsBuild (all charts)
+--- AUDUSD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 1 (+ 0 H4 structure event(s))
+  by model: LIQ SSL SWEEP 1
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+
+--- EURUSD#0442,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 4 (+ 0 H4 structure event(s))
+  by model: LIQ PDL BROKEN 1  |  LIQ PWL SWEEP 1  |  LIQ SSL BROKEN 1  |  LIQ SSL SWEEP 1
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+
+--- EURUSD#3F83,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 4 (+ 0 H4 structure event(s))
+  by model: LIQ PDL BROKEN 1  |  LIQ PWL SWEEP 1  |  LIQ SSL BROKEN 1  |  LIQ SSL SWEEP 1
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+
+--- GBPUSD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 0 (+ 0 H4 structure event(s))
+  BRI-08 rows compared: 2 (REF / BRK)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+
+--- NZDUSD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 2 (+ 0 H4 structure event(s))
+  by model: LIQ PDL BROKEN 1  |  LIQ SSL SWEEP 1
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+
+--- USDCAD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 1 (+ 0 H4 structure event(s))
+  by model: LIQ BSL BROKEN 1
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+
+--- USDCHF,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 4 (+ 0 H4 structure event(s))
+  by model: LIQ BSL BROKEN 1  |  LIQ BSL SWEEP 1  |  LIQ PWH SWEEP 1  |  PA BREAK-RETEST 1
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+
+--- USDJPY,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+
+--- XAUUSD#159A,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 7 (+ 0 H4 structure event(s))
+  BRI-08 rows compared: 8 (REF / BRK)
+  by model: BPR 2  |  CISD 1  |  MSS 1  |  PA BREAK-RETEST 1  |  PA ENGULFING 2
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+
+--- XAUUSD#8C1C,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 7 (+ 0 H4 structure event(s))
+  BRI-08 rows compared: 8 (REF / BRK)
+  by model: BPR 2  |  CISD 1  |  MSS 1  |  PA BREAK-RETEST 1  |  PA ENGULFING 2
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
