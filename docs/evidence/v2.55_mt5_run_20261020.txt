@@ -557,3 +557,181 @@ RESULT: inputs complete, 0 differences (categories without a sample are listed a
              (the 8-point CHOCH is filtered, a larger one 8 h later is not), then the same BEARISH leg with the POI above price
   By server hour MODEL rows spread over the whole day; the terminal runs about a third of it (local 09:00-17:00).
   The rebuilds agree: no MODEL row falls in any live stretch, so nothing was missed - the samples have not happened yet.
+
+## 10. 20261023.log (full, 09:05 .. 17:05 local) and 20261026.log (09:08 .. 09:28) - the first v2.55 live MODEL / B8 rows
+# sha256 72f2fc14131065062182387fed69866ba81a44376c820e5e6a2690a4d5b26f1a  20261023.log (the 12:15 upload is its prefix)
+# sha256 20a56587b3a794878459f3c83a98ebf8f692e8be99d066035eb8492382270356  20261026.log
+# 10-23 11:25 local: four more v2.55 charts, default params 461F006E: GBPUSD#3674, USDCHF#209F, NZDUSD#58F3, USDCAD#9646.
+# run 1792585034 from 10-21 12:17 to 10-26 (no restart); USDCAD / USDCHF refreshed 12:35 local, after their first live rows.
+### 10a. ReloadTest -LiveVsBuild, 20261023.log alone
+--- AUDUSD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 1 (+ 1 H4 structure event(s))
+  protected-level rows compared: 2 (PROT / ANCHOR / INTERNAL)
+  by model: LIQ BSL SWEEP 1
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- EURUSD#0442,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 2 (+ 0 H4 structure event(s))
+  by model: LIQ PDL SWEEP 1  |  LIQ SSL SWEEP 1
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- EURUSD#3F83,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 2 (+ 0 H4 structure event(s))
+  by model: LIQ PDL SWEEP 1  |  LIQ SSL SWEEP 1
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- GBPUSD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- NZDUSD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 1 (+ 0 H4 structure event(s))
+  by model: LIQ BSL SWEEP 1
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDCAD,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 3 (+ 0 H4 structure event(s))
+  BRI-08 rows compared: 4 (REF / BRK)
+  by model: CISD 1  |  MSS 1  |  PA REJECTION 1
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDCHF,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 1   pending review: 0   liquidity pending: 0
+  live events compared: 2 (+ 0 H4 structure event(s))
+  BRI-08 rows compared: 2 (REF / BRK)
+  by model: BPR 1  |  LIQ BSL SWEEP 1
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDJPY,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- XAUUSD#159A,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+--- XAUUSD#8C1C,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 0   comparable: 0   pending review: 0   liquidity pending: 0
+  nothing comparable yet - no PASS can be given.
+### 10b. python3 tools/live_coverage.py --ver 2.55 20261020.log 20261021.log 20261022.log 20261023.log 20261026.log
+#      (exit 1: two cross-sleep rows the same but for leg= - PENDING REVIEW, see below; every intraday row agrees)
+== intraday live vs build, v2.55 instances (rows compared per category / differences)
+  instance       day        pairs  MODEL  LIQ  CTX PROT   B8  diff  outside
+  AUDUSD#BB16    20261020       8      0    2    0    0    0     0        0
+  AUDUSD#BB16    20261021       5      0    0    1    2    0     0        0
+  AUDUSD#F657    20261021       1      0    0    0    0    0     0        0
+  AUDUSD#F657    20261022       8      0    0    0    0    0     0        0
+  AUDUSD#F657    20261023       5      0    1    1    2    0     0        0
+  AUDUSD#F657    20261026       2      0    0    0    0    0     0        0
+  EURUSD#0442    20261020      16      0    0    0    0    0     0        0
+  EURUSD#0442    20261021      15      0    0    0    0    0     0        0
+  EURUSD#0442    20261022      11      0    3    1    2    0     0        0
+  EURUSD#0442    20261023       9      0    2    0    0    0     0        0
+  EURUSD#0442    20261026       3      0    0    0    0    0     0        0
+  EURUSD#3F83    20261021       3      0    0    0    0    0     0        0
+  EURUSD#3F83    20261022      11      0    3    1    2    0     0        0
+  EURUSD#3F83    20261023       9      0    2    0    0    0     0        0
+  EURUSD#3F83    20261026       3      0    0    0    0    0     0        0
+  EURUSD#B605    20261020      16      0    0    0    0    0     0        0
+  EURUSD#B605    20261021       9      0    0    0    0    0     0        0
+  GBPUSD#3674    20261023       2      0    0    0    0    0     0        0
+  GBPUSD#3674    20261026       2      0    0    0    0    0     0        0
+  NZDUSD#58F3    20261023       2      0    1    0    0    0     0        0
+  NZDUSD#58F3    20261026       2      0    0    0    0    0     0        0
+  USDCAD#9646    20261023       1      3    0    0    0    4     0        0
+  USDCAD#9646    20261026       2      0    0    0    0    0     0        0
+  USDCHF#209F    20261023       1      1    1    0    0    2     0        0
+  USDCHF#209F    20261026       2      0    0    0    0    0     0        0
+  USDJPY#D61E    20261020       8      0    0    0    0    0     0        0
+  USDJPY#D61E    20261021       7      0    0    0    0    0     0        0
+  USDJPY#D61E    20261022       6      0    0    1    0    0     0        0
+  USDJPY#D61E    20261023       4      0    0    0    0    0     0        0
+  USDJPY#D61E    20261026       2      0    0    0    0    0     0        0
+  XAUUSD#159A    20261021       2      0    0    0    0    0     0        0
+  XAUUSD#159A    20261022      12      0    1    0    0    0     0        0
+  XAUUSD#159A    20261023       8      0    0    0    0    0     0        0
+  XAUUSD#159A    20261026       3      0    0    0    0    0     0        0
+  XAUUSD#8C1C    20261022       7      0    0    0    0    0     0        0
+  XAUUSD#8C1C    20261023       8      0    0    0    0    0     0        0
+  XAUUSD#8C1C    20261026       3      0    0    0    0    0     0        0
+  XAUUSD#DA59    20261020       8      0    0    0    0    0     0        0
+  XAUUSD#DA59    20261021       5      0    0    0    0    0     0        0
+  total
+  AUDUSD#BB16                          0    2    1    2    0
+  AUDUSD#F657                          0    1    1    2    0
+  EURUSD#0442                          0    5    1    2    0
+  EURUSD#3F83                          0    5    1    2    0
+  EURUSD#B605                          0    0    0    0    0
+  GBPUSD#3674                          0    0    0    0    0
+  NZDUSD#58F3                          0    1    0    0    0
+  USDCAD#9646                          3    0    0    0    4
+  USDCHF#209F                          1    1    0    0    2
+  USDJPY#D61E                          0    0    1    0    0
+  XAUUSD#159A                          0    1    0    0    0
+  XAUUSD#8C1C                          0    0    0    0    0
+  XAUUSD#DA59                          0    0    0    0    0
+  differences on compared rows: 0
+  ("outside": live rows of a stretch whose event time is at its edges; not counted, listed below)
+
+== across a terminal restart (A-60) - two builds of one day with another run= in between: not intraday evidence;
+   the live rows before the restart are checked forward against the build after it
+  EURUSD#0442 20261021: build 27 11:39:35.162 (run 1791818856) -> build 1 11:53:24.006 (run 1792583599): 0 live row(s)
+  EURUSD#0442 20261021: build 4 12:16:50.057 (run 1792583599) -> build 1 12:17:16.287 (run 1792585034): 0 live row(s)
+  USDJPY#D61E 20261021: build 16 11:39:27.723 (run 1791818856) -> build 1 13:01:39.473 (run 1792585034): 0 live row(s)
+== across a sleep (A-60) - rows logged after the last build of a day, checked against the next first build
+  USDCAD#9646 20261023: 9 live row(s) after the last build (12:35:20.238 local, to=2026.10.23 14:30)
+    next first build 20261026 09:08:32.356 local, to=2026.10.26 12:00, params 461F006E
+    forward  13:15:00.840  MODEL exact     HMI-LIVE,USDCAD,MODEL,-1,3163,3163,OB,PA BREAK-RETEST,2026.10.23 15:15:00,1.39980,1970.01.01 00:00:00,0.00000,
+    forward  13:25:00.040  LIQ   exact     HMI-LIVE,USDCAD,LIQ,-1,0,0,SSL,BROKEN,2026.10.23 15:25:00,1.39972,2026.10.23 15:05:00,0,inst=9646,run=17925850
+    forward  14:04:59.936  CTX   exact     HMI-CTX,USDCAD,BOS,dir=DOWN,live=1,ctx=BEARISH,str=7,messy=0,bar=2026.10.23 16:00,swing=2026.10.23 00:00,swing
+    forward  14:04:59.936  PROT  leg only  HMI-PROT,USDCAD,KEEP_NONE,dir=DOWN,live=1,leg=9,bar=2026.10.23 16:00,level=1.40820,swing=2026.10.21 16:00,conf
+    forward  14:04:59.936  PROT  leg only  HMI-ANCHOR,USDCAD,KEEP_NONE,dir=DOWN,live=1,leg=9,bar=2026.10.23 16:00,level=1.40820,swing=2026.10.21 16:00,co
+    forward  14:04:59.936  LIQ   exact     HMI-LIVE,USDCAD,LIQ,-1,0,0,SSL,SWEEP,2026.10.23 16:05:00,1.39738,2026.10.23 15:50:00,0,inst=9646,run=179258503
+    forward  14:04:59.936  LIQ   exact     HMI-LIVE,USDCAD,LIQ,-1,0,0,SSL,BROKEN,2026.10.23 16:05:00,1.39790,2026.10.23 15:45:00,0,inst=9646,run=17925850
+    forward  14:10:00.359  LIQ   exact     HMI-LIVE,USDCAD,LIQ,-1,0,0,SSL,BROKEN,2026.10.23 16:10:00,1.39762,2026.10.23 15:50:00,0,inst=9646,run=17925850
+    forward  14:19:59.998  MODEL exact     HMI-LIVE,USDCAD,MODEL,-1,3163,3163,OB,BPR,2026.10.23 16:20:00,1.39797,1970.01.01 00:00:00,0.00000,inst=9646,ru
+    reverse  awake window 10-23 14:30 .. 18:55 server (last line 17:05:53 local): 9 build row(s) {'MODEL': 2, 'LIQ': 4, 'CTX': 1, 'PROT': 2}, missing from live 0, leg only 2
+  USDCHF#209F 20261023: 5 live row(s) after the last build (12:35:15.166 local, to=2026.10.23 14:30)
+    next first build 20261026 09:08:32.172 local, to=2026.10.26 12:00, params 461F006E
+    forward  13:54:59.863  B8    exact     HMI-BRK,USDCHF,CISD,cycle=3003,dir=-1,live=1,bar=2026.10.23 15:50,close=0.82216,mp=3,prev_bar=2026.10.23 15:45
+    forward  13:54:59.863  MODEL exact     HMI-LIVE,USDCHF,MODEL,-1,3003,3003,OB,CISD,2026.10.23 15:55:00,0.82272,2026.10.23 13:25:00,0.82263,inst=209F,r
+    forward  14:24:59.905  MODEL exact     HMI-LIVE,USDCHF,MODEL,-1,3003,3003,OB,PA ENGULFING,2026.10.23 16:25:00,0.82332,1970.01.01 00:00:00,0.00000,ins
+    forward  14:54:59.813  MODEL exact     HMI-LIVE,USDCHF,MODEL,-1,3003,3003,OB,PA BREAK-RETEST,2026.10.23 16:55:00,0.82398,1970.01.01 00:00:00,0.00000,
+    forward  15:14:59.739  LIQ   exact     HMI-LIVE,USDCHF,LIQ,1,0,0,PDH,SWEEP,2026.10.23 17:15:00,0.82467,2026.10.23 17:10:00,0,inst=209F,run=1792585034
+    reverse  awake window 10-23 14:30 .. 18:55 server (last line 17:05:53 local): 5 build row(s) {'B8': 1, 'MODEL': 3, 'LIQ': 1}, missing from live 0
+  XAUUSD#159A 20261023: 1 live row(s) after the last build (13:52:37.501 local, to=2026.10.23 15:45)
+    next first build 20261026 09:08:33.362 local, to=2026.10.26 12:00, params 461F006E
+    forward  15:39:59.767  LIQ   exact     HMI-LIVE,XAUUSD,LIQ,-1,0,0,SSL,SWEEP,2026.10.23 17:40:00,3986.79,2026.10.23 17:25:00,0,inst=159A,run=179258503
+    reverse  awake window 10-23 15:45 .. 18:55 server (last line 17:05:53 local): 1 build row(s) {'LIQ': 1}, missing from live 0
+  XAUUSD#8C1C 20261023: 1 live row(s) after the last build (13:52:37.453 local, to=2026.10.23 15:45)
+    next first build 20261026 09:08:32.366 local, to=2026.10.26 12:00, params A047970C
+    forward  15:39:59.765  LIQ   exact     HMI-LIVE,XAUUSD,LIQ,-1,0,0,SSL,SWEEP,2026.10.23 17:40:00,3986.79,2026.10.23 17:25:00,0,inst=8C1C,run=179258503
+  USDCHF#209F: both directions agree for MODEL 3, LIQ 1, B8 1
+  XAUUSD#159A: both directions agree for LIQ 1
+  XAUUSD#8C1C: both directions agree for LIQ 1
+== category coverage, v2.55
+  AUDUSD#BB16    intraday: LIQ, CTX, PROT           across a sleep only: -                  edge only: -            no sample: MODEL, B8
+  AUDUSD#F657    intraday: LIQ, CTX, PROT           across a sleep only: -                  edge only: -            no sample: MODEL, B8
+  EURUSD#0442    intraday: LIQ, CTX, PROT           across a sleep only: -                  edge only: -            no sample: MODEL, B8
+  EURUSD#3F83    intraday: LIQ, CTX, PROT           across a sleep only: -                  edge only: -            no sample: MODEL, B8
+  EURUSD#B605    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  GBPUSD#3674    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  NZDUSD#58F3    intraday: LIQ                      across a sleep only: -                  edge only: -            no sample: MODEL, CTX, PROT, B8
+  USDCAD#9646    intraday: MODEL, B8                across a sleep only: -                  edge only: -            no sample: LIQ, CTX, PROT
+  USDCHF#209F    intraday: MODEL, LIQ, B8           across a sleep only: -                  edge only: -            no sample: CTX, PROT
+  USDJPY#D61E    intraday: CTX                      across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, PROT, B8
+  XAUUSD#159A    intraday: LIQ                      across a sleep only: -                  edge only: -            no sample: MODEL, CTX, PROT, B8
+  XAUUSD#8C1C    intraday: -                        across a sleep only: LIQ                edge only: -            no sample: MODEL, CTX, PROT, B8
+  XAUUSD#DA59    intraday: -                        across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+RESULT: NOT PASSED - 2 cross-sleep row(s) the same but for leg= - PENDING REVIEW (leg counts from each build's own H4 start, which moved)
+### 10c. v2.55 live coverage per symbol, intraday, 10-20 14:58 .. 10-26 (MODEL / LIQ / CTX / PROT / B8), 0 differences
+  EURUSD default (3F83)          0 / 5 / 1 / 2 / 0
+  EURUSD ATR (0442 since 10-21 12:50; B605 none)   0 / 5 / 1 / 2 / 0
+  AUDUSD (BB16, F657)            0 / 3 / 2 / 4 / 0
+  USDJPY (D61E)                  0 / 0 / 1 / 0 / 0
+  USDCAD (9646)                  3 / 0 / 0 / 0 / 4      CISD 1 (with HMI-BRK), MSS 1 (with HMI-BRK), PA REJECTION 1; REF 2
+  USDCHF (209F)                  1 / 1 / 0 / 0 / 2      BPR 1; REF 2
+  NZDUSD (58F3)                  0 / 1 / 0 / 0 / 0
+  GBPUSD (3674)                  - no live row yet
+  XAUUSD default (DA59, 159A)    0 / 1 / 0 / 0 / 0
+  XAUUSD ATR (8C1C, observation) - intraday none; LIQ 1 across the sleep
+  Across the 10-23 -> 10-26 sleep (forward + reverse over the awake part, not intraday): USDCHF MODEL 3 (CISD, PA ENGULFING,
+  PA BREAK-RETEST) / LIQ 1 / B8 1 agree; USDCAD MODEL 2 / LIQ 4 / CTX 1 agree, PROT 2 the same but for leg= 9 vs 10
+  (leg counts from the build's own H4 start, which moved over the weekend) - PENDING REVIEW, as ReloadTest treats it.
+  Every category has a live sample on at least one instance; XAUUSD MODEL has none (Audit Round 33).

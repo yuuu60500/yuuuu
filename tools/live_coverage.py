@@ -30,7 +30,8 @@ Live rows at the edges of a stretch (an event stamped after the later build's 't
 Exit status 1, and a last line RESULT: NOT PASSED, when the input has a problem (a build that is incomplete or never
 closed, an END without BEGIN, a live row whose run/init is not its build's, a row that cannot be parsed), a compared
 intraday row differs, an edge row is in neither build, or a cross-sleep row is not matched (a leg-only match counts as
-not matched here; ReloadTest treats it as PENDING REVIEW). Zero differences on the compared rows alone is not a pass.
+not matched: it is reported as PENDING REVIEW, as ReloadTest does, and the RESULT is not a pass). Zero differences on the
+compared rows alone is not a pass.
 
     python3 tools/live_coverage.py [--ver 2.54] [--offset 2] LOG [LOG ...]    (logs in date order)
 """
@@ -260,6 +261,7 @@ def main():
     xs = collections.defaultdict(collections.Counter)
     found = False
     xbad = 0
+    xleg = 0
     for i, (name, seq, last_local, _) in enumerate(days):
         name2, seq2 = (days[i + 1][0], days[i + 1][1]) if i + 1 < len(days) else ('', {})
         for src in srcs:
@@ -283,21 +285,28 @@ def main():
             exact = collections.Counter(r.key() for r in y['rows'])
             noleg = collections.Counter(r.key(('leg',)) for r in y['rows'])
             ok = 0
+            fleg = 0
             for r in x['live']:
                 v = 'exact' if exact[r.key()] else ('leg only' if noleg[r.key(('leg',))] else 'MISSING')
                 ok += v == 'exact'
+                fleg += v == 'leg only'
                 print(f'    forward  {r.local}  {r.cat:5} {v:8}  {r.msg[:110]}')
             awake = dt.datetime.strptime(x['head']['to'][:10] + ' ' + last_local[:8], '%Y.%m.%d %H:%M:%S') + \
                 dt.timedelta(hours=a.offset)
             lo, hi = T(x['head']['to']), awake - dt.timedelta(minutes=10)
             lv = collections.Counter(r.key() for r in x['live'])
+            lvn = collections.Counter(r.key(('leg',)) for r in x['live'])
             want = [r for r in y['rows'] if lo < r.time <= hi]
             miss = [r for r in want if not lv[r.key()]]
+            rleg = [r for r in miss if lvn[r.key(('leg',))]]          # the same row but for leg= (counted forward already)
+            miss = [r for r in miss if not lvn[r.key(('leg',))]]
             print(f'    reverse  awake window {lo:%m-%d %H:%M} .. {hi:%H:%M} server (last line {last_local[:8]} local): '
-                  f'{len(want)} build row(s) {dict(collections.Counter(r.cat for r in want))}, missing from live {len(miss)}')
+                  f'{len(want)} build row(s) {dict(collections.Counter(r.cat for r in want))}, missing from live {len(miss)}'
+                  + (f', leg only {len(rleg)}' if rleg else ''))
             for r in miss:
                 print(f'      missing  {r.msg[:110]}')
-            xbad += (len(x['live']) - ok) + len(miss)
+            xbad += (len(x['live']) - ok - fleg) + len(miss)
+            xleg += fleg
             if ok == len(x['live']) and not miss:
                 xs[src].update(r.cat for r in x['live'])
     if not found:
@@ -318,7 +327,9 @@ def main():
         print(f'  across a sleep: {xbad} row(s) not matched - see above')
     xbad += rbad
     bad = [f'{n} {w}' for n, w in ((input_bad, 'input problem(s)'), (diffs, 'difference(s) on compared rows'),
-                                    (edge_bad, 'edge row(s) in neither build'), (xbad, 'cross-sleep / restart row(s) not matched')) if n]
+                                    (edge_bad, 'edge row(s) in neither build'), (xbad, 'cross-sleep / restart row(s) not matched'),
+                                    (xleg, 'cross-sleep row(s) the same but for leg= - PENDING REVIEW (leg counts from each '
+                                           "build's own H4 start, which moved)")) if n]
     print('\nRESULT: ' + ('NOT PASSED - ' + '; '.join(bad) if bad else
                           'inputs complete, 0 differences (categories without a sample are listed above, not passed)'))
     return 1 if bad else 0

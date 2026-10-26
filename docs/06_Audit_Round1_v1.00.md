@@ -2245,3 +2245,19 @@ v2.53 与 v2.54 同一段（10-20 15:30 构建，CTX / PROT / SESS / ARM 行）:
                          之后同一空头段、POI 在价格上方 —— 这次长空白主要是行情结构，不只是余量
 ```
 
+
+## Audit Round 34 —— v2.55 首批实时 MODEL / B8 样本（10-23、10-26）
+
+```
+挂图:                    10-23 11:25 加 v2.55 GBPUSD#3674、USDCHF#209F、NZDUSD#58F3、USDCAD#9646（默认参数）；共 10 张 v2.55 图
+                         （含 EURUSD ATR、XAUUSD ATR 观察）；10-21 12:17 以来无重启
+当日区间（0 差异）:      USDCAD MODEL 3（CISD、MSS 各带 HMI-BRK，PA REJECTION）/ B8 4；USDCHF MODEL 1（BPR）/ LIQ 1 / B8 2；
+                         ReloadTest -LiveVsBuild 与 live_coverage.py 结论一致
+v2.55 实时覆盖（合计）:  MODEL、LIQ、CTX、PROT、B8 五类各至少一个品种有当日区间样本；XAUUSD MODEL 仍无（Round 33）
+跨周末（单列）:          USDCHF MODEL 3 / LIQ 1 / B8 1 两向一致；USDCAD MODEL 2 / LIQ 4 / CTX 1 一致，PROT / ANCHOR 2 行只差 leg=（9 / 10：
+                         leg 从各自构建的 H4 起点数，周末窗口移动）—— PENDING REVIEW，不是重绘
+工具:                    live_coverage.py：跨休眠反向核对也认出「只差 leg」，与正向一起计为 PENDING REVIEW（RESULT 写明原因，
+                         不再算作不匹配）；回归 19/19（+1）。v2.54 证据输出不变
+下一步:                  打包（MQL 不变；工具与日志）交验收方确定 v2.55 覆盖范围
+```
+

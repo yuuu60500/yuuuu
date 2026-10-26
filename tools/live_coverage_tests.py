@@ -109,6 +109,17 @@ def restart(drop_row=None):
     return f
 
 
+def presleep_prot_leg(d):
+    """a PROT row logged after the day's last build, in the next day's first build with another leg= only"""
+    d1, d2 = d
+    row = 'HMI-PROT,AUDUSD,KEEP_NONE,dir=UP,live={},leg={},bar=2026.10.19 12:40,level=0.69364,swing=2026.10.16 20:00,' \
+          'confirm=2026.10.19 08:00,bos=2026.10.19 12:00,age=1,prev=NA,cand=NA,' + ID
+    i = next(k for k, x in enumerate(d1) if 'HMI-LIVE,AUDUSD,LIQ,1,0,0,BSL' in x)
+    d1 = d1[:i + 1] + [line('10:45:00.000', row.format(1, 9))] + d1[i + 1:]
+    d2 = d2[:-1] + [line('09:00:00.002', row.format(0, 10))] + d2[-1:]
+    return [d1, d2]
+
+
 LIVE_M = '10:10:00.000'
 CASES = [
     ('unaltered', lambda d: d, 0),
@@ -131,6 +142,8 @@ CASES = [
     # before it are only checked forward against the build after it
     ('restart between the builds', restart(), 0),
     ('restart, a live row missing from the build after it', restart('HMI-BUILD,' + MODEL), 1),
+    # across a sleep, a row that is the same but for leg= (leg counts from each build's own H4 start): PENDING REVIEW
+    ('pre-sleep PROT the same but for leg', presleep_prot_leg, 1),
     # v2.55 (--ver 2.55): HMI-REF / HMI-BRK are a category of their own (B8); cycle= is init-relative, not compared
     ('v2.55 unaltered (cycle ids differ)', lambda d: d, 0, '2.55'),
     ('v2.55 live HMI-BRK prev_mp changed', sub('cycle=30,dir=1,live=1,bar=2026.10.19 12:15,close=0.69785,mp=3,'
@@ -165,6 +178,9 @@ def main():
                     and 'in the later build' in r.stdout and 'both directions agree for LIQ 1' in r.stdout
             if name.startswith('restart, a live row missing'):
                 good = good and 'MISSING' in r.stdout and 'input problem' not in last
+            if name == 'pre-sleep PROT the same but for leg':
+                good = good and 'leg only' in r.stdout and 'missing from live 0, leg only 1' in r.stdout \
+                    and 'PENDING REVIEW' in last and 'not matched' not in last
             if name == 'restart between the builds':
                 good = good and 'across a terminal restart' in r.stdout and 'AUDUSD#T1      20261019' not in r.stdout
             if name.startswith('v2.55 unaltered'):
