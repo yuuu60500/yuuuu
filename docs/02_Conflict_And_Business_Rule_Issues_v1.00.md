@@ -1070,8 +1070,10 @@ score = floor((2·num + den) / (2·den))；tier：num < 35·den 弱，num < 65·
 raw 0 .. 100（小数），score 0 .. 100（整数），tier 弱 / 中等 / 强（按 raw）
 面板（FULL）   趋势强度  中等 · 56/100   数据截至 2026.10.26 12:00 H4 收盘
                BOS 计数与 CLEAN / MESSY 仍在 H4 CONTEXT 行，改称「BOS 计数」「结构诊断」，不再叫 strength / quality（原需求 §1.4）
-面板（COMPACT）BULLISH   BOS 3 CLEAN   |   强度 中等 56/100   |   POI …   下一行：数据截至 2026.10.26 12:00 H4 收盘
-               （v2.56r2，验收方 P2：默认是 COMPACT，分数须能对上它的 H4；等待数据时不显示这一行）
+面板（COMPACT）第一行 BULLISH   BOS 3 CLEAN   |   POI 0   |   SESSION 11:55（与 v2.55 相同，str 改称 BOS）
+               第二行 强度 中等 56/100   数据截至 2026.10.26 12:00 H4 收盘（等待数据时只有「强度 等待数据」）
+               （r2：验收方 P2，分数须能对上它的 H4；r4：MT5 文字标签最多显示 63 个字符，r2 把分数放在第一行后 Session 被截掉，
+               改为分数与时间同在第二行；强度相关各行最长 54 个字符，strength_sim P08 检查）
 其他状态       样本不足（H4 不足 15 根）/ 不可用（ATR 无效）/ 暂不评级（区间震荡 | 反转待确认）/ 等待数据 —— 都不显示数字
 等待数据时     最后处理的一根是有效评分 → 「等待数据（上次有效结果 中等 · 56/100，<时间> H4 收盘）」；否则只写「等待数据」
 ```
@@ -1113,7 +1115,7 @@ TRANS_OK / FAIL 当根  处理后为新方向 → 当根按新方向计分，窗
 窗口          只读 h−14 .. h：h−14 只用收盘（TR[h−13]）；h−12 是净推进起点与 path 第一步；h−3 是动量起点
 ```
 
-### T-7 成对场景（`python3 tools/strength_sim.py` → 79/79；每个场景多空各一次，空头 = 价格镜像 + BEARISH）
+### T-7 成对场景（`python3 tools/strength_sim.py` → 81/81；每个场景多空各一次，空头 = 价格镜像 + BEARISH）
 
 T = 7000 point（ATR 500）除注明外；括号内为 S_move / S_eff / S_mom。
 
@@ -1140,7 +1142,7 @@ T = 7000 point（ATR 500）除注明外；括号内为 S_move / S_eff / S_mom。
 | X02 | RANGE / TRANSITION | | NODIR，chg12 / chg3 / path / T 照记 |
 | W01–W06 | 窗口：h−15 之前不读；h−14 只读收盘；之后的根不改变 h；C[h−3] 只改 recent 与 path；C[h−12] 改 net 与 path | | 见模型输出 |
 | E01–E05 | Context 引擎：CHOCH 当根 NODIR；TRANS_OK / FAIL 当根按新方向；趋势中每根有分；与更早历史无关；计分不改变任何状态 | | |
-| P01–P06 | 面板文字：有分 / 等待（上一根有分、尚无任何根、上一根为区间）/ 样本不足 / ATR 无效 / 区间、过渡 | | 与 MQL 同一措辞 |
+| P01–P08 | 面板文字：有分 / 等待（上一根有分、尚无任何根、上一根为区间）/ 样本不足 / ATR 无效 / 区间、过渡；COMPACT 第二行；各行 ≤ 63 字符 | | 与 MQL 同一措辞 |
 
 真实数据（`--replay`，EURUSD 1292 根）：前缀一致；镜像数据每根 Context 镜像、raw 相同，0 差异；分布只作记录。
 

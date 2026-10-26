@@ -105,6 +105,22 @@ def panel_text(rec, ctx, wait, when):
     return f"趋势强度  {ZH_TIER[rec['tier']]} · {rec['score']}/100   数据截至 {when} H4 收盘"
 
 
+def compact_text(rec, ctx, wait, when):
+    """PANEL_COMPACT's strength row (StrPanelShort + StrPanelAsOf, v2.56r4): the score and its H4 close on one row"""
+    if wait or rec is None:
+        return "强度 等待数据"
+    if rec["state"] == "NODATA":
+        short = "强度 样本不足" if rec["reason"] == "HISTORY" else "强度 不可用"
+    elif rec["state"] == "NODIR":
+        short = "强度 暂不评级"
+    else:
+        short = f"强度 {ZH_TIER[rec['tier']]} {rec['score']}/100"
+    return short + f"   数据截至 {when} H4 收盘"
+
+
+LABEL_MAX = 63          # an MT5 OBJ_LABEL shows this many characters; the rest is cut off
+
+
 # ---- scenario bars ---------------------------------------------------------------------------------------------
 BASE = 1.10000
 T0 = int(B.dt.datetime(2026, 9, 7, 0, 0, tzinfo=B.dt.timezone.utc).timestamp())
@@ -327,6 +343,17 @@ def scenarios():
           panel_text(score(v1, 14, RANGE), RANGE, False, t1) == "趋势强度  暂不评级（区间震荡）" and
           panel_text(score(v1, 14, TRANS), TRANS, False, t1) == "趋势强度  暂不评级（反转待确认）")
     check("P06 waiting after a RANGE bar: no earlier direction's score", panel_text(score(v1, 14, RANGE), RANGE, True, t1) == "趋势强度  等待数据")
+    check("P07 COMPACT row: score and H4 close together; waiting: no time",
+          compact_text(ok_rec, BULL_CTX, False, t1) == "强度 强 91/100   数据截至 2026.10.26 12:00 H4 收盘" and
+          compact_text(ok_rec, BULL_CTX, True, t1) == "强度 等待数据")
+    worst = dict(ok_rec, tier="MED", score=100)                     # the longest tier word and score
+    rows = [panel_text(worst, BULL_CTX, w, t1) for w in (False, True)] + [compact_text(worst, BULL_CTX, False, t1)] + \
+           [f(score(v1, 13, BULL_CTX), BULL_CTX, False, t1) for f in (panel_text, compact_text)] + \
+           [f(score(flat, 14, BULL_CTX), BULL_CTX, False, t1) for f in (panel_text, compact_text)] + \
+           [f(score(v1, 14, c), c, False, t1) for f in (panel_text, compact_text) for c in (RANGE, TRANS)]
+    longest = max(rows, key=len)
+    check(f"P08 every strength row fits an OBJ_LABEL ({LABEL_MAX} characters; longest {len(longest)}: {longest})",
+          len(longest) <= LABEL_MAX)
 
 
 # ---- log rows, formatted as HMI_StrengthEngine.mqh prints them (for tools/logtests) -------------------------------

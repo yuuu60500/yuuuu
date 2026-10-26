@@ -502,13 +502,16 @@ void OM_DrawPanel()
       L[n++] = ctx +
                "   BOS " + IntegerToString(g_ctx_strength) +
                (g_ctx_messy ? " MESSY" : " CLEAN") +
-               "   |   " + StrPanelShort() +
                "   |   POI " + IntegerToString(poi_active) +
                "   |   " + (g_sess.active ? "SESSION " +
                TimeToString(g_sess.start_time, TIME_MINUTES) : "no session") +
                (g_lh_state == LH_WAITING ? "   |   LIQ WAITING" : "");
-      string asof = StrPanelAsOf();               // v2.56: which H4 close the score belongs to
-      if(asof != "") { C[n] = base; L[n++] = asof; }
+      // v2.56r4: the score and the H4 close it belongs to on a row of their own -
+      // an OBJ_LABEL shows 63 characters, and on the first row the score pushed
+      // the session off its end (MT5 run 2026-10-26)
+      string asof = StrPanelAsOf();
+      C[n] = base;
+      L[n++] = StrPanelShort() + (asof != "" ? "   " + asof : "");
       C[n] = base;
       L[n++] = OM_PanelCycleLine();
      }

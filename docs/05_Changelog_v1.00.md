@@ -2080,3 +2080,18 @@ tools/ReloadTest.ps1   Show-StrAdditive：去掉 attempt= 后两边相同的 REP
 tools/logtests         s29（只差 attempt=）/ s30（got= 也不同 → UNEXPLAINED，且不列为元数据），162 组
 docs                   BRI-13 T-9；docs/04；docs/06 Audit Round 40；evidence/v2.56_mt5_run_20261026.txt
 ```
+
+## v2.56r4 —— COMPACT 面板：分数移到第二行（显示；评分与日志不变；未编译）
+
+```
+Date:     2026-10-26
+来源:     MT5 截图：COMPACT 第一行「… | 强度 弱 15/100 | POI 0 | SESSI」正好 63 个字符 —— MT5 OBJ_LABEL 只显示 63 个字符，
+          r2 把分数放进第一行后 Session（及 LIQ WAITING）被截掉；FULL 的 POI 行「… M5 BLOCK GAP-REJECTE」同样是 63 个字符
+
+MQL5 HMI_ObjectManager   COMPACT 第一行恢复 v2.55 的内容（str 改称 BOS）；第二行 = 「强度 中等 56/100」+「数据截至 … H4 收盘」
+                         （等待时只有「强度 等待数据」）；日志、评分、FULL 不变
+tools/strength_sim.py    compact_text；P07 COMPACT 行、P08 强度各行 ≤ 63 字符（最长 54）—— 81/81
+保留（原有，显示阶段）   FULL「H4 POI … M5 BLOCK GAP-REJECTED: n」、「CYCLE …」、「LIQ HISTORY: WAITING …」行，TRANSITION 下 COMPACT 第一行
+                         在 v2.55 就超过 63 个字符
+docs                     BRI-13 T-3；docs/04；docs/06 Audit Round 40 补记
+```

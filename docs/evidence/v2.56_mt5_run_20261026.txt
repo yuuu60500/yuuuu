@@ -142,4 +142,5 @@ RESULT: inputs complete, 0 differences (categories without a sample are listed a
 
 ## 5. panel (user screenshot, USDCAD v2.56 COMPACT): 'BEARISH | BOS 7 CLEAN | 强度 弱 15/100 | POI 0 | SESSI…' / '数据截至 2026.10.26 16:00 H4 收盘'
 #   = the log's last HMI-STR row of E6D0: bar=2026.10.26 16:00, net 168, path 1432, recent -135, tr_sum 3226 -> 24.30 / 11.73 / 0 -> raw 15.04, WEAK;
-#   Chinese renders; the first COMPACT line is cut at the edge of a narrow chart window (display stage)
+#   Chinese renders; the first COMPACT line is cut at character 63 - the OBJ_LABEL limit, not the window: the r2 score pushed the
+#   session off it (r4 moves the score to the second row). FULL (AUDUSD): BOS 计数 5 / 结构诊断 CLEAN / 趋势强度 弱 · 25/100 数据截至 16:00

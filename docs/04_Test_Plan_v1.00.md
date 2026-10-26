@@ -1031,7 +1031,7 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           HMI-STR   构建中 M5 窗口内每根 H4 一行、实时每根 H4 一行；ReloadTest 逐行复算 score / tier / 分项（失败即不通过）
           HMI-STR-HIST 每次构建一行（END 之前）：ok + nodir + nodata = bars，分箱和 = ok，与本构建 HMI-STR 行一致
           HMI-STR-WAIT 只在实时等待时出现，不比较
-3  离线：python3 tools/strength_sim.py → 79/79（验收方三组对照、分项独立变化、封顶、35 / 65 未取整边界、数据不足、
+3  离线：python3 tools/strength_sim.py → 81/81（验收方三组对照、分项独立变化、封顶、35 / 65 未取整边界、数据不足、
           方向、窗口、Context 引擎当根、面板文字；多空镜像）；--replay EURUSD_H1.csv → 前缀一致、镜像 0 差异、分布记录
           ReloadTest 日志用例 160/160（s01–s28：STR 重载一致 / 缺行 / 分数、分项、方向、NODIR 字段篡改 / 直方图计数、缺失、to /
           同根两行 / def 改变 → 不可比较 / def 未知 / 边界行复算 / 实时一致、缺行、篡改、def 改变 / v2.55 → v2.56 加法一致、
@@ -1057,3 +1057,6 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           第 6 项 5 对 v2.55 / v2.56「IDENTICAL apart from the strength rows」（XAUUSD 两对另列 REPLAY attempt= 实例元数据）；
           第 7 项 -Str 10 图记录；第 8 项 COMPACT 截图（USDCAD）；第 5 项实时 STR 尚无样本（挂图后未过 H4 收盘）；FULL 截图待补
           工具 r3（attempt= 元数据）：logtests 162/162
+   r4（2026-10-26）：COMPACT 截图显示第一行在第 63 个字符截断（OBJ_LABEL 上限）—— 分数移到第二行与时间同行；需重新编译、
+          第 8 项截图以 r4 为准。FULL 的 POI 行、CYCLE 行、LIQ WAITING 行及 TRANSITION 下 COMPACT 第一行在 v2.55 已超 63 字符
+          （原有，显示阶段处理）
