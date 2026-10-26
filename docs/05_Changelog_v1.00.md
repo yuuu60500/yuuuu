@@ -2051,3 +2051,19 @@ MQL5
 Trading Logic Changed:  NO（只显示，Rule 69）
 Compile Status:         NOT COMPILE VERIFIED
 ```
+
+## v2.56r2 —— 验收方三处 P2（评分公式与信号规则不变；未编译）
+
+```
+Date:     2026-10-26
+来源:     验收方「HMI v2.56 开发版审核报告」（2026-10-26）：开发版编译 0 / 0，三项评分不需重做；正式验收前补三处 P2
+
+tools/ReloadTest.ps1        StrAudit：构建内 HMI-STR 须 From < bar <= To（BEGIN 的 M5 时间，H4VisibleTo 口径）；HIST.to 不晚于 To
+MQL5 HMI_StrengthEngine     StrPanelShort 加「/100」；StrPanelAsOf：COMPACT 下一行「数据截至 … H4 收盘」（同一评分游标，等待时不显示）
+MQL5 HMI_ObjectManager      COMPACT 插入该行（各行颜色各自赋值）
+MQL5 H4M5_Identification    H4 / M5 SeriesAppend 返回 RELOAD：StrReloadPanel —— g_ready = false、等待（src=RELOAD）、立即重画；
+                            重建仍只走 TryBuild
+tools/logtests              s26–s28（验收方两份时间边界反例 + 同版本重载一份），160 组
+docs                        BRI-13 T-3 / T-5 / T-9；docs/04 v2.56 清单；docs/06 Audit Round 37
+Trading Logic Changed:  NO
+```

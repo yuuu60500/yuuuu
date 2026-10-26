@@ -760,5 +760,21 @@ case("s24_versus256_no_str", v55v56(new_rows=[]), VS,
      ["strength rows FAILED their check (1)", "0 HMI-STR-HIST row(s) in build 1 (one expected)"], ["IDENTICAL apart from the strength rows"])
 case("s25_versus256_old_has_str", v55v56(old_rows=strs(inst="0C55")[:1]), VS,
      ["v2.55 build carries 1 strength row(s)"], ["IDENTICAL apart from the strength rows"])
+# reviewer, v2.56 dev review P2: a build scores an H4 bar only after processing it - From < bar <= To (BEGIN's M5 times);
+# its histogram's to= never after To. The two counterexamples of the review, then the same in a same-version reload.
+_last = SS.tstr16(_SB[-1][0] + SS.H4)
+def _after(nb):
+    return [setf(l, "to", "2026.10.01 00:00") if "HMI-STR-HIST," in l else
+            (setf(l, "bar", "2026.10.01 00:00") if "HMI-STR," in l and f",bar={_last}," in l else l) for l in nb]
+_first = SS.tstr16(_SB[0][0] + SS.H4)
+def _before(nb):
+    return [setf(l, "bar", "2026.09.06 00:00") if "HMI-STR," in l and f",bar={_first}," in l else l for l in nb]
+case("s26_versus256_str_after_window", v55v56(new_tweak=_after), VS,
+     ["strength rows FAILED their check", "HMI-STR bar=2026.10.01 00:00 outside the build's processed M5 window (2026.09.07 03:40 .. 2026.09.30 12:35]",
+      "HIST to=2026.10.01 00:00 after the build's last M5 bar 2026.09.30 12:35"], ["IDENTICAL apart from the strength rows"])
+case("s27_versus256_str_before_window", v55v56(new_tweak=_before), VS,
+     ["strength rows FAILED their check", "HMI-STR bar=2026.09.06 00:00 outside the build's processed M5 window"], ["IDENTICAL apart from the strength rows"])
+case("s28_reload_str_after_window", [start("2.56")] + s56(1, strs() + shist()) + _after(s56(2, strs() + shist())), R,
+     ["ROW CHECK(S) FAILED", "B: HMI-STR bar=2026.10.01 00:00 outside the build's processed M5 window"], NOSTR)
 json.dump(C, open("cases.json", "w"), indent=1)
 print(len(C), "cases")

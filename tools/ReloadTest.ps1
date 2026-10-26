@@ -344,9 +344,21 @@ function StrVerify($x) {
 function StrAudit($bk) {
     $s = Get-Struct $bk; $out = @()
     foreach ($x in $s.Str) { $w = StrVerify $x; if ($w) { $out += "$($x.BarS): $w" } }
+    # (reviewer, v2.56 dev review P2) a build scores an H4 bar only once it has
+    # processed it: its close is after the first M5 open (rows are logged from
+    # there) and no later than the last M5 open (H4VisibleTo) - From < bar <= To,
+    # BEGIN's own times, nothing added
+    foreach ($x in $s.Str) {
+        if ($x.Bar -ne [datetime]::MinValue -and ($x.Bar -le $bk.From -or $x.Bar -gt $bk.To)) {
+            $out += "HMI-STR bar=$($x.BarS) outside the build's processed M5 window ($($bk.FromS) .. $($bk.ToS)]"
+        }
+    }
     foreach ($g in @($s.Str | Group-Object BarS | Where-Object { $_.Count -gt 1 })) { $out += "bar $($g.Name) has $($g.Count) HMI-STR rows" }
     if ((VerNum $bk.Ver) -lt [decimal]2.56 -and $s.Str.Count -eq 0 -and $s.Hist.Count -eq 0) { return $out }
     if ($s.Hist.Count -ne 1) { return ($out + "$($s.Hist.Count) HMI-STR-HIST row(s) in build $($bk.Build) (one expected)") }
+    # the histogram counts the whole processed H4 window: its from= may be long
+    # before the M5 window, its to= never after the last M5 open
+    if ($s.Hist[0].To -eq [datetime]::MinValue -or $s.Hist[0].To -gt $bk.To) { $out += "HIST to=$($s.Hist[0].F['to']) after the build's last M5 bar $($bk.ToS)" }
     $f = $s.Hist[0].F; $n = @{}
     foreach ($k in 'bars', 'ok', 'nodir', 'nodata', 'weak', 'med', 'strong') {
         if ([string]$f[$k] -notmatch '^\d{1,9}$') { return ($out + "HIST $k=$($f[$k])") }

@@ -2293,3 +2293,19 @@ v2.55 实时覆盖（合计）:  MODEL、LIQ、CTX、PROT、B8 五类各至少�
                          （s01–s25，工具逐行复算与模型在 35 / 65 精确边界上一致）；live_coverage_tests 22/22
 保留:                    v2.55 受限基线不变；质量 v2.57、面板 v2.58；黄金 MODEL / B8-C5 不是本版阻塞项
 ```
+
+
+## Audit Round 37 —— v2.56 开发版审核（验收方 2026-10-26）：评分成立，三处 P2
+
+```
+验收方结果:              开发版编译 0 errors / 0 warnings（X64 Regular）；strength_sim 79/79、--replay 2/2、logtests 157/157、
+                         live_coverage_tests 22/22、params 461F006E；另一套算式逐根 1292 根 0 差异；三组对照 91 / 56 / 20 多空一致
+P2-1 处理窗口            StrAudit 不查 STR 的时间：最后一行移到 To 之后（HIST.to 同步）或第一行移到 From 之前，原工具仍给
+                         IDENTICAL —— 成立。修：From < bar <= To（MQL 的记录条件：收盘晚于第一根 M5 开盘；H4VisibleTo：收盘不晚于
+                         最后一根 M5 开盘），HIST.to <= To；反例入库 s26 / s27，另加同版本重载 s28
+P2-2 COMPACT 时间        默认面板只有「强度 强 91」，看不出属于哪根 H4 —— 成立。修：「/100」+ 下一行「数据截至 … H4 收盘」
+                         （同一评分游标；等待时不显示）。验收方候选补丁在新行之后没有给周期行赋颜色，本修改各行各自赋值
+P2-3 RELOAD 等待         SA_RELOAD 只置 g_ready = false 后返回，面板保留旧构建的分数直到下一次计算 —— 成立（源码分支检查，
+                         非界面复现）。修：StrReloadPanel 立即显示等待并重画，重建仍走 TryBuild
+回归:                    logtests 160/160；strength_sim 79/79；live_coverage_tests 22/22（见 docs/04 运行状态）
+```

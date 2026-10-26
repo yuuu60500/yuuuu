@@ -1031,9 +1031,10 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           HMI-STR-WAIT 只在实时等待时出现，不比较
 3  离线：python3 tools/strength_sim.py → 79/79（验收方三组对照、分项独立变化、封顶、35 / 65 未取整边界、数据不足、
           方向、窗口、Context 引擎当根、面板文字；多空镜像）；--replay EURUSD_H1.csv → 前缀一致、镜像 0 差异、分布记录
-          ReloadTest 日志用例 157/157（s01–s25：STR 重载一致 / 缺行 / 分数、分项、方向、NODIR 字段篡改 / 直方图计数、缺失、to /
+          ReloadTest 日志用例 160/160（s01–s28：STR 重载一致 / 缺行 / 分数、分项、方向、NODIR 字段篡改 / 直方图计数、缺失、to /
           同根两行 / def 改变 → 不可比较 / def 未知 / 边界行复算 / 实时一致、缺行、篡改、def 改变 / v2.55 → v2.56 加法一致、
-          链路行改变、MODEL 改变、窗口不同、强度行失败、无强度行、旧版带强度行）
+          链路行改变、MODEL 改变、窗口不同、强度行失败、无强度行、旧版带强度行；r2 s26–s28：强度行晚于构建最后一根 M5 /
+          早于第一根、直方图 to 越界 —— 验收方反例）
           python3 tools/live_coverage_tests.py → 22/22（+3：v2.56 STR 一致、分数改变、缺行）
 4  同窗口重载（同一根 M5 内刷新两次）：MODEL / LIQ / CTX / PROT / B8 / STR 六类 IDENTICAL，STR 逐行复算全部通过
 5  实时 vs 重建：STR 按 H4 收盘逐行全字段相同（ReloadTest -LiveVsBuild；python3 tools/live_coverage.py --ver 2.56）；
@@ -1042,6 +1043,8 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           判据：「IDENTICAL apart from the strength rows」—— 除 HMI-STR / HMI-STR-HIST 外逐行相同（身份字段除外）；
           任何其他差异 UNEXPLAINED；窗口不同 NOT JUDGED
 7  分布记录：ReloadTest -Str（各图最新构建的 HMI-STR-HIST，按参数摘要与 def 合并）—— 记录，不据此改阈值
-8  面板截图：有分（强 / 中等 / 弱各一，若行情给得出）、暂不评级（区间或过渡）、样本不足或等待数据（可用刚挂图的第一屏）；
-          H4 CONTEXT 行显示「BOS 计数」「结构诊断」；中文字符正常显示（不是方框）
+8  面板截图：默认 COMPACT 的「强度 … /100」与下一行「数据截至 … H4 收盘」；FULL；暂不评级（区间或过渡）、样本不足或等待数据
+          （可用刚挂图的第一屏）；FULL 的 H4 CONTEXT 行显示「BOS 计数」「结构诊断」；中文字符正常显示（不是方框），面板行数正常
 ```
+   运行状态（2026-10-26，Audit Round 37）：第 0 项开发版 0 / 0（验收方，X64 Regular）；验收方复核 79/79、2/2、157/157、22/22、
+          461F006E、独立三项算术 1292 根 0 差异；r2 修三处 P2（处理窗口校验、COMPACT 分数时间、RELOAD 即时等待），待重新编译与 MT5 运行

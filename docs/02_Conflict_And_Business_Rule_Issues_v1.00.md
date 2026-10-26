@@ -1070,7 +1070,8 @@ score = floor((2·num + den) / (2·den))；tier：num < 35·den 弱，num < 65·
 raw 0 .. 100（小数），score 0 .. 100（整数），tier 弱 / 中等 / 强（按 raw）
 面板（FULL）   趋势强度  中等 · 56/100   数据截至 2026.10.26 12:00 H4 收盘
                BOS 计数与 CLEAN / MESSY 仍在 H4 CONTEXT 行，改称「BOS 计数」「结构诊断」，不再叫 strength / quality（原需求 §1.4）
-面板（COMPACT）BULLISH   BOS 3 CLEAN   |   强度 中等 56   |   POI …
+面板（COMPACT）BULLISH   BOS 3 CLEAN   |   强度 中等 56/100   |   POI …   下一行：数据截至 2026.10.26 12:00 H4 收盘
+               （v2.56r2，验收方 P2：默认是 COMPACT，分数须能对上它的 H4；等待数据时不显示这一行）
 其他状态       样本不足（H4 不足 15 根）/ 不可用（ATR 无效）/ 暂不评级（区间震荡 | 反转待确认）/ 等待数据 —— 都不显示数字
 等待数据时     最后处理的一根是有效评分 → 「等待数据（上次有效结果 中等 · 56/100，<时间> H4 收盘）」；否则只写「等待数据」
 ```
@@ -1092,8 +1093,9 @@ raw 0 .. 100（小数），score 0 .. 100（整数），tier 弱 / 中等 / 强�
 ```
 NODATA / HISTORY   h < 14：从序列起点到 h 不足 15 根已收盘 H4（ATR14 的 TR 需要前一根收盘）  → 样本不足
 NODATA / ATR       T = 0（15 根完全无波动）                                                    → 不可用（ATR 无效）
-WAIT（面板状态）   序列未同步：本 tick 的 H4 或 M5 SeriesAppend 返回 NOT_READY，或尚无完成的构建 → 等待数据
-                   日志：进入等待时一行 HMI-STR-WAIT（src=H4 | M5 | BUILD，last=最后处理的 H4 收盘），只在实时出现，不比较
+WAIT（面板状态）   序列未同步：本 tick 的 H4 或 M5 SeriesAppend 返回 NOT_READY，或尚无完成的构建；或返回 RELOAD
+                   （历史被改动，下一 tick 经 TryBuild 重建 —— v2.56r2，验收方 P2：当下即显示等待，不留旧构建的分数）→ 等待数据
+                   日志：进入等待时一行 HMI-STR-WAIT（src=H4 | M5 | BUILD | RELOAD，last=最后处理的 H4 收盘），只在实时出现，不比较
 NODIR              数据有效，ctx = RANGE / TRANSITION                                          → 暂不评级（区间 / 过渡）
 ```
 
@@ -1162,7 +1164,7 @@ HMI-STR,<sym>,live=<0|1>,bar=<H4 收盘时间>,ctx=<BULLISH|BEARISH|RANGE|TRANSI
         chg12 / chg3 为向上为正的原始收盘差；net / recent 为 D 定向后的值
 HMI-STR-HIST,<sym>,live=0,def=,from=,to=<已处理 H4 窗口首末根收盘>,bars=,ok=,nodir=,nodata=,weak=,med=,strong=,h=<101 个计数>,inst=,run=,init=
         每次构建一行，在 HMI-BUILD-END 之前；统计整个已处理 H4 窗口（不含尚未送入结构引擎的根）
-HMI-STR-WAIT,<sym>,live=1,state=NODATA,reason=WAIT,src=H4|M5|BUILD,last=<最后处理的 H4 收盘|->,inst=,run=,init=
+HMI-STR-WAIT,<sym>,live=1,state=NODATA,reason=WAIT,src=H4|M5|BUILD|RELOAD,last=<最后处理的 H4 收盘|->,inst=,run=,init=
 ```
 
 `ReloadTest.ps1`：
@@ -1171,6 +1173,8 @@ HMI-STR-WAIT,<sym>,live=1,state=NODATA,reason=WAIT,src=H4|M5|BUILD,last=<最后�
 - **逐行复算**：按行内 `def=` 解析出的常量，用十进制精确运算，从 chg12 / chg3 / path / tr_sum 复算 net、recent、
   三个分项、raw、score 与 tier。分数或等级不符、分项小数差超过 1e-6，都判为失败。还核对状态与 ctx、reason、NA 字段的一致性，
   以及 path ≥ |chg12|、|chg3|。
+- **处理窗口**（v2.56r2，验收方 P2）：构建内每行 HMI-STR 须满足 `From < bar ≤ To`（BEGIN 的 M5 开盘时间，按 H4VisibleTo，
+  不另加 5 分钟）；HMI-STR-HIST 的 to 不得晚于 To（from 可以早于 From：直方图统计整个已处理 H4 窗口）。
 - **直方图核对**：ok + nodir + nodata = bars；101 个分箱之和 = ok；weak + med + strong = ok；各状态、各等级、各分值的行数
   不超过直方图计数；最后一行 HMI-STR 的 bar = 直方图的 to；同一根 H4 不得有两行。
 - **def 不同**：两次构建 def 不同，STR 判为 NOT COMPARABLE（pending）。def 无法解析，判为失败。

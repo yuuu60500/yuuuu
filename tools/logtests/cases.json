@@ -2175,5 +2175,51 @@
   "forbid": [
    "IDENTICAL apart from the strength rows"
   ]
+ },
+ "s26_versus256_str_after_window": {
+  "args": [
+   "-Source",
+   "USDJPY#0C55,M5",
+   "-Versus",
+   "USDJPY#0D56,M5"
+  ],
+  "expect": [
+   "strength rows FAILED their check",
+   "HMI-STR bar=2026.10.01 00:00 outside the build's processed M5 window (2026.09.07 03:40 .. 2026.09.30 12:35]",
+   "HIST to=2026.10.01 00:00 after the build's last M5 bar 2026.09.30 12:35"
+  ],
+  "forbid": [
+   "IDENTICAL apart from the strength rows"
+  ]
+ },
+ "s27_versus256_str_before_window": {
+  "args": [
+   "-Source",
+   "USDJPY#0C55,M5",
+   "-Versus",
+   "USDJPY#0D56,M5"
+  ],
+  "expect": [
+   "strength rows FAILED their check",
+   "HMI-STR bar=2026.09.06 00:00 outside the build's processed M5 window"
+  ],
+  "forbid": [
+   "IDENTICAL apart from the strength rows"
+  ]
+ },
+ "s28_reload_str_after_window": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "B: HMI-STR bar=2026.10.01 00:00 outside the build's processed M5 window"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the strength rows"
+  ]
  }
 }

@@ -291,7 +291,16 @@ string StrPanelShort()
    StrRec r = g_str[h];
    if(r.state == STR_NODATA) return(head + HMI_U(r.reason == SR_HISTORY ? ZH_FEW : ZH_NA));
    if(r.state == STR_NODIR)  return(head + HMI_U(ZH_NORATE));
-   return(head + StrTierZh(r.tier) + " " + IntegerToString(r.score));
+   return(head + StrTierZh(r.tier) + " " + IntegerToString(r.score) + "/100");
+  }
+
+//--- PANEL_COMPACT's time row: the H4 close the strength line belongs to (the same
+//--- cursor); none while waiting - an older bar's time is not current then ---------
+string StrPanelAsOf()
+  {
+   int h = g_str_n - 1;
+   if(!g_ready || g_str_wait || h < 0 || h >= g_h4_n) return("");
+   return(HMI_U(ZH_ASOF) + " " + StrBarTime(h) + " H4 " + HMI_U(ZH_CLOSE));
   }
 
 #endif // HMI_STRENGTHENGINE_MQH

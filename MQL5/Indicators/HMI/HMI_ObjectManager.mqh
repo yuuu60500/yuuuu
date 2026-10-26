@@ -507,6 +507,8 @@ void OM_DrawPanel()
                "   |   " + (g_sess.active ? "SESSION " +
                TimeToString(g_sess.start_time, TIME_MINUTES) : "no session") +
                (g_lh_state == LH_WAITING ? "   |   LIQ WAITING" : "");
+      string asof = StrPanelAsOf();               // v2.56: which H4 close the score belongs to
+      if(asof != "") { C[n] = base; L[n++] = asof; }
       C[n] = base;
       L[n++] = OM_PanelCycleLine();
      }

@@ -377,6 +377,17 @@ void StrWaitPanel(const string src)
    if(!was) { OM_DrawPanel(); ChartRedraw(); }
   }
 
+//--- v2.56 (reviewer P2): history changed under the build - the next tick
+//--- rebuilds through TryBuild; until then the panel says "waiting", not the
+//--- old build's score as current
+void StrReloadPanel()
+  {
+   g_ready = false;
+   StrSetWait("RELOAD");
+   OM_DrawPanel();
+   ChartRedraw();
+  }
+
 //+------------------------------------------------------------------+
 int OnCalculate(const int rates_total,
                 const int prev_calculated,
@@ -408,7 +419,7 @@ int OnCalculate(const int rates_total,
 
    //--- H4 first, so Phase 0 can consume it -------------------------
    int ah = SeriesAppend(PERIOD_H4, g_h4, g_h4_n, g_h4_atr);
-   if(ah == SA_RELOAD) { g_ready = false; return(rates_total); }
+   if(ah == SA_RELOAD) { StrReloadPanel(); return(rates_total); }
 
    // A-30: H4 not delivered yet is NOT the same as no new H4. Advancing M5
    // now would evaluate those bars against a context the H4 bar has not
@@ -418,7 +429,7 @@ int OnCalculate(const int rates_total,
    if(ah == SA_NOT_READY) { StrWaitPanel("H4"); return(rates_total); }
 
    int am = SeriesAppend(PERIOD_M5, g_m5, g_m5_n, g_m5_atr);
-   if(am == SA_RELOAD)    { g_ready = false; return(rates_total); }
+   if(am == SA_RELOAD)    { StrReloadPanel(); return(rates_total); }
    if(am == SA_NOT_READY) { StrWaitPanel("M5"); return(rates_total); }
 
    // both series delivered: the strength line is current again (v2.56)
