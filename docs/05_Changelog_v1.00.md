@@ -2006,3 +2006,17 @@ docs                          baselines/v2.55.md（指纹、证据、日内覆�
                               06 Audit Round 32–35；evidence/v2.55_mt5_run_20261020.txt
 Trading Logic Changed:  NO（相对 v2.55 开发版）
 ```
+
+## v2.56 定义稿 1（强度评分，未实现）—— MQL5 与 v2.55 基线相同
+
+```
+Date:     2026-10-26
+来源:     验收方「HMI v2.55r3 验收报告与下一步」第 2 项：先交付公式、方向依赖、取值范围、阈值、边界与成对场景、「数据不足」，确认后实现
+
+docs/02                BRI-13 定义稿 1：T-1 公式（最近 12 根 H4 沿 Context 方向净推进 / ATR(14)，CAP 4 ATR → 0 .. 100，整数运算）、
+                       T-2 方向依赖、T-3 范围与分档、T-4 暂定阈值与 MT5 定档程序、T-5 数据不足 / 无方向、T-6 时序与边界、
+                       T-7 成对场景、T-8 与现有输出的关系、T-9 日志提案（HMI-STR / HMI-STR-HIST）、T-10 6 项待确认选择
+tools/strength_sim.py  离线模型：定义场景多空镜像 53/53；--replay 前缀一致、镜像 0 差异、离线分布（暂定阈值的来源）
+docs/04                v2.56 验收清单草案；docs/evidence/v2.56_strength_offline.txt
+Trading Logic Changed:  NO（只显示，Rule 69；本稿未改代码）
+```

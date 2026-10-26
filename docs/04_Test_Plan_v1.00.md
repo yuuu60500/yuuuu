@@ -1019,3 +1019,22 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           未覆盖：XAUUSD MODEL 实时路径、B8-C5 原生差异分支、GBPUSD 与黄金 ATR 日内样本；跨周末 USDCAD PROT 2 行 PENDING REVIEW
           （全日志 RESULT NOT PASSED，不改写）
 ```
+
+### v2.56 验收清单（强度评分；基线 v2.55 受限基线）—— 草案，随 docs/02 BRI-13 定义稿 1 确认后定稿
+
+```
+0  编译 0 errors / 0 warnings
+1  版本：BEGIN ver=2.56；默认参数 params=461F006E 不变（CAP / T1 / T2 为编译常量，不是输入）
+2  新日志行（InpLogSignals = true；BRI-13 T-9）：
+          HMI-STR 构建中 M5 窗口内每根 H4 一行、实时每根 H4 一行；state=OK 时 score / tier 由 net、t、ctx 按 T-1 逐行复算一致，
+          NODIR 只在 ctx = RANGE / TRANSITION，NODATA 只在 D-1 .. D-3；HMI-STR-HIST 每次构建一行，计数之和 = ok
+3  离线：python3 tools/strength_sim.py → 53/53（定义场景多空镜像、窗口、Context 引擎当根顺序）；
+          --replay EURUSD_H1.csv → 前缀一致、镜像 0 差异（docs/evidence/v2.56_strength_offline.txt）
+4  同窗口重载：MODEL / LIQ / CTX / PROT / B8 / STR 六类 IDENTICAL
+5  实时 vs 重建：STR 按 bar 逐行全字段相同（live_coverage.py --ver 2.56）；0 行写「无样本」，不写通过
+6  跨版本 v2.55 vs v2.56（同品种两张图，同一根 M5 内各重建一次）：除 HMI-STR / HMI-STR-HIST 外逐行相同 —— 任何其他差异
+          UNEXPLAINED（新评分不改变原有标记）
+7  定档（T-4）：八品种默认参数各一次完整构建的 HMI-STR-HIST 合并 → T1 / T2 = round(S > 0 的 P33 / P67)，S = 100 占比 5% .. 15%；
+          与暂定值（CAP 4 ATR、T1 34、T2 64）不符按 T-4 处理
+8  面板：有分 / 无方向 / 数据不足三种显示各截图一次（数据不足可用历史很短的品种或刚挂图时的第一屏）
+```

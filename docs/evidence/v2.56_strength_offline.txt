@@ -1,0 +1,99 @@
+# v2.56 strength score (docs/02 BRI-13 定义稿 1) - offline model, 2026-10-26
+# data: backtesting.py 0.6.6 backtesting/test/EURUSD.csv, sha256 81e977905a006cc8fbc034ebdb83c999a8ed6ba00191dc7ea5ef5b386fb74a82 (shipped as Tools/data/EURUSD_H1.csv)
+# tools/strength_sim.py sha256 d206336b018e3015f125ce0e321c9a71e444d3dd5f96c8e912d059c140241b5e
+
+## python3 tools/strength_sim.py
+== definition scenarios (each also mirrored: bear bars + BEARISH = same result) ==
+PASS  S01 15 bars, h = 14: first bar with a score [bull]  -> OK S=35 MED
+PASS  S01 15 bars, h = 14: first bar with a score [bear]  -> OK S=35 MED
+PASS  S01 h = 13: 14 bars -> NODATA [bull]  -> NODATA S=None NA
+PASS  S01 h = 13: 14 bars -> NODATA [bear]  -> NODATA S=None NA
+PASS  S02 T = 0 (15 identical bars) -> NODATA, not 0 [bull]  -> NODATA S=None NA
+PASS  S02 T = 0 (15 identical bars) -> NODATA, not 0 [bear]  -> NODATA S=None NA
+PASS  S03 net = 0 -> 0 NONE [bull]  -> OK S=0 NONE
+PASS  S03 net = 0 -> 0 NONE [bear]  -> OK S=0 NONE
+PASS  S03 net against the context (-400) -> 0 NONE, never negative [bull]  -> OK S=0 NONE
+PASS  S03 net against the context (-400) -> 0 NONE, never negative [bear]  -> OK S=0 NONE
+PASS  S04 x / T = 2 / 7 (4 ATR) -> 100 [bull]  -> OK S=100 STRONG
+PASS  S04 x / T = 2 / 7 (4 ATR) -> 100 [bear]  -> OK S=100 STRONG
+PASS  S04 6.5 ATR -> capped at 100 [bull]  -> OK S=100 STRONG
+PASS  S04 6.5 ATR -> capped at 100 [bear]  -> OK S=100 STRONG
+PASS  S04 99.5 exactly -> 100 (half up) [bull]  -> OK S=100 STRONG
+PASS  S04 99.5 exactly -> 100 (half up) [bear]  -> OK S=100 STRONG
+PASS  S04 99.45 -> 99 [bull]  -> OK S=99 STRONG
+PASS  S04 99.45 -> 99 [bear]  -> OK S=99 STRONG
+PASS  S05 0.5 exactly -> 1 WEAK (smallest positive) [bull]  -> OK S=1 WEAK
+PASS  S05 0.5 exactly -> 1 WEAK (smallest positive) [bear]  -> OK S=1 WEAK
+PASS  S05 0.45 -> 0 NONE [bull]  -> OK S=0 NONE
+PASS  S05 0.45 -> 0 NONE [bear]  -> OK S=0 NONE
+PASS  S06 33.5 -> 34 = T1 MED [bull]  -> OK S=34 MED
+PASS  S06 33.5 -> 34 = T1 MED [bear]  -> OK S=34 MED
+PASS  S06 33.45 -> 33 WEAK [bull]  -> OK S=33 WEAK
+PASS  S06 33.45 -> 33 WEAK [bear]  -> OK S=33 WEAK
+PASS  S07 63.5 -> 64 = T2 STRONG [bull]  -> OK S=64 STRONG
+PASS  S07 63.5 -> 64 = T2 STRONG [bear]  -> OK S=64 STRONG
+PASS  S07 63.45 -> 63 MED [bull]  -> OK S=63 MED
+PASS  S07 63.45 -> 63 MED [bear]  -> OK S=63 MED
+PASS  S08 same bars, opposite context (rise under BEARISH) -> 0 NONE [bull]  -> OK S=0 NONE
+PASS  S08 same bars, opposite context (rise under BEARISH) -> 0 NONE [bear]  -> OK S=0 NONE
+PASS  S08 same bars, own context -> 70 STRONG [bull]  -> OK S=70 STRONG
+PASS  S08 same bars, own context -> 70 STRONG [bear]  -> OK S=70 STRONG
+PASS  S09 RANGE -> NODIR [bull]  -> NODIR S=None NA
+PASS  S09 RANGE -> NODIR [bear]  -> NODIR S=None NA
+PASS  S09 TRANSITION -> NODIR [bull]  -> NODIR S=None NA
+PASS  S09 TRANSITION -> NODIR [bear]  -> NODIR S=None NA
+PASS  S09 NODIR still logs net / T
+
+== window: which bars the score reads ==
+PASS  S10 bars before h-14 do not count (bars 0 .. 4 changed) -> S 70
+PASS  S10 a wick on h-14 does not count (only its close enters TR[h-13])
+PASS  S10 the close of h-14 counts (gap into h-13 enlarges TR[h-13])
+PASS  S10 a wick on h-13 counts (TR window) -> T 7100, S 69
+PASS  S11 a later bar never changes the score of h (no future)
+PASS  S12 the close of h-12 is an endpoint: 200 points lower -> net 1600, S 78 (known sensitivity)
+PASS  S13 a gap counts through the previous close (TR, not H-L) -> T 7075
+
+== with the H4 context engine (v2.54 rules, unchanged in v2.55 / v2.56) ==
+PASS  E01 [bull] CHOCH bar -> NODIR on that bar; the bar before is scored (1 CHOCH)
+PASS  E02 [bull] TRANS_OK / TRANS_FAIL bar -> scored in the new direction on that bar (1)
+PASS  E03 [bull] every trend bar from h = 14 is scored, BOS bars included (36 bars, 4 BOS)
+PASS  E01 [bear] CHOCH bar -> NODIR on that bar; the bar before is scored (1 CHOCH)
+PASS  E02 [bear] TRANS_OK / TRANS_FAIL bar -> scored in the new direction on that bar (1)
+PASS  E03 [bear] every trend bar from h = 14 is scored, BOS bars included (36 bars, 4 BOS)
+PASS  E04 identical last 15 bars, different history before -> identical score (independent of `str` / leg)
+
+scenario inputs (bull case): name / context / net / T / result
+  S01 15 bars, h = 14: first bar with a score                BULLISH    net    700  T  7000  ('OK', 35, 'MED')
+  S01 h = 13: 14 bars -> NODATA                              BULLISH    net   None  T  None  ('NODATA', None, 'NA')
+  S02 T = 0 (15 identical bars) -> NODATA, not 0             BULLISH    net      0  T     0  ('NODATA', None, 'NA')
+  S03 net = 0 -> 0 NONE                                      BULLISH    net      0  T  7000  ('OK', 0, 'NONE')
+  S03 net against the context (-400) -> 0 NONE, never negati BULLISH    net   -400  T  7000  ('OK', 0, 'NONE')
+  S04 x / T = 2 / 7 (4 ATR) -> 100                           BULLISH    net   2000  T  7000  ('OK', 100, 'STRONG')
+  S04 6.5 ATR -> capped at 100                               BULLISH    net   3250  T  7000  ('OK', 100, 'STRONG')
+  S04 99.5 exactly -> 100 (half up)                          BULLISH    net   1990  T  7000  ('OK', 100, 'STRONG')
+  S04 99.45 -> 99                                            BULLISH    net   1989  T  7000  ('OK', 99, 'STRONG')
+  S05 0.5 exactly -> 1 WEAK (smallest positive)              BULLISH    net     10  T  7000  ('OK', 1, 'WEAK')
+  S05 0.45 -> 0 NONE                                         BULLISH    net      9  T  7000  ('OK', 0, 'NONE')
+  S06 33.5 -> 34 = T1 MED                                    BULLISH    net    670  T  7000  ('OK', 34, 'MED')
+  S06 33.45 -> 33 WEAK                                       BULLISH    net    669  T  7000  ('OK', 33, 'WEAK')
+  S07 63.5 -> 64 = T2 STRONG                                 BULLISH    net   1270  T  7000  ('OK', 64, 'STRONG')
+  S07 63.45 -> 63 MED                                        BULLISH    net   1269  T  7000  ('OK', 63, 'MED')
+  S08 same bars, opposite context (rise under BEARISH) -> 0  BEARISH    net   1400  T  7000  ('OK', 0, 'NONE')
+  S08 same bars, own context -> 70 STRONG                    BULLISH    net   1400  T  7000  ('OK', 70, 'STRONG')
+  S09 RANGE -> NODIR                                         RANGE      net   1400  T  7000  ('NODIR', None, 'NA')
+  S09 TRANSITION -> NODIR                                    TRANSITION net   1400  T  7000  ('NODIR', None, 'NA')
+
+53/53 PASS
+
+## python3 tools/strength_sim.py --replay EURUSD_H1.csv
+replay EURUSD_H1.csv: 1292 H4 bars 2017.04.19 08:00 .. 2018.02.07 12:00
+PASS  R1 prefix: score of h from bars[:h+1] equals the full run (every 37th bar from 40)
+PASS  R2 mirror: mirrored bars give the mirrored context on every bar and the same score (0 differ, context 0 differ)
+
+states: OK 957 / NODIR 321 / NODATA 14
+x / ATR on OK bars: P10 -1.49  P25 -0.27  P33 0.20  P50 1.15  P67 1.97  P75 2.40  P90 4.06  P95 4.84  (<= 0: 290 of 957)
+S on OK bars: S = 0 295, S = 100 101 (10.6% of OK bars; CAP = 4 ATR ~ P90 of x / ATR)
+S > 0: P33 34.0  P50 46.0  P67 63.9  -> provisional T1 = round(P33) = 34, T2 = round(P67) = 64
+tiers (T1 = 34, T2 = 64): NONE 295  WEAK 214  MED 229  STRONG 219
+
+2/2 PASS
