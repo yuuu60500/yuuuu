@@ -95,6 +95,29 @@ def days255():
     return d1, d2
 
 
+# v2.56: one HMI-STR row for the H4 bar closing 12:00, live between build 1 (to 11:55) and build 2 (to 12:25), which holds
+# it; each build also writes its HMI-STR-HIST and the live run one HMI-STR-WAIT - neither is a row to compare
+STR = 'HMI-STR,AUDUSD,live={},bar=2026.10.19 12:00,ctx=BULLISH,state=OK,reason=-,def=STR1-N12K3-M3R1-W45.35.20-T35.65,dir=1,' \
+      'chg12=1400,chg3=350,path=1400,tr_sum=7000,net=1400,recent=350,s_move=93.333333,s_eff=100.000000,s_mom=70.000000,' \
+      'raw=91.000000,score=91,tier=STRONG'
+HIST = 'HMI-STR-HIST,AUDUSD,live=0,def=STR1-N12K3-M3R1-W45.35.20-T35.65,from=2026.07.10 04:00,to={},bars=500,ok=300,' \
+       'nodir=186,nodata=14,weak=100,med=100,strong=100,h=' + ';'.join(['3'] * 100) + ';0'
+WAIT = 'HMI-STR-WAIT,AUDUSD,live=1,state=NODATA,reason=WAIT,src=H4,last=2026.10.19 08:00'
+
+
+def days256():
+    d1, d2 = days255()
+    v = lambda x: x.replace('ver=2.55', 'ver=2.56')
+    d1, d2 = [v(x) for x in d1], [v(x) for x in d2]
+    i1 = next(k for k, x in enumerate(d1) if 'HMI-BUILD-END' in x and 'build=1,' in x)
+    d1 = d1[:i1] + [line('10:00:00.005', HIST.format('2026.10.19 08:00') + ',' + ID)] + d1[i1:]
+    i = next(k for k, x in enumerate(d1) if 'HMI-BUILD-BEGIN' in x and 'build=2,' in x)
+    d1 = d1[:i] + [line('10:05:00.000', STR.format(1) + ',' + ID), line('10:06:00.000', WAIT + ',' + ID)] + d1[i:]
+    j = next(k for k, x in enumerate(d1) if 'HMI-BUILD-END' in x and 'build=2,' in x)
+    d1 = d1[:j] + [line('10:31:00.004', STR.format(0) + ',' + ID), line('10:31:00.005', HIST.format('2026.10.19 12:00') + ',' + ID)] + d1[j:]
+    return d1, d2
+
+
 def restart(drop_row=None):
     """the terminal restarted between build 1 and build 2: build 2 onwards carries run=101"""
     def f(d):
@@ -151,6 +174,17 @@ CASES = [
                                                'cycle=30,dir=1,live=1,bar=2026.10.19 12:15,close=0.69785,mp=3,'
                                                'prev_bar=2026.10.19 12:10,prev_close=0.69781,prev_mp=4'), 1, '2.55'),
     ('v2.55 live HMI-REF missing', drop('HMI-REF,AUDUSD,CISD,cycle=30,'), 1, '2.55'),
+    # v2.56 (--ver 2.56): HMI-STR is a category of its own (STR), judged like CTX on the H4 bar
+    ('v2.56 unaltered (HIST / WAIT rows not compared)', lambda d: d, 0, '2.56'),
+    ('v2.56 live HMI-STR score changed', sub('HMI-STR,AUDUSD,live=1,bar=2026.10.19 12:00,ctx=BULLISH,state=OK,reason=-,'
+                                             'def=STR1-N12K3-M3R1-W45.35.20-T35.65,dir=1,chg12=1400,chg3=350,path=1400,'
+                                             'tr_sum=7000,net=1400,recent=350,s_move=93.333333,s_eff=100.000000,'
+                                             's_mom=70.000000,raw=91.000000,score=91',
+                                             'HMI-STR,AUDUSD,live=1,bar=2026.10.19 12:00,ctx=BULLISH,state=OK,reason=-,'
+                                             'def=STR1-N12K3-M3R1-W45.35.20-T35.65,dir=1,chg12=1400,chg3=350,path=1400,'
+                                             'tr_sum=7000,net=1400,recent=350,s_move=93.333333,s_eff=100.000000,'
+                                             's_mom=70.000000,raw=91.000000,score=90'), 1, '2.56'),
+    ('v2.56 live HMI-STR missing from the later build', drop('HMI-STR,AUDUSD,live=0,'), 1, '2.56'),
 ]
 
 
@@ -163,7 +197,7 @@ def main():
         os.makedirs(tmp, exist_ok=True)
         for name, alter, want, *ver in CASES:
             ver = ver[0] if ver else '2.54'
-            d1, d2 = alter(days255() if ver == '2.55' else days())
+            d1, d2 = alter(days256() if ver == '2.56' else days255() if ver == '2.55' else days())
             paths = []
             for n, d in (('20261019.log', d1), ('20261020.log', d2)):
                 p = os.path.join(tmp, n)
@@ -186,6 +220,9 @@ def main():
             if name.startswith('v2.55 unaltered'):
                 good = good and 'AUDUSD#T1      20261019       1      1    0    0    0    2     0        0' in r.stdout \
                     and 'intraday: MODEL, B8' in r.stdout
+            if name.startswith('v2.56 unaltered'):
+                good = good and 'AUDUSD#T1      20261019       1      1    0    0    0    2    1     0        0' in r.stdout \
+                    and 'intraday: MODEL, B8, STR' in r.stdout
             ok += good
             print(f'  {"ok  " if good else "FAIL"} {name:40} exit {r.returncode} (want {want})  {last[:70]}')
             if not good:

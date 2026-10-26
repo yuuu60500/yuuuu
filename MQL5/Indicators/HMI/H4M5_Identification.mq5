@@ -9,7 +9,7 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "2.55"          // keep equal to HMI_VERSION (HMI_Defs.mqh)
+#property version   "2.56"          // keep equal to HMI_VERSION (HMI_Defs.mqh)
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window
@@ -50,6 +50,8 @@ void H4ProcessBar(const int h)
 
    if(before != g_ctx && SafeIdx(g_active_cyc, g_cyc_n))
       g_cyc[g_active_cyc].ctx_changed = true;          // diagnostic only (D-1)
+
+   StrOnH4Bar(h);                 // v2.56 strength score: last, reads only (Rule 69)
   }
 
 //+------------------------------------------------------------------+
@@ -205,6 +207,7 @@ void ResetEngine()
    g_ctx = CTX_RANGE;  g_ctx_pending = DIR_NONE;
    g_ctx_strength = 0; g_ctx_messy = false; g_ctx_time = 0; g_ctx_bars = 0;
    ProtClear(g_prot);  ProtClear(g_anchor);  g_leg_seq = 0;      // BRI-12
+   StrReset();                                                   // v2.56
    g_diag_poi_rejected_gap = 0;  g_diag_blk_rejected_gap = 0;
    g_alertq_n = 0;
    g_sess.active = false;  g_sess.id = 0;  g_sess.poi_id = 0;
@@ -276,6 +279,7 @@ void BuildHistory()
    for(int n = 0; n < g_m5_n; n++) ProcessClosedM5Bar(n);
    g_live = true;
 
+   StrLogHist();                       // v2.56: score histogram of the processed H4 window
    if(InpLogSignals)
       PrintFormat("HMI-BUILD-END,%s,marks=%d,cycles=%d,pois=%d,blocks=%d,build=%d,liq=%s,liqev=%d,unknown=%d,liqwait=%d,inst=%s,run=%I64d,init=%d",
                   _Symbol, g_log_count, g_cyc_n, g_poi_n, g_blk_n, g_build_seq,
@@ -303,6 +307,9 @@ bool TryBuild()
    ResetEngine();
    BuildHistory();
    g_ready = true;
+   g_str_wait = false;
+   OM_DrawPanel();                     // the strength line drew "waiting" while g_ready was false
+   ChartRedraw();
    return(true);
   }
 
@@ -361,6 +368,15 @@ int OnInit()
    return(INIT_SUCCEEDED);
   }
 
+//--- v2.56: a series did not deliver this tick - the panel says "waiting"
+//--- (with the last valid score and its time), not an old score as current
+void StrWaitPanel(const string src)
+  {
+   bool was = g_str_wait;
+   StrSetWait(src);
+   if(!was) { OM_DrawPanel(); ChartRedraw(); }
+  }
+
 //+------------------------------------------------------------------+
 int OnCalculate(const int rates_total,
                 const int prev_calculated,
@@ -381,7 +397,12 @@ int OnCalculate(const int rates_total,
 
    if(!g_ready)
      {
-      TryBuild();                                 // data not ready: retry next tick
+      if(!TryBuild())                             // data not ready: retry next tick
+        {
+         StrSetWait("BUILD");                     // say so - never show an older build as current
+         OM_DrawPanel();
+         ChartRedraw();
+        }
       return(rates_total);
      }
 
@@ -394,11 +415,18 @@ int OnCalculate(const int rates_total,
    // reached, and nothing ever re-runs them - so live and rebuild diverge,
    // which is precisely what Rule 51 forbids. Wait instead; the M5 bars are
    // still there on the next tick and nothing is lost by being late.
-   if(ah == SA_NOT_READY) return(rates_total);
+   if(ah == SA_NOT_READY) { StrWaitPanel("H4"); return(rates_total); }
 
    int am = SeriesAppend(PERIOD_M5, g_m5, g_m5_n, g_m5_atr);
    if(am == SA_RELOAD)    { g_ready = false; return(rates_total); }
-   if(am == SA_NOT_READY) return(rates_total);
+   if(am == SA_NOT_READY) { StrWaitPanel("M5"); return(rates_total); }
+
+   // both series delivered: the strength line is current again (v2.56)
+   if(g_str_wait)
+     {
+      g_str_wait = false;
+      if(am == 0) { OM_DrawPanel(); ChartRedraw(); }   // am > 0 redraws below
+     }
 
    if(am > 0)
      {

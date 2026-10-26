@@ -1020,21 +1020,28 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           （全日志 RESULT NOT PASSED，不改写）
 ```
 
-### v2.56 验收清单（强度评分；基线 v2.55 受限基线）—— 草案，随 docs/02 BRI-13 定义稿 1 确认后定稿
+### v2.56 验收清单（BRI-13 修订稿 2：三项合成趋势强度，只显示；基线 v2.55 受限基线）
 
 ```
-0  编译 0 errors / 0 warnings
-1  版本：BEGIN ver=2.56；默认参数 params=461F006E 不变（CAP / T1 / T2 为编译常量，不是输入）
+0  编译 0 errors / 0 warnings（新文件 HMI_StrengthEngine.mqh；源文件全部 ASCII 或 UTF-8，面板中文由 \uXXXX 解码）
+1  版本：starting on v2.56；BEGIN ver=2.56；默认参数 params=461F006E 不变；HMI-STR 的 def=STR1-N12K3-M3R1-W45.35.20-T35.65
 2  新日志行（InpLogSignals = true；BRI-13 T-9）：
-          HMI-STR 构建中 M5 窗口内每根 H4 一行、实时每根 H4 一行；state=OK 时 score / tier 由 net、t、ctx 按 T-1 逐行复算一致，
-          NODIR 只在 ctx = RANGE / TRANSITION，NODATA 只在 D-1 .. D-3；HMI-STR-HIST 每次构建一行，计数之和 = ok
-3  离线：python3 tools/strength_sim.py → 53/53（定义场景多空镜像、窗口、Context 引擎当根顺序）；
-          --replay EURUSD_H1.csv → 前缀一致、镜像 0 差异（docs/evidence/v2.56_strength_offline.txt）
-4  同窗口重载：MODEL / LIQ / CTX / PROT / B8 / STR 六类 IDENTICAL
-5  实时 vs 重建：STR 按 bar 逐行全字段相同（live_coverage.py --ver 2.56）；0 行写「无样本」，不写通过
-6  跨版本 v2.55 vs v2.56（同品种两张图，同一根 M5 内各重建一次）：除 HMI-STR / HMI-STR-HIST 外逐行相同 —— 任何其他差异
-          UNEXPLAINED（新评分不改变原有标记）
-7  定档（T-4）：八品种默认参数各一次完整构建的 HMI-STR-HIST 合并 → T1 / T2 = round(S > 0 的 P33 / P67)，S = 100 占比 5% .. 15%；
-          与暂定值（CAP 4 ATR、T1 34、T2 64）不符按 T-4 处理
-8  面板：有分 / 无方向 / 数据不足三种显示各截图一次（数据不足可用历史很短的品种或刚挂图时的第一屏）
+          HMI-STR   构建中 M5 窗口内每根 H4 一行、实时每根 H4 一行；ReloadTest 逐行复算 score / tier / 分项（失败即不通过）
+          HMI-STR-HIST 每次构建一行（END 之前）：ok + nodir + nodata = bars，分箱和 = ok，与本构建 HMI-STR 行一致
+          HMI-STR-WAIT 只在实时等待时出现，不比较
+3  离线：python3 tools/strength_sim.py → 79/79（验收方三组对照、分项独立变化、封顶、35 / 65 未取整边界、数据不足、
+          方向、窗口、Context 引擎当根、面板文字；多空镜像）；--replay EURUSD_H1.csv → 前缀一致、镜像 0 差异、分布记录
+          ReloadTest 日志用例 157/157（s01–s25：STR 重载一致 / 缺行 / 分数、分项、方向、NODIR 字段篡改 / 直方图计数、缺失、to /
+          同根两行 / def 改变 → 不可比较 / def 未知 / 边界行复算 / 实时一致、缺行、篡改、def 改变 / v2.55 → v2.56 加法一致、
+          链路行改变、MODEL 改变、窗口不同、强度行失败、无强度行、旧版带强度行）
+          python3 tools/live_coverage_tests.py → 22/22（+3：v2.56 STR 一致、分数改变、缺行）
+4  同窗口重载（同一根 M5 内刷新两次）：MODEL / LIQ / CTX / PROT / B8 / STR 六类 IDENTICAL，STR 逐行复算全部通过
+5  实时 vs 重建：STR 按 H4 收盘逐行全字段相同（ReloadTest -LiveVsBuild；python3 tools/live_coverage.py --ver 2.56）；
+          0 行写「无样本」，不写通过
+6  跨版本 v2.55 vs v2.56（同品种两张图，同一根 M5 内各重建一次）：-Source <v2.55> -Versus <v2.56>
+          判据：「IDENTICAL apart from the strength rows」—— 除 HMI-STR / HMI-STR-HIST 外逐行相同（身份字段除外）；
+          任何其他差异 UNEXPLAINED；窗口不同 NOT JUDGED
+7  分布记录：ReloadTest -Str（各图最新构建的 HMI-STR-HIST，按参数摘要与 def 合并）—— 记录，不据此改阈值
+8  面板截图：有分（强 / 中等 / 弱各一，若行情给得出）、暂不评级（区间或过渡）、样本不足或等待数据（可用刚挂图的第一屏）；
+          H4 CONTEXT 行显示「BOS 计数」「结构诊断」；中文字符正常显示（不是方框）
 ```

@@ -1,99 +1,117 @@
-# v2.56 strength score (docs/02 BRI-13 定义稿 1) - offline model, 2026-10-26
+# v2.56 strength score (docs/02 BRI-13 修订稿 2: requirement §5, net move 45% / efficiency 35% / recent momentum 20%) - offline model, 2026-10-26
 # data: backtesting.py 0.6.6 backtesting/test/EURUSD.csv, sha256 81e977905a006cc8fbc034ebdb83c999a8ed6ba00191dc7ea5ef5b386fb74a82 (shipped as Tools/data/EURUSD_H1.csv)
-# tools/strength_sim.py sha256 d206336b018e3015f125ce0e321c9a71e444d3dd5f96c8e912d059c140241b5e
+# tools/strength_sim.py sha256 b09c3f975ab32131a52eb76ff5c0d4d45214e07e2e39c1fa8677703f21b1bc76
+# supersedes the 定义稿 1 output of the same name (single-item net move / ATR, withdrawn)
 
 ## python3 tools/strength_sim.py
-== definition scenarios (each also mirrored: bear bars + BEARISH = same result) ==
-PASS  S01 15 bars, h = 14: first bar with a score [bull]  -> OK S=35 MED
-PASS  S01 15 bars, h = 14: first bar with a score [bear]  -> OK S=35 MED
-PASS  S01 h = 13: 14 bars -> NODATA [bull]  -> NODATA S=None NA
-PASS  S01 h = 13: 14 bars -> NODATA [bear]  -> NODATA S=None NA
-PASS  S02 T = 0 (15 identical bars) -> NODATA, not 0 [bull]  -> NODATA S=None NA
-PASS  S02 T = 0 (15 identical bars) -> NODATA, not 0 [bear]  -> NODATA S=None NA
-PASS  S03 net = 0 -> 0 NONE [bull]  -> OK S=0 NONE
-PASS  S03 net = 0 -> 0 NONE [bear]  -> OK S=0 NONE
-PASS  S03 net against the context (-400) -> 0 NONE, never negative [bull]  -> OK S=0 NONE
-PASS  S03 net against the context (-400) -> 0 NONE, never negative [bear]  -> OK S=0 NONE
-PASS  S04 x / T = 2 / 7 (4 ATR) -> 100 [bull]  -> OK S=100 STRONG
-PASS  S04 x / T = 2 / 7 (4 ATR) -> 100 [bear]  -> OK S=100 STRONG
-PASS  S04 6.5 ATR -> capped at 100 [bull]  -> OK S=100 STRONG
-PASS  S04 6.5 ATR -> capped at 100 [bear]  -> OK S=100 STRONG
-PASS  S04 99.5 exactly -> 100 (half up) [bull]  -> OK S=100 STRONG
-PASS  S04 99.5 exactly -> 100 (half up) [bear]  -> OK S=100 STRONG
-PASS  S04 99.45 -> 99 [bull]  -> OK S=99 STRONG
-PASS  S04 99.45 -> 99 [bear]  -> OK S=99 STRONG
-PASS  S05 0.5 exactly -> 1 WEAK (smallest positive) [bull]  -> OK S=1 WEAK
-PASS  S05 0.5 exactly -> 1 WEAK (smallest positive) [bear]  -> OK S=1 WEAK
-PASS  S05 0.45 -> 0 NONE [bull]  -> OK S=0 NONE
-PASS  S05 0.45 -> 0 NONE [bear]  -> OK S=0 NONE
-PASS  S06 33.5 -> 34 = T1 MED [bull]  -> OK S=34 MED
-PASS  S06 33.5 -> 34 = T1 MED [bear]  -> OK S=34 MED
-PASS  S06 33.45 -> 33 WEAK [bull]  -> OK S=33 WEAK
-PASS  S06 33.45 -> 33 WEAK [bear]  -> OK S=33 WEAK
-PASS  S07 63.5 -> 64 = T2 STRONG [bull]  -> OK S=64 STRONG
-PASS  S07 63.5 -> 64 = T2 STRONG [bear]  -> OK S=64 STRONG
-PASS  S07 63.45 -> 63 MED [bull]  -> OK S=63 MED
-PASS  S07 63.45 -> 63 MED [bear]  -> OK S=63 MED
-PASS  S08 same bars, opposite context (rise under BEARISH) -> 0 NONE [bull]  -> OK S=0 NONE
-PASS  S08 same bars, opposite context (rise under BEARISH) -> 0 NONE [bear]  -> OK S=0 NONE
-PASS  S08 same bars, own context -> 70 STRONG [bull]  -> OK S=70 STRONG
-PASS  S08 same bars, own context -> 70 STRONG [bear]  -> OK S=70 STRONG
-PASS  S09 RANGE -> NODIR [bull]  -> NODIR S=None NA
-PASS  S09 RANGE -> NODIR [bear]  -> NODIR S=None NA
-PASS  S09 TRANSITION -> NODIR [bull]  -> NODIR S=None NA
-PASS  S09 TRANSITION -> NODIR [bear]  -> NODIR S=None NA
-PASS  S09 NODIR still logs net / T
+== the reviewer's three cases (2026-10-26; same increments as its 同净推进同ATR_对照行情.csv) ==
+PASS  V01 steady progress: net 1400, path 1400, recent +350 [bull] -> OK 91 STRONG  (move 93.33 eff 100.00 mom 70.00 raw 91.0000)
+PASS  V01 steady progress: net 1400, path 1400, recent +350 [bear] -> OK 91 STRONG  (move 93.33 eff 100.00 mom 70.00 raw 91.0000)
+PASS  V02 same net and ATR, recent pullback: path 3400, recent -1000 [bull] -> OK 56 MED  (move 93.33 eff 41.18 mom 0.00 raw 56.4118)
+PASS  V02 same net and ATR, recent pullback: path 3400, recent -1000 [bear] -> OK 56 MED  (move 93.33 eff 41.18 mom 0.00 raw 56.4118)
+PASS  V03 net 0, recent recovery +500 -> 20, not 0 [bull] -> OK 20 WEAK  (move 0.00 eff 0.00 mom 100.00 raw 20.0000)
+PASS  V03 net 0, recent recovery +500 -> 20, not 0 [bear] -> OK 20 WEAK  (move 0.00 eff 0.00 mom 100.00 raw 20.0000)
 
-== window: which bars the score reads ==
-PASS  S10 bars before h-14 do not count (bars 0 .. 4 changed) -> S 70
-PASS  S10 a wick on h-14 does not count (only its close enters TR[h-13])
-PASS  S10 the close of h-14 counts (gap into h-13 enlarges TR[h-13])
-PASS  S10 a wick on h-13 counts (TR window) -> T 7100, S 69
-PASS  S11 a later bar never changes the score of h (no future)
-PASS  S12 the close of h-12 is an endpoint: 200 points lower -> net 1600, S 78 (known sensitivity)
-PASS  S13 a gap counts through the previous close (TR, not H-L) -> T 7075
+== each item moves on its own (T = 7000 = 14 x 500 unless noted) ==
+PASS  I01 base: net 900, path 1500, recent 300 [bull] -> OK 60 MED  (move 60.00 eff 60.00 mom 60.00 raw 60.0000)
+PASS  I01 base: net 900, path 1500, recent 300 [bear] -> OK 60 MED  (move 60.00 eff 60.00 mom 60.00 raw 60.0000)
+PASS  I01 path 2700 (more back and forth): only S_eff falls [bull] -> OK 51 MED  (move 60.00 eff 33.33 mom 60.00 raw 50.6667)
+PASS  I01 path 2700 (more back and forth): only S_eff falls [bear] -> OK 51 MED  (move 60.00 eff 33.33 mom 60.00 raw 50.6667)
+PASS  I02 recent 100 (same net, path): only S_mom falls [bull] -> OK 52 MED  (move 60.00 eff 60.00 mom 20.00 raw 52.0000)
+PASS  I02 recent 100 (same net, path): only S_mom falls [bear] -> OK 52 MED  (move 60.00 eff 60.00 mom 20.00 raw 52.0000)
+PASS  I03 T 14000 (ATR doubled, same closes): S_move, S_mom halve, S_eff stays [bull] -> OK 41 MED  (move 30.00 eff 60.00 mom 30.00 raw 40.5000)
+PASS  I03 T 14000 (ATR doubled, same closes): S_move, S_mom halve, S_eff stays [bear] -> OK 41 MED  (move 30.00 eff 60.00 mom 30.00 raw 40.5000)
+PASS  I01-I03 only the named item differs from the base
 
-== with the H4 context engine (v2.54 rules, unchanged in v2.55 / v2.56) ==
+== caps, signs ==
+PASS  C01 net exactly 3 ATR (1500), straight: S_move 100 [bull] -> OK 95 STRONG  (move 100.00 eff 100.00 mom 75.00 raw 95.0000)
+PASS  C01 net exactly 3 ATR (1500), straight: S_move 100 [bear] -> OK 95 STRONG  (move 100.00 eff 100.00 mom 75.00 raw 95.0000)
+PASS  C01 net 2400 > 3 ATR: S_move capped at 100 [bull] -> OK 100 STRONG  (move 100.00 eff 100.00 mom 100.00 raw 100.0000)
+PASS  C01 net 2400 > 3 ATR: S_move capped at 100 [bear] -> OK 100 STRONG  (move 100.00 eff 100.00 mom 100.00 raw 100.0000)
+PASS  C02 recent exactly 1 ATR (500): S_mom 100 [bull] -> OK 59 MED  (move 40.00 eff 60.00 mom 100.00 raw 59.0000)
+PASS  C02 recent exactly 1 ATR (500): S_mom 100 [bear] -> OK 59 MED  (move 40.00 eff 60.00 mom 100.00 raw 59.0000)
+PASS  C03 net -300, recent +500: only S_mom -> 20 (total not zeroed by net <= 0) [bull] -> OK 20 WEAK  (move 0.00 eff 0.00 mom 100.00 raw 20.0000)
+PASS  C03 net -300, recent +500: only S_mom -> 20 (total not zeroed by net <= 0) [bear] -> OK 20 WEAK  (move 0.00 eff 0.00 mom 100.00 raw 20.0000)
+PASS  C04 everything against the context: 0, tier WEAK (0 is WEAK, not a separate state) [bull] -> OK 0 WEAK  (move 0.00 eff 0.00 mom 0.00 raw 0.0000)
+PASS  C04 everything against the context: 0, tier WEAK (0 is WEAK, not a separate state) [bear] -> OK 0 WEAK  (move 0.00 eff 0.00 mom 0.00 raw 0.0000)
+
+== tiers on the unrounded score, display rounded half up ==
+PASS  B01 raw 34.5 exactly -> shows 35, tier WEAK [bull] -> OK 35 WEAK  (move 33.33 eff 50.00 mom 10.00 raw 34.5000)
+PASS  B01 raw 34.5 exactly -> shows 35, tier WEAK [bear] -> OK 35 WEAK  (move 33.33 eff 50.00 mom 10.00 raw 34.5000)
+PASS  B02 raw 34.96 -> shows 35, tier WEAK [bull] -> OK 35 WEAK  (move 33.33 eff 40.00 mom 29.80 raw 34.9600)
+PASS  B02 raw 34.96 -> shows 35, tier WEAK [bear] -> OK 35 WEAK  (move 33.33 eff 40.00 mom 29.80 raw 34.9600)
+PASS  B03 raw 35 exactly -> 35 MED [bull] -> OK 35 MED  (move 33.33 eff 40.00 mom 30.00 raw 35.0000)
+PASS  B03 raw 35 exactly -> 35 MED [bear] -> OK 35 MED  (move 33.33 eff 40.00 mom 30.00 raw 35.0000)
+PASS  B04 raw 64.46 -> 64 MED [bull] -> OK 64 MED  (move 66.67 eff 50.00 mom 84.80 raw 64.4600)
+PASS  B04 raw 64.46 -> 64 MED [bear] -> OK 64 MED  (move 66.67 eff 50.00 mom 84.80 raw 64.4600)
+PASS  B05 raw 64.5 exactly -> shows 65, tier MED [bull] -> OK 65 MED  (move 66.67 eff 50.00 mom 85.00 raw 64.5000)
+PASS  B05 raw 64.5 exactly -> shows 65, tier MED [bear] -> OK 65 MED  (move 66.67 eff 50.00 mom 85.00 raw 64.5000)
+PASS  B06 raw 64.96 -> shows 65, tier MED [bull] -> OK 65 MED  (move 66.67 eff 57.14 mom 74.80 raw 64.9600)
+PASS  B06 raw 64.96 -> shows 65, tier MED [bear] -> OK 65 MED  (move 66.67 eff 57.14 mom 74.80 raw 64.9600)
+PASS  B07 raw 65 exactly -> 65 STRONG [bull] -> OK 65 STRONG  (move 66.67 eff 57.14 mom 75.00 raw 65.0000)
+PASS  B07 raw 65 exactly -> 65 STRONG [bear] -> OK 65 STRONG  (move 66.67 eff 57.14 mom 75.00 raw 65.0000)
+PASS  B01 raw is exactly 69/2 (no float on the boundary)
+PASS  B03 raw is exactly 35 (no float on the boundary)
+PASS  B05 raw is exactly 129/2 (no float on the boundary)
+PASS  B07 raw is exactly 65 (no float on the boundary)
+
+== data, direction ==
+PASS  D01 h = 13 (14 bars): NODATA HISTORY [bull] -> NODATA None NA  (NODATA/HISTORY)
+PASS  D01 h = 13 (14 bars): NODATA HISTORY [bear] -> NODATA None NA  (NODATA/HISTORY)
+PASS  D01 HISTORY reason
+PASS  D02 15 identical bars (T = 0): NODATA ATR, not 0 [bull] -> NODATA None NA  (NODATA/ATR)
+PASS  D02 15 identical bars (T = 0): NODATA ATR, not 0 [bear] -> NODATA None NA  (NODATA/ATR)
+PASS  D02 ATR reason
+PASS  D03 closes all equal, bars have range (path = 0, T > 0): valid, S_eff 0 -> 0 WEAK [bull] -> OK 0 WEAK  (move 0.00 eff 0.00 mom 0.00 raw 0.0000)
+PASS  D03 closes all equal, bars have range (path = 0, T > 0): valid, S_eff 0 -> 0 WEAK [bear] -> OK 0 WEAK  (move 0.00 eff 0.00 mom 0.00 raw 0.0000)
+PASS  X01 same bars under BEARISH: 0 WEAK (direction decides) [bull] -> OK 0 WEAK  (move 0.00 eff 0.00 mom 0.00 raw 0.0000)
+PASS  X01 same bars under BEARISH: 0 WEAK (direction decides) [bear] -> OK 0 WEAK  (move 0.00 eff 0.00 mom 0.00 raw 0.0000)
+PASS  X02 RANGE: NODIR [bull] -> NODIR None NA  (NODIR/-)
+PASS  X02 RANGE: NODIR [bear] -> NODIR None NA  (NODIR/-)
+PASS  X02 TRANSITION: NODIR [bull] -> NODIR None NA  (NODIR/-)
+PASS  X02 TRANSITION: NODIR [bear] -> NODIR None NA  (NODIR/-)
+PASS  X02 NODIR still records chg12 / chg3 / path / T
+
+== window: which bars the score reads (h = 19) ==
+PASS  W01 bars before h-14 do not count (bars 0 .. 4 changed): 91
+PASS  W02 a wick on h-14 does not count
+PASS  W03 the close of h-14 counts through TR[h-13]: T 7100 (was 7000), net unchanged
+PASS  W04 a later bar never changes the score of h (no future)
+PASS  W05 C[h-3] 200 lower: recent 550, net 1400 unchanged, path 1556
+PASS  W06 C[h-12] 200 lower: net 1600 (+200), path 1600 (+200), recent unchanged
+
+== with the H4 context engine (v2.54 rules; unchanged in v2.55 / v2.56) ==
 PASS  E01 [bull] CHOCH bar -> NODIR on that bar; the bar before is scored (1 CHOCH)
 PASS  E02 [bull] TRANS_OK / TRANS_FAIL bar -> scored in the new direction on that bar (1)
 PASS  E03 [bull] every trend bar from h = 14 is scored, BOS bars included (36 bars, 4 BOS)
+PASS  E05 [bull] scoring reads only: bars and context events unchanged after scoring every bar
 PASS  E01 [bear] CHOCH bar -> NODIR on that bar; the bar before is scored (1 CHOCH)
 PASS  E02 [bear] TRANS_OK / TRANS_FAIL bar -> scored in the new direction on that bar (1)
 PASS  E03 [bear] every trend bar from h = 14 is scored, BOS bars included (36 bars, 4 BOS)
-PASS  E04 identical last 15 bars, different history before -> identical score (independent of `str` / leg)
+PASS  E05 [bear] scoring reads only: bars and context events unchanged after scoring every bar
+PASS  E04 identical last 15 bars, different history before -> identical score (independent of BOS count / leg)
 
-scenario inputs (bull case): name / context / net / T / result
-  S01 15 bars, h = 14: first bar with a score                BULLISH    net    700  T  7000  ('OK', 35, 'MED')
-  S01 h = 13: 14 bars -> NODATA                              BULLISH    net   None  T  None  ('NODATA', None, 'NA')
-  S02 T = 0 (15 identical bars) -> NODATA, not 0             BULLISH    net      0  T     0  ('NODATA', None, 'NA')
-  S03 net = 0 -> 0 NONE                                      BULLISH    net      0  T  7000  ('OK', 0, 'NONE')
-  S03 net against the context (-400) -> 0 NONE, never negati BULLISH    net   -400  T  7000  ('OK', 0, 'NONE')
-  S04 x / T = 2 / 7 (4 ATR) -> 100                           BULLISH    net   2000  T  7000  ('OK', 100, 'STRONG')
-  S04 6.5 ATR -> capped at 100                               BULLISH    net   3250  T  7000  ('OK', 100, 'STRONG')
-  S04 99.5 exactly -> 100 (half up)                          BULLISH    net   1990  T  7000  ('OK', 100, 'STRONG')
-  S04 99.45 -> 99                                            BULLISH    net   1989  T  7000  ('OK', 99, 'STRONG')
-  S05 0.5 exactly -> 1 WEAK (smallest positive)              BULLISH    net     10  T  7000  ('OK', 1, 'WEAK')
-  S05 0.45 -> 0 NONE                                         BULLISH    net      9  T  7000  ('OK', 0, 'NONE')
-  S06 33.5 -> 34 = T1 MED                                    BULLISH    net    670  T  7000  ('OK', 34, 'MED')
-  S06 33.45 -> 33 WEAK                                       BULLISH    net    669  T  7000  ('OK', 33, 'WEAK')
-  S07 63.5 -> 64 = T2 STRONG                                 BULLISH    net   1270  T  7000  ('OK', 64, 'STRONG')
-  S07 63.45 -> 63 MED                                        BULLISH    net   1269  T  7000  ('OK', 63, 'MED')
-  S08 same bars, opposite context (rise under BEARISH) -> 0  BEARISH    net   1400  T  7000  ('OK', 0, 'NONE')
-  S08 same bars, own context -> 70 STRONG                    BULLISH    net   1400  T  7000  ('OK', 70, 'STRONG')
-  S09 RANGE -> NODIR                                         RANGE      net   1400  T  7000  ('NODIR', None, 'NA')
-  S09 TRANSITION -> NODIR                                    TRANSITION net   1400  T  7000  ('NODIR', None, 'NA')
+== panel line (display; same rules in MQL) ==
+PASS  P01 OK: tier word, score and the H4 close time
+PASS  P02 waiting after a scored bar: says so, gives it as the last valid result with its time
+PASS  P03 waiting before any bar
+PASS  P04 HISTORY / ATR
+PASS  P05 RANGE / TRANSITION: no number
+PASS  P06 waiting after a RANGE bar: no earlier direction's score
 
-53/53 PASS
+79/79 PASS
 
 ## python3 tools/strength_sim.py --replay EURUSD_H1.csv
 replay EURUSD_H1.csv: 1292 H4 bars 2017.04.19 08:00 .. 2018.02.07 12:00
 PASS  R1 prefix: score of h from bars[:h+1] equals the full run (every 37th bar from 40)
-PASS  R2 mirror: mirrored bars give the mirrored context on every bar and the same score (0 differ, context 0 differ)
+PASS  R2 mirror: mirrored bars give the mirrored context and the same raw score on every bar (0 differ, context 0 differ)
 
-states: OK 957 / NODIR 321 / NODATA 14
-x / ATR on OK bars: P10 -1.49  P25 -0.27  P33 0.20  P50 1.15  P67 1.97  P75 2.40  P90 4.06  P95 4.84  (<= 0: 290 of 957)
-S on OK bars: S = 0 295, S = 100 101 (10.6% of OK bars; CAP = 4 ATR ~ P90 of x / ATR)
-S > 0: P33 34.0  P50 46.0  P67 63.9  -> provisional T1 = round(P33) = 34, T2 = round(P67) = 64
-tiers (T1 = 34, T2 = 64): NONE 295  WEAK 214  MED 229  STRONG 219
+states: NODATA/HISTORY 14, NODIR/- 321, OK/- 957
+distribution record (not a calibration; thresholds stay 35 / 65 unless a definition revision says otherwise):
+  raw     P10   0.00  P25   5.82  P33  12.46  P50  29.83  P67  49.64  P75  61.46  P90  83.15   = 0: 180  = 100: 0
+  S_move  P10   0.00  P25   0.00  P33   6.51  P50  38.38  P67  65.79  P75  80.12  P90 100.00   = 0: 290  = 100: 168
+  S_eff   P10   0.00  P25   0.00  P33   3.54  P50  20.45  P67  34.43  P75  41.03  P90  63.40   = 0: 290  = 100: 0
+  S_mom   P10   0.00  P25   0.00  P33   0.00  P50  12.43  P67  59.60  P75  86.94  P90 100.00   = 0: 432  = 100: 211
+  tiers (35 / 65 on raw): WEAK 515  MED 229  STRONG 213  of 957
 
 2/2 PASS

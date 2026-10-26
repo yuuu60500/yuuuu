@@ -657,5 +657,108 @@ _rs = lambda lines: [l.replace(",run=7,", ",run=8,").replace(" run=7 init=", " r
 b8case("e22_live255_restart_between_builds", lb1 + LIVE + _rs(lb2[1:]),
        ["terminal restarted between the builds (run 7 -> 8)", "nothing comparable yet - no PASS can be given"], ["AGREE BOTH WAYS"], ["-LiveVsBuild"])
 
+# ---- v2.56 (BRI-13): strength score rows. HMI-STR / HMI-STR-HIST written by tools/strength_sim.py exactly as
+# HMI_StrengthEngine.mqh prints them; ReloadTest recomputes every row from its own inputs and must agree with the
+# model to the last digit (the exact 35 / 65 boundaries included), find tampering, and judge STR as a category.
+import strength_sim as SS
+_SB, _SC = SS.engine_series()
+def strs(upto=None, live=0, init=1, sub=None, inst="0001"):
+    n = len(_SB) if upto is None else upto
+    return [L(SRC, SS.str_row(_SB, h, _SC[h], live=live, init=init, inst=inst)) for h in range(sub or 0, n)]
+def shist(upto=None, init=1, inst="0001"):
+    n = len(_SB) if upto is None else upto
+    return [L(SRC, SS.hist_row(_SB, [SS.score(_SB, h, _SC[h]) for h in range(n)], init=init, inst=inst))]
+def _bnd():
+    out = []
+    for i, (b, h, cx) in enumerate(SS.boundary_cases()):
+        r = SS.str_row(b, h, cx)
+        out.append(setf(L(SRC, r), "bar", f"2026.09.2{i // 10} {i % 10:02d}:00"))
+    return out
+def s56(b, rows, **kw): return blk(b, ver="2.56", extra_rows=rows, **kw)
+def tamper(lines, pick, fn):
+    """change the first line pick() selects"""
+    out, done = [], False
+    for l in lines:
+        if not done and pick(l):
+            l = fn(l); done = True
+        if l is not None: out.append(l)
+    return out
+_ok_row = lambda l: "HMI-STR," in l and ",state=OK," in l
+NOSTR = ["IDENTICAL inside", "AGREE BOTH WAYS", "IDENTICAL apart from the strength rows"]
+case("s01_reload_str_identical", [start("2.56")] + s56(1, strs() + shist()) + s56(2, strs() + shist()), R,
+     ["STR    IDENTICAL over", "every row recomputes from its inputs", "IDENTICAL inside the comparable region"], ["FAILED", "MISMATCH"])
+case("s02_reload_str_row_missing", [start("2.56")] + s56(1, strs() + shist()) + s56(2, tamper(strs(), lambda l: ",bar=2026.09.13 20:00," in l, lambda l: None) + shist()), R,
+     ["STR    MISMATCH (1)", "A only  STR STR|bar=2026.09.13 20:00"], NOSTR)
+case("s03_reload_str_score_tampered", [start("2.56")] + s56(1, strs() + shist()) + s56(2, tamper(strs(), _ok_row, lambda l: setf(l, "score", str(int(fld(l, "score")) + 1))) + shist()), R,
+     ["ROW CHECK(S) FAILED", "recomputed", "strength rows FAILED their check"], NOSTR)
+case("s04_reload_str_seff_tampered", [start("2.56")] + s56(1, strs() + shist()) + s56(2, tamper(strs(), _ok_row, lambda l: setf(l, "s_eff", "99.000000")) + shist()), R,
+     ["ROW CHECK(S) FAILED", "s_eff=99.000000, recomputed"], NOSTR)
+case("s05_reload_str_net_not_dir", [start("2.56")] + s56(1, strs() + shist()) + s56(2, tamper(strs(), lambda l: _ok_row(l) and ",dir=-1," in l, lambda l: setf(l, "dir", "1")) + shist()), R,
+     ["ROW CHECK(S) FAILED", "OK with ctx=BEARISH dir=1"], NOSTR)
+case("s06_reload_str_nodir_with_score", [start("2.56")] + s56(1, strs() + shist()) + s56(2, tamper(strs(), lambda l: ",state=NODIR," in l, lambda l: setf(l, "score", "50")) + shist()), R,
+     ["ROW CHECK(S) FAILED", "NODIR with score=50"], NOSTR)
+case("s07_reload_str_hist_ok_wrong", [start("2.56")] + s56(1, strs() + shist()) + s56(2, strs() + tamper(shist(), lambda l: True, lambda l: setf(l, "ok", "35"))), R,
+     ["ROW CHECK(S) FAILED", "HIST ok + nodir + nodata = 58, bars=59"], NOSTR)
+case("s08_reload_str_hist_missing", [start("2.56")] + s56(1, strs() + shist()) + s56(2, strs()), R,
+     ["ROW CHECK(S) FAILED", "0 HMI-STR-HIST row(s) in build 2 (one expected)"], NOSTR)
+case("s09_reload_str_hist_to", [start("2.56")] + s56(1, strs() + shist()) + s56(2, strs() + tamper(shist(), lambda l: True, lambda l: setf(l, "to", "2026.09.17 00:00"))), R,
+     ["ROW CHECK(S) FAILED", "but HIST to=2026.09.17 00:00"], NOSTR)
+case("s10_reload_str_dup_bar", [start("2.56")] + s56(1, strs() + shist()) + s56(2, strs() + strs(sub=58) + shist()), R,
+     ["ROW CHECK(S) FAILED", "bar 2026.09.16 20:00 has 2 HMI-STR rows"], NOSTR)
+_d66 = lambda l: l.replace("-T35.65", "-T35.66")
+case("s11_reload_str_def_changed", [start("2.56")] + s56(1, strs() + shist()) + s56(2, [_d66(l) for l in strs() + shist()]), R,
+     ["STR    NOT COMPARABLE - scoring definition differs", "PENDING REVIEW, not a pass", "strength rows not compared"], NOSTR + ["STR    MISMATCH"])
+case("s12_reload_str_def_unknown", [start("2.56")] + s56(1, strs() + shist()) + s56(2, [l.replace("STR1-N12K3", "STR9-N12K3") for l in strs() + shist()]), R,
+     ["is not a definition this tool can recompute"], NOSTR)
+# the boundary rows recompute exactly (B01-B07: raw 34.5 / 34.96 / 35 / 64.46 / 64.5 / 64.96 / 65), checked through -Str's audit
+_bh = [SS.score(b, h, cx) for (b, h, cx) in SS.boundary_cases()]
+def _bhist():
+    h = [0] * 101
+    for r in _bh:
+        if r["state"] == "OK": h[r["score"]] += 1
+    ok = [r for r in _bh if r["state"] == "OK"]
+    t = lambda k: sum(1 for r in ok if r["tier"] == k)
+    return L(SRC, f"HMI-STR-HIST,USDJPY,live=0,def={SS.DEF_ID},from=2026.09.20 00:00,to=2026.09.2{(len(_bh) - 1) // 10} {(len(_bh) - 1) % 10:02d}:00,bars={len(_bh)},"
+                  f"ok={len(ok)},nodir=0,nodata={len(_bh) - len(ok)},weak={t('WEAK')},med={t('MED')},strong={t('STRONG')},h={';'.join(map(str, h))},inst=0001,run=7,init=1")
+case("s13_str_boundaries_recompute", [start("2.56")] + s56(1, _bnd() + [_bhist()]), ["-Str"],
+     ["merged  params ABCD1234 " + SS.DEF_ID, "displayed score  P10"], ["CHECK FAILED"])
+case("s14_str_boundary_tier_tampered", [start("2.56")] + s56(1, tamper(_bnd(), lambda l: ",raw=65.000000," in l, lambda l: setf(l, "tier", "MED")) + [_bhist()]), ["-Str"],
+     ["CHECK FAILED (2)"], [])
+# live vs build: the live run's rows on the H4 bars between the builds, both ways
+_X, _Y = 40, 50
+_tA, _tB = SS.tstr16(_SB[_X - 1][0] + SS.H4), SS.tstr16(_SB[_Y - 1][0] + SS.H4)
+def sb(b, n, init, rows=None, **kw):
+    return blk(b, ver="2.56", init=init, to=(_tA if n == _X else _tB), extra_rows=(rows if rows is not None else strs(n, init=init) + shist(n, init=init)), **kw)
+_LV = strs(_Y, live=1, sub=_X)
+case("s15_live_str_ok", [start("2.56")] + sb(1, _X, 1) + _LV + [start("2.56", init=2)] + sb(2, _Y, 2), ["-LiveVsBuild"],
+     [f"strength rows compared: {_Y - _X} (STR)", "AGREE BOTH WAYS on every covered bar"], ["MISMATCH(ES)", "FAILED"])
+case("s16_live_str_missing", [start("2.56")] + sb(1, _X, 1) + _LV + [start("2.56", init=2)] + sb(2, _Y, 2, rows=tamper(strs(_Y, init=2), lambda l: f",bar={SS.tstr16(_SB[_X + 3][0] + SS.H4)}," in l, lambda l: None) + shist(_Y, init=2)),
+     ["-LiveVsBuild"], ["MISMATCH(ES) on covered bars", "live only  [1->2] STR STR|bar=" + SS.tstr16(_SB[_X + 3][0] + SS.H4)], ["AGREE BOTH WAYS"])
+_tam = lambda l: setf(l, "score", str(int(fld(l, "score")) + 1))
+case("s17_live_str_tampered", [start("2.56")] + sb(1, _X, 1) + tamper(_LV, _ok_row, _tam) + [start("2.56", init=2)] + sb(2, _Y, 2), ["-LiveVsBuild"],
+     ["live strength row(s) FAILED the recomputation", "MISMATCH(ES) on covered bars"], ["AGREE BOTH WAYS on every covered bar"])
+case("s18_live_str_def_changed", [start("2.56")] + sb(1, _X, 1) + [_d66(l) for l in _LV] + [start("2.56", init=2)] + sb(2, _Y, 2), ["-LiveVsBuild"],
+     ["scoring definition differs", "strength rows not compared"], ["strength rows compared:"])
+# v2.55 -> v2.56: the strength score is added and nothing else may change
+def v55v56(old_rows=(), new_rows=None, new_tweak=None, new_kw=None):
+    a = blk(1, ver="2.55", inst="0C55", init=1, extra_rows=list(old_rows))
+    nb = blk(1, ver="2.56", inst="0D56", init=2, extra_rows=(strs(init=2, inst="0D56") + shist(init=2, inst="0D56") if new_rows is None else new_rows), **(new_kw or {}))
+    if new_tweak: nb = new_tweak(nb)
+    return [start("2.55", inst="0C55")] + a + [start("2.56", inst="0D56", init=2)] + nb
+VS = ["-Source", "USDJPY#0C55,M5", "-Versus", "USDJPY#0D56,M5"]
+case("s19_versus256_additive_ok", v55v56(), VS,
+     ["the strength score is added (BRI-13, display only)", "IDENTICAL apart from the strength rows"], ["UNEXPLAINED", "FAILED", "NOT JUDGED"])
+case("s20_versus256_chain_row_changed", v55v56(new_tweak=lambda nb: tamper(nb, lambda l: "HMI-ARM," in l, lambda l: l.replace("sess=60", "sess=61"))), VS,
+     ["line(s) differ outside the strength rows - UNEXPLAINED", "HMI-ARM,USDJPY,block=61,sess=61"], ["IDENTICAL apart from the strength rows"])
+case("s21_versus256_model_changed", v55v56(new_tweak=lambda nb: tamper(nb, lambda l: ",MODEL," in l, lambda l: l.replace(",1.23456,", ",1.23457,"))), VS,
+     ["line(s) differ outside the strength rows - UNEXPLAINED", "v2.55 only (1)  HMI-BUILD,USDJPY,MODEL"], ["IDENTICAL apart from the strength rows"])
+case("s22_versus256_window_moved", v55v56(new_kw={"frm": "2026.09.07 03:45"}), VS,
+     ["NOT JUDGED - the windows differ"], ["IDENTICAL apart from the strength rows"])
+case("s23_versus256_str_bad", v55v56(new_tweak=lambda nb: tamper(nb, _ok_row, _tam)), VS,
+     ["strength rows FAILED their check (2)", "recomputed 81", "row(s) with score 82 but HIST bin 82 = 1"], ["IDENTICAL apart from the strength rows"])
+case("s24_versus256_no_str", v55v56(new_rows=[]), VS,
+     ["strength rows FAILED their check (1)", "0 HMI-STR-HIST row(s) in build 1 (one expected)"], ["IDENTICAL apart from the strength rows"])
+case("s25_versus256_old_has_str", v55v56(old_rows=strs(inst="0C55")[:1]), VS,
+     ["v2.55 build carries 1 strength row(s)"], ["IDENTICAL apart from the strength rows"])
 json.dump(C, open("cases.json", "w"), indent=1)
 print(len(C), "cases")

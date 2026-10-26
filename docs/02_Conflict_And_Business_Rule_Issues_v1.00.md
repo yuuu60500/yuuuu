@@ -1013,178 +1013,171 @@ ReloadTest 与模型逐类一致（EURUSD 302、种子 11 171、种子 37 200，
 
 ---
 
-## BRI-13 —— v2.56 强度评分（定义稿 1，待确认）
+## BRI-13 —— v2.56 强度评分（修订稿 2：按原需求 §5 三项合成，验收方 2026-10-26 口径）
 
-来源：验收方「HMI v2.55r3 验收报告与下一步」（2026-10-26）第 2 项：先交付公式、方向依赖、取值范围、阈值、边界与成对场景，
-明确何时显示「数据不足」；确认定义后实现。CISD / MSS、保护点、Session、MODEL 规则保持 v2.55 基线，新增评分不改变原有标记。
+来源：《HMI 趋势面板改造需求（工程师版）》（2026-09-24，基于 v2.33；原文已入库 `docs/requirements/`）§3 / §5 / §10 / §11，
+验收方「HMI v2.56 定义稿审核与工程师修订口径」（2026-10-26）。
 
-**依据与缺口。** 本稿只依据仓库里已记录的约束：
+**定义稿 1 撤回。** 定义稿 1（同日）在没有原文的情况下只用「12 根净推进 / ATR」一项，改变了原需求的强度含义：原需求是
+净推进 45% + 方向效率 35% + 近期动量 20%，净推进满分 3 ATR、近期动量满分 1 ATR，分档 35 / 65 按未取整分数。验收方的对照：
+同样净推进 1400 point、同样 ATR 500，连续推进与「前段上涨、近期回撤」在定义稿 1 中都是 70；原定义分别是 91 与 56。本稿恢复原定义，
+定义稿 1 的 CAP 4 ATR、34 / 64、6 项待确认选择全部作废；它的 53/53 不作为本版验收结果。
 
-- Rule 69 —— 强度只显示，不作任何过滤（docs/01 §2.4）；
-- §6.1 —— 「价格类分项（强度、K 线重叠）仍用最近 **12** 根已收盘 H4」；样本不足时不补 50 分 / 满分，不悄悄归一化；
-- docs/04 —— 分档阈值来自真实分布，不拍脑袋；
-- §4.2 —— `leg_anchor` 用于推进 / 回撤比例 / 阶段，属于趋势面板（v2.58），本版不用。
-
-《趋势面板改造需求（工程师版）》原文的强度一节没有交到工程师手里（2026-10-13 曾请求上传）。请验收方对照原文核对本稿；
-原文若另有公式或分项，以原文为准，本稿按原文改写后再实现。
-
-现有 `strength`（趋势段内 BOS 计数，CHOCH 归零）与 CLEAN / MESSY **保留不动**，HMI-CTX 的 `str=` 不变。新评分是另一个量，
-面板上分开显示（见 T-8）。
-
-### T-1 公式
+### T-1 公式（原需求 §3 / §5）
 
 ```
-时点        H4 bar h 收盘、由 Context 引擎处理之后（与该根的 HMI-CTX / HMI-PROT 同一时刻，之后计算）
-方向        d = +1：处理 h 之后 ctx = BULLISH；d = -1：BEARISH；RANGE / TRANSITION → 无方向（T-5）
-价格单位    整数 point：pts(a - b) = round((a - b) / _Point)；全部整数运算，MQL 与离线模型逐位一致
-net         = pts(C[h] - C[h-12])                       最近 12 根的收盘净推进（C[h-12] 是窗口前一根的收盘）
-T           = Σ TR[k]，k = h-13 .. h                    = 14 × ATR(14)（point），与 SeriesComputeATR 同一 TR 定义：
-              TR[k] = max(H[k] - L[k], |H[k] - C[k-1]|, |L[k] - C[k-1]|)
-x           = d × net                                   沿 Context 方向的推进
-S           = 0                                    x ≤ 0
-            = min(100, floor((700·x + T) / (2·T)))  x > 0
+只用已经送入结构引擎的已收盘 H4。h = 刚处理完的一根；D = 处理 h 之后 ctx：BULLISH +1，BEARISH -1；RANGE / TRANSITION 不计算（T-5）
+N = 12，K = 3，A = ATR14[h]（SeriesComputeATR 的 14 期简单平均 TR）
+
+net    = D × (C[h] − C[h−12])
+path   = Σ |C[i] − C[i−1]|，i = h−11 .. h
+recent = D × (C[h] − C[h−3])
+
+S_move = 100 × clamp(net / 3A, 0, 1)
+S_eff  = 100 × clamp(max(net, 0) / path, 0, 1)        path = 0 且数据有效时 S_eff = 0
+S_mom  = 100 × clamp(recent / A, 0, 1)
+raw    = 0.45 S_move + 0.35 S_eff + 0.20 S_mom         0 .. 100，保留小数，分项不先取整
+score  = raw 四舍五入（.5 进位）—— 只用于显示
+tier   = 按未取整的 raw：[0, 35) 弱 WEAK，[35, 65) 中等 MED，[65, 100] 强 STRONG；0 分属于弱
 ```
 
-含义：`x / ATR` 是 12 根 H4（约两个交易日）内沿趋势方向走了几个 ATR；`S = 100 × (x / ATR) / CAP`，CAP = 4 ATR，
-四舍五入（.5 进位，整数运算没有浮点边界）。即 1 ATR = 25 分，4 ATR 及以上 = 100。
+**净推进 ≤ 0 不把总分置零**：此时 S_move、S_eff 为 0，S_mom 仍可有效（验收方对照 3：净推进 0、近 3 根同向 +1 ATR → 20 分，弱）。
 
-只读 bar h-14 .. h 的价格：h-14 只用收盘（TR[h-13] 的前收盘），h-13 用高低与收盘，h-12 是净推进的起点。不读 h 之后的任何根。
+**精确运算。** 价格先换成整数 point（`round(差 / _Point)`），T = Σ TR（14 根，= 14A）。设
+`m = min(max(14·net, 0), 3T)`，`e = min(max(net, 0), path)`，`q = min(max(14·recent, 0), T)`，则
+
+```
+raw = (45·m·1 + 20·q·3)·path + 35·e·T·3·1   /   (T·path·3·1)          path > 0
+raw = (45·m·1 + 20·q·3)                       /   (T·3·1)               path = 0（此时 m = q = 0）
+score = floor((2·num + den) / (2·den))；tier：num < 35·den 弱，num < 65·den 中等，否则强
+```
+
+全部是 64 位整数运算：MQL、离线模型、验收工具三处逐位一致，35 / 65 和 .5 的边界不受浮点影响。分项 S_move / S_eff / S_mom 与 raw
+以 6 位小数记入日志（显示与复核用），score / tier 由整数式决定。
 
 ### T-2 方向依赖
 
 ```
-同一组价格，方向相反 → 结果不同：上涨 1400 point 在 BULLISH 下 S = 70，在 BEARISH 下 S = 0（逆向推进不给负分，记 0）
-镜像对称              价格按水平轴镜像、BULLISH ↔ BEARISH 互换 → 每一根的 S 相同（离线：场景全部双向；真实数据 1292 根 0 差异）
-方向来源              只看处理 h 之后的 Context 状态；TRANSITION 的 pending 方向不用（T-5 无方向）
-与趋势段无关          不看趋势段起点、BOS 次数、保护点、锚点：同样最近 15 根 + 同方向 → 同样 S（场景 E04）
+同一组价格，Context 方向相反 → 结果不同（推进、效率、动量都按 D 定向，反向为 0）
+镜像对称            价格水平镜像 + BULLISH ↔ BEARISH → 每根 raw 相同（场景全部双向；EURUSD 1292 根 0 差异）
+方向来源            处理 h 之后的 Context；TRANSITION 的 pending 方向不用
+与趋势段无关        窗口不限当前趋势段、不因新趋势缩短（原需求 §5.4 末段）；不读 BOS 计数、保护点、锚点
 ```
 
 ### T-3 取值范围与显示
 
 ```
-S        整数 0 .. 100；只在「有分」时显示
-分档     S = 0           NONE    无推进（净推进为 0 或逆向）
-         1 ≤ S < T1      WEAK    弱
-         T1 ≤ S < T2     MED     中
-         S ≥ T2          STRONG  强
-另两种   无方向（RANGE / TRANSITION）；数据不足 —— 都不显示数字，也不显示 0（T-5）
-日志     另记原始 net、T（可由 S = f(net, T, d) 逐行复算）；面板另显示 x / ATR 一位小数（= 14·x / T）
+raw 0 .. 100（小数），score 0 .. 100（整数），tier 弱 / 中等 / 强（按 raw）
+面板（FULL）   趋势强度  中等 · 56/100   数据截至 2026.10.26 12:00 H4 收盘
+               BOS 计数与 CLEAN / MESSY 仍在 H4 CONTEXT 行，改称「BOS 计数」「结构诊断」，不再叫 strength / quality（原需求 §1.4）
+面板（COMPACT）BULLISH   BOS 3 CLEAN   |   强度 中等 56   |   POI …
+其他状态       样本不足（H4 不足 15 根）/ 不可用（ATR 无效）/ 暂不评级（区间震荡 | 反转待确认）/ 等待数据 —— 都不显示数字
+等待数据时     最后处理的一根是有效评分 → 「等待数据（上次有效结果 中等 · 56/100，<时间> H4 收盘）」；否则只写「等待数据」
 ```
 
-### T-4 阈值与来源
+面板文字由源码中的 `\uXXXX` 编码生成（源文件保持 ASCII，不依赖文件编码）。变化箭头属于 v2.58 面板；本版逐根保存
+状态、分数、等级与当时的趋势段号（`g_str[]`，段号不写日志），v2.58 直接读取，不另算一套。
+
+### T-4 阈值
+
+3 ATR、1 ATR、45 / 35 / 20、35 / 65 为首版默认定义（原需求 §10），编译常量，不新增输入（交易参数摘要仍为 461F006E）。
+每行 HMI-STR 带 `def=STR1-N12K3-M3R1-W45.35.20-T35.65`：任何常量改变都改变 def；两次构建 def 不同时，STR 判为不可比较
+（不是重绘），其他类别照常比较。
+
+分布只作记录：`ReloadTest -Str` 合并各图最新构建的 HMI-STR-HIST，给出分位、0 / 100 的个数与三档占比。不为三档均分自动改公式，
+不以满分占比作验收硬指标；阈值修订须单独说明对照结果，不在实现里顺手改。离线 EURUSD 记录见 `docs/evidence/v2.56_strength_offline.txt`。
+
+### T-5 数据不足、等待、无方向
 
 ```
-CAP = 4 ATR   离线 EURUSD（backtesting.py 数据，2017-04 .. 2018-02，1292 根 H4，v2.54 Context 模型）趋势根 x / ATR 的
-              P90 = 4.06；S = 100 的根占趋势根 10.6%
-T1  = 34      S > 0 的 P33 = 34.0
-T2  = 64      S > 0 的 P67 = 63.9
-              （趋势根 957：NONE 295 / WEAK 214 / MED 229 / STRONG 219；x / ATR ≤ 0 的 290 根 = 趋势中的回撤 / 停滞）
+NODATA / HISTORY   h < 14：从序列起点到 h 不足 15 根已收盘 H4（ATR14 的 TR 需要前一根收盘）  → 样本不足
+NODATA / ATR       T = 0（15 根完全无波动）                                                    → 不可用（ATR 无效）
+WAIT（面板状态）   序列未同步：本 tick 的 H4 或 M5 SeriesAppend 返回 NOT_READY，或尚无完成的构建 → 等待数据
+                   日志：进入等待时一行 HMI-STR-WAIT（src=H4 | M5 | BUILD，last=最后处理的 H4 收盘），只在实时出现，不比较
+NODIR              数据有效，ctx = RANGE / TRANSITION                                          → 暂不评级（区间 / 过渡）
 ```
 
-这三个数是**暂定值**：只来自一个品种、一段历史。定档程序（v2.56 实现后，MT5 默认参数，八品种）：
-
-1. 每品种取一次完整构建的 HMI-STR-HIST（H4 整窗口约 500 根中 state = OK 的 S 直方图，T-9），八品种合并；
-2. T1 = round(合并后 S > 0 的 P33)，T2 = round(P67)；与暂定值相差 > 3 分时改常数，另出修订版（只改分档文字，不改 S）；
-3. S = 100 的占比应在 5% .. 15%（CAP ≈ P90）；超出时提出 CAP 修订 —— CAP 改变 S 本身，作为单独的定义修订，不在实现里顺手改；
-4. 只在默认参数图上取；ATR 余量等非默认图另列，不合并。
-
-CAP / T1 / T2 是编译常量，不新增输入（参数摘要保持 461F006E）。
-
-### T-5 「数据不足」与「无方向」
-
-**数据不足**（NODATA；面板显示「数据不足」，日志 state=NODATA，S=NA）——任一成立：
-
-```
-D-1  h < 14：H4 序列从起点到 h 不足 15 根已收盘（TR[h-13] 要 C[h-14]）—— 新图、历史很短的品种、窗口起点后最初 14 根
-D-2  T = 0：15 根完全没有波动（ATR = 0，无法归一）—— 不当作 0 分
-D-3  H4 序列未就绪 / 尚未处理任何 H4 根（现有 SA_NOT_READY / 等待状态）
-```
-
-不补分：数据不足时不显示 0、50 或上一次的分数，也不改用更短窗口。
-
-**无方向**（NODIR；面板显示「无方向」，S=NA）：处理 h 之后 ctx 为 RANGE 或 TRANSITION。此时 net、T 仍记日志。
-两者同时成立时记数据不足（先判数据）。
-
-**不算数据不足：** 趋势段比 12 根短（窗口照常包含进入趋势前的根，按 §6.1「最近 12 根已收盘 H4」）；窗口内有周末 / 节假日缺口
-（按根数，不按日历；缺口经 TR 的前收盘计入波动）。
+不补 0 或 50，不缩短窗口，不把旧值当当前值：等待时只按「上次有效结果 + 时间」显示，RANGE / TRANSITION 不显示上一方向的分数。
 
 ### T-6 时序与边界
 
 ```
-同根顺序      H4 bar h：超时 → 保护点破坏 → BOS / TRANS（P-7，不变）→ HMI-CTX / PROT 行 → 计算并记 HMI-STR（新增，最后）
-CHOCH 当根    处理后为 TRANSITION → 当根即「无方向」；前一根照常有分（场景 E01）
-TRANS_OK / FAIL 当根  处理后为新方向 → 当根按新方向计分，窗口含 TRANSITION 期间的根（E02）
-BOS 当根      照常计分，不因 BOS 重置；BOS 计数不是输入（E03 / E04）
-构建与实时    同一函数（Rule 51）；实时在该 H4 根收盘后第一次处理 H4 时计算，H4 未收盘的根不计算、面板不随 tick 变动
-移动窗口      只依赖最近 15 根价格与当时 Context；H4 窗口起点移动只影响起点后最初 14 根（数据不足）与 A-59 已知的早期
-              Context 差异
-端点敏感      C[h-12] 是起点：同一路径起点收盘低 200 point → net +200（场景 S12，70 → 78）—— 已知特性，记录不修正
+同根顺序      H4ProcessBar(h)：摆动 → 流动性 → Context（超时 / 保护点 / BOS / TRANS，HMI-CTX / PROT 行）→ 区间 → H4 FVG / POI
+              → 计算并记 HMI-STR（最后一步，只读）
+CHOCH 当根    处理后 TRANSITION → 当根 NODIR；前一根照常有分
+TRANS_OK / FAIL 当根  处理后为新方向 → 当根按新方向计分，窗口照常含过渡期间的根
+构建与实时    同一函数（Rule 51）；实时在 H4 根收盘后、第一次处理到它时计算；面板只随已处理的 H4 变化
+同一游标      评分、Context、ATR 与「数据截至」都取自同一根已处理 H4（g_str[g_h4_cursor − 1]）
+窗口          只读 h−14 .. h：h−14 只用收盘（TR[h−13]）；h−12 是净推进起点与 path 第一步；h−3 是动量起点
 ```
 
-### T-7 成对场景（`python3 tools/strength_sim.py`，53/53；每个场景多空各一次，空头 = 价格镜像 + BEARISH，结果相同）
+### T-7 成对场景（`python3 tools/strength_sim.py` → 79/79；每个场景多空各一次，空头 = 价格镜像 + BEARISH）
 
-T = 7000 point（ATR = 500）除注明外；S = 350·x / T 四舍五入。
+T = 7000 point（ATR 500）除注明外；括号内为 S_move / S_eff / S_mom。
 
-| 编号 | 场景 | 输入（多头） | 期望 |
+| 编号 | 场景 | net / path / recent | 期望 |
 |---|---|---|---|
-| S01 | 第 15 根（h = 14）首次有分 / 第 14 根（h = 13） | net 700 | 35 MED / 数据不足 |
-| S02 | 15 根完全相同（T = 0） | net 0，T 0 | 数据不足（不是 0） |
-| S03 | 净推进 0 / 逆向 −400 | | 0 NONE / 0 NONE（不为负） |
-| S04 | 恰好 4 ATR / 6.5 ATR / 99.5 / 99.45 | net 2000 / 3250 / 1990 / 1989 | 100 / 100（封顶）/ 100（.5 进位）/ 99 |
-| S05 | 0.5 / 0.45 | net 10 / 9 | 1 WEAK（最小正分）/ 0 NONE |
-| S06 | T1 边界 33.5 / 33.45 | net 670 / 669 | 34 MED / 33 WEAK |
-| S07 | T2 边界 63.5 / 63.45 | net 1270 / 1269 | 64 STRONG / 63 MED |
-| S08 | 同一组上涨价格：BEARISH / BULLISH | net 1400 | 0 NONE / 70 STRONG |
-| S09 | RANGE / TRANSITION | net 1400 | 无方向（net、T 照记） |
-| S10 | 改 h-15 之前的根 / h-14 的影线 / h-14 的收盘 / h-13 的影线 | | 不变 / 不变 / T 变（7100，69）/ T 7100，S 69 |
-| S11 | 增加 h+1 | | S(h) 不变 |
-| S12 | 起点 C[h-12] 低 200 point | net 1600，T 7200 | 78（端点敏感，记录） |
-| S13 | h-4 跳空开盘 300 point | T 7075 | TR 按前收盘计入缺口 |
-| E01 | Context 引擎：CHOCH 当根 | | 当根无方向，前一根有分 |
-| E02 | TRANS_OK / TRANS_FAIL 当根 | | 当根按新方向计分 |
-| E03 | 趋势中每一根（含 BOS 根，h ≥ 14） | | 全部有分 |
-| E04 | 最近 15 根相同、更早历史不同 | | 分数相同 |
+| V01 | 验收方对照 1：连续推进 | 1400 / 1400 / +350 | 91 强（93.33 / 100 / 70） |
+| V02 | 验收方对照 2：同净推进同 ATR，近期回撤 | 1400 / 3400 / −1000 | 56 中等（93.33 / 41.18 / 0），raw 56.41 |
+| V03 | 验收方对照 3：净推进 0，近期恢复 | 0 / 1000 / +500 | 20 弱（0 / 0 / 100） |
+| I01 | 只加往返：path 1500 → 2700 | 900 / 1500→2700 / 300 | 60 → 51，只有 S_eff 变（60 → 33.33） |
+| I02 | 只减近期：recent 300 → 100 | 900 / 1500 / 300→100 | 60 → 52，只有 S_mom 变（60 → 20） |
+| I03 | 只把 ATR 加倍（T 14000） | 900 / 1500 / 300 | 41（raw 40.5，.5 进位），S_move / S_mom 减半，S_eff 不变 |
+| C01 | 恰 3 ATR / 超过 3 ATR | 1500 / 1500 / 375；2400 / 2400 / 600 | 95；100（封顶） |
+| C02 | 近期恰 1 ATR | 600 / 1000 / 500 | 59（S_mom 100） |
+| C03 | 净推进 −300、近期 +500 | −300 / 1300 / +500 | 20 弱（总分不因 net ≤ 0 归零） |
+| C04 | 全部逆向 | −900 / 900 / −300 | 0 弱 |
+| B01 / B02 | raw 34.5 / 34.96 | 500 / 1000 / 50；500 / 1250 / 149 | 显示 35，等级弱 |
+| B03 | raw 恰 35 | 500 / 1250 / 150 | 35 中等 |
+| B04 / B05 / B06 | raw 64.46 / 64.5 / 64.96 | 1000 / 2000 / 424；1000 / 2000 / 425；1000 / 1750 / 374 | 64 中等；65 中等；65 中等 |
+| B07 | raw 恰 65 | 1000 / 1750 / 375 | 65 强 |
+| D01 | h = 13（14 根） | | NODATA / HISTORY |
+| D02 | 15 根完全相同（T = 0） | | NODATA / ATR（不是 0 分） |
+| D03 | 收盘全相同、K 线有波幅（path = 0，T > 0） | 0 / 0 / 0 | 0 弱（数据有效，S_eff = 0） |
+| X01 | 同一组上涨价格在 BEARISH 下 | | 0 弱 |
+| X02 | RANGE / TRANSITION | | NODIR，chg12 / chg3 / path / T 照记 |
+| W01–W06 | 窗口：h−15 之前不读；h−14 只读收盘；之后的根不改变 h；C[h−3] 只改 recent 与 path；C[h−12] 改 net 与 path | | 见模型输出 |
+| E01–E05 | Context 引擎：CHOCH 当根 NODIR；TRANS_OK / FAIL 当根按新方向；趋势中每根有分；与更早历史无关；计分不改变任何状态 | | |
+| P01–P06 | 面板文字：有分 / 等待（上一根有分、尚无任何根、上一根为区间）/ 样本不足 / ATR 无效 / 区间、过渡 | | 与 MQL 同一措辞 |
 
-真实数据（`--replay`，EURUSD 1292 根）：前缀一致（以 h 结束的运行与全量运行同分）；镜像数据每根 Context 镜像、分数相同，0 差异。
+真实数据（`--replay`，EURUSD 1292 根）：前缀一致；镜像数据每根 Context 镜像、raw 相同，0 差异；分布只作记录。
 
 ### T-8 与现有输出的关系
 
 ```
-不变        全部现有日志行（MODEL、HMI-CTX / PROT / ANCHOR / POI / SESS / ARM / REF / BRK / LIQ …）逐字相同；
-            任何标记、POI、Session、周期、MODEL 不读 S（Rule 69）；输入不变（461F006E）
-面板        FULL：H4 CONTEXT 行不变；新增一行  H4 STRENGTH 70/100 STRONG (+2.8 ATR / 12 H4)  ；
-                  无方向 → H4 STRENGTH -- 无方向；数据不足 → H4 STRENGTH 数据不足
-            COMPACT：第一行 str N 之后加  S70  / S-- / S?? ；只改文字，图形调整留在显示阶段
-跨版本      v2.55 → v2.56 同窗口：除新增 HMI-STR / HMI-STR-HIST 之外逐行相同 —— 任何其他差异都是 UNEXPLAINED
+不变        全部现有日志行（MODEL、HMI-CTX / PROT / ANCHOR / INTERNAL / DEDUP / POI / SESS / BLK / ARM / REF / BRK / LIQ …）
+            逐字相同；任何标记、POI、Session、周期、MODEL 不读评分（Rule 69）；输入不变（461F006E）
+新增        HMI-STR、HMI-STR-HIST、HMI-STR-WAIT 三种日志行；面板一行（FULL）/ 一段（COMPACT）；H4 CONTEXT 行的两个字样
+跨版本      v2.55 → v2.56 同窗口：去掉 HMI-STR / HMI-STR-HIST 与身份字段（inst / run / init）后逐行相同；其他任何差异 UNEXPLAINED，
+            不因「只加显示」豁免（ReloadTest -Versus 加法模式）
 ```
 
-### T-9 日志与验收工具（提案）
+### T-9 日志与验收工具
 
 ```
-HMI-STR,<sym>,live=<0|1>,bar=<H4 收盘时间>,ctx=<BULLISH|BEARISH|RANGE|TRANSITION>,state=OK|NODIR|NODATA,
-        score=<0..100|NA>,tier=<NONE|WEAK|MED|STRONG|NA>,net=<point|NA>,t=<point|NA>,inst=,run=,init=
-        构建：H4 收盘时间不早于 M5 窗口第一根的各根（约 100 根，与标记同一区间）；实时：每根 H4 一行
-HMI-STR-HIST,<sym>,live=0,from=<H4 窗口第一根收盘>,to=<最后一根收盘>,ok=<n>,nodir=<n>,nodata=<n>,
-        h=<c0;c1;…;c100>,inst=,run=,init=
-        每次构建一行：整个 H4 窗口 state = OK 的 S 直方图（101 个计数），供 T-4 定档
+HMI-STR,<sym>,live=<0|1>,bar=<H4 收盘时间>,ctx=<BULLISH|BEARISH|RANGE|TRANSITION>,state=OK|NODIR|NODATA,reason=-|HISTORY|ATR,
+        def=<定义标识>,dir=<1|-1|0>,chg12=,chg3=,path=,tr_sum=<point|NA>,net=,recent=<point|NA>,
+        s_move=,s_eff=,s_mom=,raw=<6 位小数|NA>,score=<0..100|NA>,tier=<WEAK|MED|STRONG|NA>,inst=,run=,init=
+        构建：H4 收盘时间晚于 M5 窗口第一根开盘的各根（约 100 根，与标记同一区间）；实时：每根 H4 一行
+        chg12 / chg3 为向上为正的原始收盘差；net / recent 为 D 定向后的值
+HMI-STR-HIST,<sym>,live=0,def=,from=,to=<已处理 H4 窗口首末根收盘>,bars=,ok=,nodir=,nodata=,weak=,med=,strong=,h=<101 个计数>,inst=,run=,init=
+        每次构建一行，在 HMI-BUILD-END 之前；统计整个已处理 H4 窗口（不含尚未送入结构引擎的根）
+HMI-STR-WAIT,<sym>,live=1,state=NODATA,reason=WAIT,src=H4|M5|BUILD,last=<最后处理的 H4 收盘|->,inst=,run=,init=
 ```
 
-时间口径同 HMI-CTX（`bar` = H4 收盘时间）。工具：ReloadTest 增 STR 判定类别（同窗口重载、实时 vs 重建：逐行全字段相同）；
-逐行按 T-1 由 net、t、ctx 复算 score / tier（篡改 → 失败）；`-Versus` v2.55 → v2.56 加法模式（只新增 STR 行，其余全同）；
-`-Str` 汇总 HMI-STR-HIST 给出 T-4 的分位；live_coverage.py `--ver 2.56` 计 STR 类别。
+`ReloadTest.ps1`：
 
-### T-10 待确认选择（★ 为建议）
+- **STR 判定类别**：同窗口重载、实时 vs 重建（按 H4 收盘时间，与 HMI-CTX 相同的区间）都要求逐行全字段相同。
+- **逐行复算**：按行内 `def=` 解析出的常量，用十进制精确运算，从 chg12 / chg3 / path / tr_sum 复算 net、recent、
+  三个分项、raw、score 与 tier。分数或等级不符、分项小数差超过 1e-6，都判为失败。还核对状态与 ctx、reason、NA 字段的一致性，
+  以及 path ≥ |chg12|、|chg3|。
+- **直方图核对**：ok + nodir + nodata = bars；101 个分箱之和 = ok；weak + med + strong = ok；各状态、各等级、各分值的行数
+  不超过直方图计数；最后一行 HMI-STR 的 bar = 直方图的 to；同一根 H4 不得有两行。
+- **def 不同**：两次构建 def 不同，STR 判为 NOT COMPARABLE（pending）。def 无法解析，判为失败。
+- **`-Versus` v2.55 → v2.56 加法模式**：见 T-8。窗口不同为 NOT JUDGED；新版构建缺 HMI-STR-HIST（未写强度行）判为失败。
+- **`-Str`**：分布记录。
 
-```
-1  强度只用价格项        ★ 单项：沿方向净推进 / ATR（T-1）
-                           另：再加「效率」(net / Σ|ΔC|) 等分项按权重合成 —— 离线与净推进 / ATR 高度相关（Σ|ΔC| / ATR 稳定在
-                           4.5 .. 7.2），且与 v2.57 质量的「K 线重叠」重叠；不建议
-2  窗口                  ★ 最近 12 根已收盘 H4，不限趋势段（§6.1）     另：限当前趋势段，段内不足 12 根 → 数据不足
-3  逆向推进              ★ 记 0（NONE）                                 另：显示负分 -100 .. 0
-4  阈值                  ★ 暂定 CAP 4 ATR / T1 34 / T2 64，按 T-4 程序用 MT5 八品种分布定档
-5  面板文字              ★ 新增一行（FULL）/ 追加 Sxx（COMPACT），中文「数据不足」「无方向」；现有 strength / str 字样不改
-6  构建日志范围          ★ M5 窗口内各 H4 根 + 每构建一行直方图        另：整个 H4 窗口每根一行（约 500 行 / 构建，日志约翻倍）
-```
+`live_coverage.py --ver 2.56` 计 STR 类别，HIST 与 WAIT 行不比较。
 
-**不在本版：** 质量评分（v2.57：K 线重叠、Q_break 等）、趋势面板与推进 / 回撤 / 阶段（v2.58，用 `leg_anchor`）、图形调整；
+**不在本版：** 质量评分（v2.57：Q_break、回撤健康度、K 线重叠）、阶段与原因（§7 / §8）、变化箭头与完整趋势面板（v2.58）、图形调整；
 H4 结构、保护点、BRI-08、Session、MODEL 规则不动。

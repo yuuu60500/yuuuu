@@ -2020,3 +2020,34 @@ tools/strength_sim.py  离线模型：定义场景多空镜像 53/53；--replay 
 docs/04                v2.56 验收清单草案；docs/evidence/v2.56_strength_offline.txt
 Trading Logic Changed:  NO（只显示，Rule 69；本稿未改代码）
 ```
+
+## v2.56 开发版 —— 趋势强度评分（BRI-13 修订稿 2，只显示；未编译）
+
+```
+Date:     2026-10-26
+来源:     验收方「HMI v2.56 定义稿审核与工程师修订口径」（2026-10-26）：定义稿 1 撤回，恢复原需求 §5 三项合成；
+          原需求入库 docs/requirements/HMI_趋势面板改造需求_工程师版.md
+基线:     v2.55 受限基线（MQL d0f4268）
+
+MQL5
+  HMI_StrengthEngine.mqh (新)   StrOnH4Bar：净推进 45% / 方向效率 35% / 近期动量 20%（3 ATR / 1 ATR），整数精确运算，
+                                分档按未取整分数 35 / 65；NODATA（HISTORY / ATR）、NODIR；逐根保存 g_str[]（含段号，供 v2.58 箭头）；
+                                HMI-STR / HMI-STR-HIST / HMI-STR-WAIT；面板文字（\uXXXX 解码）
+  H4M5_Identification.mq5       H4ProcessBar 最后一步调用 StrOnH4Bar；ResetEngine 清空；BuildHistory 在 END 前写 HIST；
+                                OnCalculate：构建失败 / H4 或 M5 未同步 → 等待数据（面板），恢复后清除；#property version 2.56
+  HMI_ObjectManager.mqh         面板：H4 CONTEXT 行 strength / quality 改称「BOS 计数」「结构诊断」；新增趋势强度行（FULL）/
+                                「强度 …」（COMPACT）；未就绪时只显示标题与等待数据
+  HMI_Defs.mqh                  HMI_VERSION 2.56
+  不变                          全部规则、标记、现有日志行；输入（461F006E）
+工具
+  ReloadTest.ps1                STR 判定类别（重载、实时 vs 重建）、逐行复算（按 def=）、直方图核对、def 不同 → 不可比较；
+                                -Versus v2.55 → v2.56 加法模式；-Str 分布记录
+  live_coverage.py              --ver 2.56 计 STR；live_coverage_tests.py 22/22
+  strength_sim.py               三项定义模型 79/79（含验收方三组对照）；日志行生成；--replay 分布记录
+  logtests                      s01–s25（157 组）
+文档
+  docs/01 §2.4、docs/02 BRI-13 修订稿 2（定义稿 1 撤回）、docs/03 模块表、docs/04 v2.56 清单、docs/06 Audit Round 36、
+  docs/evidence/v2.56_strength_offline.txt
+Trading Logic Changed:  NO（只显示，Rule 69）
+Compile Status:         NOT COMPILE VERIFIED
+```

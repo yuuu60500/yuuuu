@@ -1817,5 +1817,363 @@
   "forbid": [
    "AGREE BOTH WAYS"
   ]
+ },
+ "s01_reload_str_identical": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "STR    IDENTICAL over",
+   "every row recomputes from its inputs",
+   "IDENTICAL inside the comparable region"
+  ],
+  "forbid": [
+   "FAILED",
+   "MISMATCH"
+  ]
+ },
+ "s02_reload_str_row_missing": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "STR    MISMATCH (1)",
+   "A only  STR STR|bar=2026.09.13 20:00"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the strength rows"
+  ]
+ },
+ "s03_reload_str_score_tampered": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "recomputed",
+   "strength rows FAILED their check"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the strength rows"
+  ]
+ },
+ "s04_reload_str_seff_tampered": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "s_eff=99.000000, recomputed"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the strength rows"
+  ]
+ },
+ "s05_reload_str_net_not_dir": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "OK with ctx=BEARISH dir=1"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the strength rows"
+  ]
+ },
+ "s06_reload_str_nodir_with_score": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "NODIR with score=50"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the strength rows"
+  ]
+ },
+ "s07_reload_str_hist_ok_wrong": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "HIST ok + nodir + nodata = 58, bars=59"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the strength rows"
+  ]
+ },
+ "s08_reload_str_hist_missing": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "0 HMI-STR-HIST row(s) in build 2 (one expected)"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the strength rows"
+  ]
+ },
+ "s09_reload_str_hist_to": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "but HIST to=2026.09.17 00:00"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the strength rows"
+  ]
+ },
+ "s10_reload_str_dup_bar": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "bar 2026.09.16 20:00 has 2 HMI-STR rows"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the strength rows"
+  ]
+ },
+ "s11_reload_str_def_changed": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "STR    NOT COMPARABLE - scoring definition differs",
+   "PENDING REVIEW, not a pass",
+   "strength rows not compared"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the strength rows",
+   "STR    MISMATCH"
+  ]
+ },
+ "s12_reload_str_def_unknown": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "is not a definition this tool can recompute"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the strength rows"
+  ]
+ },
+ "s13_str_boundaries_recompute": {
+  "args": [
+   "-Str"
+  ],
+  "expect": [
+   "merged  params ABCD1234 STR1-N12K3-M3R1-W45.35.20-T35.65",
+   "displayed score  P10"
+  ],
+  "forbid": [
+   "CHECK FAILED"
+  ]
+ },
+ "s14_str_boundary_tier_tampered": {
+  "args": [
+   "-Str"
+  ],
+  "expect": [
+   "CHECK FAILED (2)"
+  ],
+  "forbid": []
+ },
+ "s15_live_str_ok": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "strength rows compared: 10 (STR)",
+   "AGREE BOTH WAYS on every covered bar"
+  ],
+  "forbid": [
+   "MISMATCH(ES)",
+   "FAILED"
+  ]
+ },
+ "s16_live_str_missing": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "MISMATCH(ES) on covered bars",
+   "live only  [1->2] STR STR|bar=2026.09.14 08:00"
+  ],
+  "forbid": [
+   "AGREE BOTH WAYS"
+  ]
+ },
+ "s17_live_str_tampered": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "live strength row(s) FAILED the recomputation",
+   "MISMATCH(ES) on covered bars"
+  ],
+  "forbid": [
+   "AGREE BOTH WAYS on every covered bar"
+  ]
+ },
+ "s18_live_str_def_changed": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "scoring definition differs",
+   "strength rows not compared"
+  ],
+  "forbid": [
+   "strength rows compared:"
+  ]
+ },
+ "s19_versus256_additive_ok": {
+  "args": [
+   "-Source",
+   "USDJPY#0C55,M5",
+   "-Versus",
+   "USDJPY#0D56,M5"
+  ],
+  "expect": [
+   "the strength score is added (BRI-13, display only)",
+   "IDENTICAL apart from the strength rows"
+  ],
+  "forbid": [
+   "UNEXPLAINED",
+   "FAILED",
+   "NOT JUDGED"
+  ]
+ },
+ "s20_versus256_chain_row_changed": {
+  "args": [
+   "-Source",
+   "USDJPY#0C55,M5",
+   "-Versus",
+   "USDJPY#0D56,M5"
+  ],
+  "expect": [
+   "line(s) differ outside the strength rows - UNEXPLAINED",
+   "HMI-ARM,USDJPY,block=61,sess=61"
+  ],
+  "forbid": [
+   "IDENTICAL apart from the strength rows"
+  ]
+ },
+ "s21_versus256_model_changed": {
+  "args": [
+   "-Source",
+   "USDJPY#0C55,M5",
+   "-Versus",
+   "USDJPY#0D56,M5"
+  ],
+  "expect": [
+   "line(s) differ outside the strength rows - UNEXPLAINED",
+   "v2.55 only (1)  HMI-BUILD,USDJPY,MODEL"
+  ],
+  "forbid": [
+   "IDENTICAL apart from the strength rows"
+  ]
+ },
+ "s22_versus256_window_moved": {
+  "args": [
+   "-Source",
+   "USDJPY#0C55,M5",
+   "-Versus",
+   "USDJPY#0D56,M5"
+  ],
+  "expect": [
+   "NOT JUDGED - the windows differ"
+  ],
+  "forbid": [
+   "IDENTICAL apart from the strength rows"
+  ]
+ },
+ "s23_versus256_str_bad": {
+  "args": [
+   "-Source",
+   "USDJPY#0C55,M5",
+   "-Versus",
+   "USDJPY#0D56,M5"
+  ],
+  "expect": [
+   "strength rows FAILED their check (2)",
+   "recomputed 81",
+   "row(s) with score 82 but HIST bin 82 = 1"
+  ],
+  "forbid": [
+   "IDENTICAL apart from the strength rows"
+  ]
+ },
+ "s24_versus256_no_str": {
+  "args": [
+   "-Source",
+   "USDJPY#0C55,M5",
+   "-Versus",
+   "USDJPY#0D56,M5"
+  ],
+  "expect": [
+   "strength rows FAILED their check (1)",
+   "0 HMI-STR-HIST row(s) in build 1 (one expected)"
+  ],
+  "forbid": [
+   "IDENTICAL apart from the strength rows"
+  ]
+ },
+ "s25_versus256_old_has_str": {
+  "args": [
+   "-Source",
+   "USDJPY#0C55,M5",
+   "-Versus",
+   "USDJPY#0D56,M5"
+  ],
+  "expect": [
+   "v2.55 build carries 1 strength row(s)"
+  ],
+  "forbid": [
+   "IDENTICAL apart from the strength rows"
+  ]
  }
 }

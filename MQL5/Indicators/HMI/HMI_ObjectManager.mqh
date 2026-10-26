@@ -10,6 +10,7 @@
 #include "HMI_Ranges.mqh"
 #include "HMI_PriceActionEngine.mqh"
 #include "HMI_LiquidityLevels.mqh"
+#include "HMI_StrengthEngine.mqh"     // v2.56: strength line (display only)
 
 #define TT_MARK  "MK"
 #define TT_CTX   "CX"
@@ -456,14 +457,27 @@ void OM_DrawPanel()
    if(g_ctx == CTX_TRANSITION)
       ctx += " (pending " + (g_ctx_pending == DIR_BULL ? "UP" : "DOWN") + ")";
 
-   if(InpPanelMode == PANEL_FULL)
+   // v2.56: the BOS count (g_ctx_strength) and CLEAN / MESSY are structure
+   // diagnostics, not the trend strength / quality (requirement §1.4); the
+   // score line is the strength. No build yet / a rebuild waiting for data:
+   // only the header and "waiting" - never the state of an older build.
+   if(!g_ready)
+     {
+      C[n] = base;
+      L[n++] = "HMI v" + HMI_VERSION + "  MARK ONLY - NO ENTRY DECISION";
+      C[n] = base;
+      L[n++] = StrPanelText();
+     }
+   else if(InpPanelMode == PANEL_FULL)
      {
       C[n] = base;
       L[n++] = "HMI v" + HMI_VERSION + "  MARK ONLY - NO ENTRY DECISION";
       C[n] = CtxPanelColor(base);
       L[n++] = "H4 CONTEXT: " + ctx +
-               "   strength " + IntegerToString(g_ctx_strength) +
-               (g_ctx_messy ? "   quality MESSY" : "   quality CLEAN");
+               "   BOS " + HMI_U(ZH_COUNT) + " " + IntegerToString(g_ctx_strength) +
+               "   " + HMI_U(ZH_STRUCT) + (g_ctx_messy ? " MESSY" : " CLEAN");
+      C[n] = base;
+      L[n++] = StrPanelText();
       C[n] = base;
       L[n++] = "H4 POI: " + IntegerToString(poi_active) + " ACTIVE / " +
                IntegerToString(g_diag_poi_rejected_gap) + " REJECTED-BY-GAP" +
@@ -486,8 +500,9 @@ void OM_DrawPanel()
      {
       C[n] = CtxPanelColor(base);
       L[n++] = ctx +
-               "   str " + IntegerToString(g_ctx_strength) +
+               "   BOS " + IntegerToString(g_ctx_strength) +
                (g_ctx_messy ? " MESSY" : " CLEAN") +
+               "   |   " + StrPanelShort() +
                "   |   POI " + IntegerToString(poi_active) +
                "   |   " + (g_sess.active ? "SESSION " +
                TimeToString(g_sess.start_time, TIME_MINUTES) : "no session") +
@@ -496,8 +511,8 @@ void OM_DrawPanel()
       L[n++] = OM_PanelCycleLine();
      }
 
-   if(InpShowATR && n < MAX_PANEL_ROWS) { C[n] = base;                 L[n++] = RangesATRText(); }
-   if(InpShowADR && n < MAX_PANEL_ROWS) { C[n] = RangesADRColor(base); L[n++] = RangesADRText(); }
+   if(g_ready && InpShowATR && n < MAX_PANEL_ROWS) { C[n] = base;                 L[n++] = RangesATRText(); }
+   if(g_ready && InpShowADR && n < MAX_PANEL_ROWS) { C[n] = RangesADRColor(base); L[n++] = RangesADRText(); }
 
    //--- draw; bottom corners stack upward so reading order is kept ---
    int  step  = TS_PANEL.size + 6;

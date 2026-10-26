@@ -212,6 +212,11 @@ quality  = { CLEAN, MESSY }
 
 按 Rule 69，strength / quality **不作为任何过滤条件**，仅用于面板显示。
 
+v2.56 起：上面的 `strength`（BOS 计数）与 CLEAN / MESSY 是结构诊断，面板改称「BOS 计数」「结构诊断」，HMI-CTX 的 `str=` /
+`messy=` 不变。**趋势强度**是另一个量：原需求 §5 的三项合成分（净推进 45%、方向效率 35%、近期动量 20%，0–100，
+分档 35 / 65 按未取整分数），每根已处理 H4 计算一次，只显示 —— 定义见 docs/02 BRI-13 修订稿 2，实现 `HMI_StrengthEngine.mqh`。
+趋势质量（原需求 §6）在 v2.57。
+
 ### 2.5 Context 的时间戳与不可变性
 
 每次 Context 变化产生一条不可变记录：

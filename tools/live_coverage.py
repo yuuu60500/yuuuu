@@ -8,12 +8,14 @@ categories that have a sample and the ones that do not (reviewer, v2.54r6 review
     CTX    HMI-CTX ...,live=1,...                PROT  HMI-PROT / HMI-ANCHOR / HMI-CTX-INTERNAL ...,live=1,...
     B8     (--ver 2.55 and later) HMI-REF / HMI-BRK ...,live=1,...  - judged on the bars MODEL rows are (their time is
            the ARMED / confirming bar's close); cycle= is left out of the key like a MODEL row's ids
+    STR    (--ver 2.56 and later) HMI-STR ...,live=1,...  - the strength score of one H4 bar (bar= its close), judged
+           like CTX; HMI-STR-HIST (one per build) and HMI-STR-WAIT (a waiting episode, live only) are not rows to compare
 
 Intraday: consecutive COMPLETE builds of one instance in one log file (one local day, no sleep in
 between), same params digest. The live rows logged between them, whose run/init must be the earlier
 build's, are compared both ways with the later build's rows of the same window:
     MODEL / LIQ  event time >= earlier 'to' + 10 min (the earlier build covers up to 'to' + 5) and <= later 'to'
-    CTX / PROT   bar > earlier 'to' and <= later 'to'
+    CTX / PROT / STR   bar > earlier 'to' and <= later 'to'
 Keys drop live= / inst= / run= / init= and, for MODEL / LIQ, only the cycle and block ids (init-relative) -
 symbol, category and direction stay, as in the reviewer's independent parser; str= and leg= are kept.
 Every live row must carry the run/init of the build it follows (checked when the log is read).
@@ -33,7 +35,7 @@ intraday row differs, an edge row is in neither build, or a cross-sleep row is n
 not matched: it is reported as PENDING REVIEW, as ReloadTest does, and the RESULT is not a pass). Zero differences on the
 compared rows alone is not a pass.
 
-    python3 tools/live_coverage.py [--ver 2.54] [--offset 2] LOG [LOG ...]    (logs in date order)
+    python3 tools/live_coverage.py [--ver 2.56] [--offset 2] LOG [LOG ...]    (logs in date order)
 """
 import argparse, collections, datetime as dt, re, sys
 
@@ -52,7 +54,7 @@ def category(c):
     if c[0] in ('HMI-BUILD', 'HMI-LIVE'):
         return c[2] if len(c) > 2 and c[2] in ('MODEL', 'LIQ') else None
     return {'HMI-CTX': 'CTX', 'HMI-PROT': 'PROT', 'HMI-ANCHOR': 'PROT', 'HMI-CTX-INTERNAL': 'PROT',
-            'HMI-REF': 'B8', 'HMI-BRK': 'B8'}.get(c[0])
+            'HMI-REF': 'B8', 'HMI-BRK': 'B8', 'HMI-STR': 'STR'}.get(c[0])
 
 
 def event_time(c, f):
@@ -68,7 +70,8 @@ def key(c, f, drop=()):
         z = [x for x in c[1:] if not x.startswith(('inst=', 'run=', 'init='))]
         return ('MODEL/LIQ', z[1]) + tuple(z[:3] + z[5:])       # symbol, category, direction; not cycle / block id
     skip = ('live', 'inst', 'run', 'init') + (('cycle',) if c[0] in ('HMI-REF', 'HMI-BRK') else ())   # cycle= is init-relative
-    return (c[0], c[2]) + tuple(sorted((k, v) for k, v in f.items() if k not in skip + drop))
+    sub = 'STR' if c[0] == 'HMI-STR' else c[2]                       # an HMI-STR row has no event kind: c[2] is live=
+    return (c[0], sub) + tuple(sorted((k, v) for k, v in f.items() if k not in skip + drop))
 
 
 class Row:
@@ -179,7 +182,7 @@ def main():
 
     srcs = sorted({s for _, seq, _, _ in days for s in seq})
     try:
-        cats = CATS + (('B8',) if float(a.ver) >= 2.55 else ())   # v2.55: HMI-REF / HMI-BRK (BRI-08 diagnostics)
+        cats = CATS + (('B8',) if float(a.ver) >= 2.55 else ()) + (('STR',) if float(a.ver) >= 2.56 else ())   # v2.55 BRI-08 / v2.56 BRI-13
     except ValueError:
         cats = CATS
     cols = lambda c: ' '.join(f'{c[k]:{5 if k == "MODEL" else 4}}' for k in cats)
