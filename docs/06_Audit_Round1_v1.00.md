@@ -2309,3 +2309,14 @@ P2-3 RELOAD 等待         SA_RELOAD 只置 g_ready = false 后返回，面板�
                          非界面复现）。修：StrReloadPanel 立即显示等待并重画，重建仍走 TryBuild
 回归:                    logtests 160/160；strength_sim 79/79；live_coverage_tests 22/22（见 docs/04 运行状态）
 ```
+
+
+## Audit Round 38 —— v2.56r2 修补复核通过（验收方 2026-10-26），转入 MT5 运行验收
+
+```
+验收方结果:              r2 包 0F265B92…2065；编译 0 errors / 0 warnings（X64 Regular）；logtests 160/160、strength_sim 79/79、
+                         live_coverage_tests 22/22、params 461F006E（37 项）；独立窗口边界 5/5（未改 / bar = To 接受；
+                         早于 From、= From、晚于 To 拒绝；HIST.from 早于 From 不误拒）。三处 P2 闭环，无新增必须修改项
+本地核对:                复核包 24 份源码指纹与仓库 3e173df 相同；所附 ReloadTest.ps1 与仓库相同
+状态:                    源码与工具复核通过；v2.56 不冻结，v2.57 不开始 —— 缺原生运行日志与面板截图（docs/04 v2.56 清单第 4–8 项）
+```
