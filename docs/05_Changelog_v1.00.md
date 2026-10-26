@@ -1993,3 +1993,16 @@ tools/logtests         e17–e21（131 组）
 docs                   Audit Round 31；docs/04 v2.55 清单第 0 / 3 / 6 项
 ```
 
+## v2.55r3 —— 受限开发与回退基线（MQL5 与 v2.55 开发版 d0f4268 相同）
+
+```
+Date:     2026-10-26
+来源:     验收方「HMI v2.55r3 验收报告与下一步」（2026-10-26）：受限通过；r3 包 SHA256 01762C35…0675
+
+tools/ReloadTest.ps1          （a79b53c）两次构建之间终端重启（run 不同）→ 不算连续实时区间，-LiveVsBuild 列为 pending（A-60）
+tools/live_coverage.py        （5a3f649）重启区间单列、只做正向；跨休眠正向 / 反向「只差 leg=」→ PENDING REVIEW（不算不匹配）
+tools/live_coverage_tests.py  19 例；tools/logtests 132 组
+docs                          baselines/v2.55.md（指纹、证据、日内覆盖表、跨周末与保留限制）；07 基线表；04 v2.55 清单结论；
+                              06 Audit Round 32–35；evidence/v2.55_mt5_run_20261020.txt
+Trading Logic Changed:  NO（相对 v2.55 开发版）
+```

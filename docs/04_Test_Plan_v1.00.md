@@ -1015,4 +1015,7 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
    运行状态（2026-10-26，Audit Round 34）：第 6 项三组同窗口样本（10-20 14:58、15:33，10-21 09:14）全部可归因；第 4 项三组 IDENTICAL；
           第 5 项五类各至少一个品种有当日区间样本、0 差异（USDCAD / USDCHF 的 MODEL 与 B8，EURUSD / AUDUSD 的 LIQ / CTX / PROT）；
           XAUUSD MODEL 无样本；B8-C5 真实窗口为 0（只有离线覆盖）
+   验收结论（2026-10-26，Audit Round 35）：受限通过，v2.55r3 留档为开发与回退基线（docs/baselines/v2.55.md）。
+          未覆盖：XAUUSD MODEL 实时路径、B8-C5 原生差异分支、GBPUSD 与黄金 ATR 日内样本；跨周末 USDCAD PROT 2 行 PENDING REVIEW
+          （全日志 RESULT NOT PASSED，不改写）
 ```
