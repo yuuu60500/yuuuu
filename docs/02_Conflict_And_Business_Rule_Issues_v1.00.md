@@ -1178,7 +1178,8 @@ HMI-STR-WAIT,<sym>,live=1,state=NODATA,reason=WAIT,src=H4|M5|BUILD|RELOAD,last=<
 - **直方图核对**：ok + nodir + nodata = bars；101 个分箱之和 = ok；weak + med + strong = ok；各状态、各等级、各分值的行数
   不超过直方图计数；最后一行 HMI-STR 的 bar = 直方图的 to；同一根 H4 不得有两行。
 - **def 不同**：两次构建 def 不同，STR 判为 NOT COMPARABLE（pending）。def 无法解析，判为失败。
-- **`-Versus` v2.55 → v2.56 加法模式**：见 T-8。窗口不同为 NOT JUDGED；新版构建缺 HMI-STR-HIST（未写强度行）判为失败。
+- **`-Versus` v2.55 → v2.56 加法模式**：见 T-8。身份字段之外，HMI-LIQ-REPLAY 的 `attempt=`（实例自 OnInit 起的流动性历史探测次数，
+  只在 OnInit 清零，A-50）也是实例元数据：只有去掉它后两边相同的行才归此类，单独列出，不算差异（v2.56r3 工具，MT5 2026-10-26）。窗口不同为 NOT JUDGED；新版构建缺 HMI-STR-HIST（未写强度行）判为失败。
 - **`-Str`**：分布记录。
 
 `live_coverage.py --ver 2.56` 计 STR 类别，HIST 与 WAIT 行不比较。

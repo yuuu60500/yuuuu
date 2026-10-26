@@ -2282,11 +2282,29 @@ function Show-StrAdditive($old, $new) {
                     $old.FromS, $old.ToS, $new.FromS, $new.ToS) -ForegroundColor Yellow
         return
     }
-    $norm = { param([string]$m) (($m -split ',') | Where-Object { $_ -notmatch '^(inst|run|init)=' }) -join ',' }
+    # identity (inst / run / init) is set aside; so is HMI-LIQ-REPLAY's attempt=, the
+    # liquidity-history probes this INSTANCE has made since its OnInit (reset there
+    # only, A-50) - a chart that waited for history once days ago keeps attempt=1
+    # in every later build, a chart attached today has 0. Lines that differ in it
+    # alone are counted and shown, never hidden; any other field still counts.
+    $norm = { param([string]$m) (($m -split ',') | Where-Object { $_ -notmatch '^(inst|run|init)=' -and -not ($m -match '^HMI-LIQ-REPLAY,' -and $_ -match '^attempt=') }) -join ',' }
+    $norm0 = { param([string]$m) (($m -split ',') | Where-Object { $_ -notmatch '^(inst|run|init)=' }) -join ',' }
     $isStr = { param([string]$m) $m -match '^HMI-STR(-HIST)?,' }
-    $co = @{}; $cn = @{}
-    foreach ($m in $old.Lines) { if (-not (& $isStr $m)) { $k = & $norm $m; $co[$k] = 1 + $(if ($co.ContainsKey($k)) { $co[$k] } else { 0 }) } }
-    foreach ($m in $new.Lines) { if (-not (& $isStr $m)) { $k = & $norm $m; $cn[$k] = 1 + $(if ($cn.ContainsKey($k)) { $cn[$k] } else { 0 }) } }
+    $co = @{}; $cn = @{}; $ao = @{}; $an = @{}
+    foreach ($m in $old.Lines) { if (-not (& $isStr $m)) { $k = & $norm $m; $co[$k] = 1 + $(if ($co.ContainsKey($k)) { $co[$k] } else { 0 }); $k0 = & $norm0 $m; $ao[$k0] = 1 + $(if ($ao.ContainsKey($k0)) { $ao[$k0] } else { 0 }) } }
+    foreach ($m in $new.Lines) { if (-not (& $isStr $m)) { $k = & $norm $m; $cn[$k] = 1 + $(if ($cn.ContainsKey($k)) { $cn[$k] } else { 0 }); $k0 = & $norm0 $m; $an[$k0] = 1 + $(if ($an.ContainsKey($k0)) { $an[$k0] } else { 0 }) } }
+    # a REPLAY line is attempt-only when it is unmatched WITH attempt= and matched without it
+    $noAtt = { param([string]$k) (($k -split ',') | Where-Object { $_ -notmatch '^attempt=' }) -join ',' }
+    $attemptOnly = @()
+    foreach ($p in @(@($ao, $an, $old.Ver), @($an, $ao, $new.Ver))) {
+        foreach ($k in $p[0].Keys) {
+            if ($k -notmatch '^HMI-LIQ-REPLAY,') { continue }
+            $d = $p[0][$k] - $(if ($p[1].ContainsKey($k)) { $p[1][$k] } else { 0 })
+            $kn = & $noAtt $k
+            $same = ($co.ContainsKey($kn) -and $cn.ContainsKey($kn) -and $co[$kn] -eq $cn[$kn])
+            if ($d -gt 0 -and $same) { $attemptOnly += "v$($p[2]) $k" }
+        }
+    }
     $diff = @()
     foreach ($k in $co.Keys) { $d = $co[$k] - $(if ($cn.ContainsKey($k)) { $cn[$k] } else { 0 }); if ($d -gt 0) { $diff += "v$($old.Ver) only ($d)  $k" } }
     foreach ($k in $cn.Keys) { $d = $cn[$k] - $(if ($co.ContainsKey($k)) { $co[$k] } else { 0 }); if ($d -gt 0) { $diff += "v$($new.Ver) only ($d)  $k" } }
@@ -2296,6 +2314,13 @@ function Show-StrAdditive($old, $new) {
     $bad = @(StrAudit $new)
     Write-Host ("  lines compared: {0} / {1} (all tags but HMI-STR); v{2} strength rows: {3} HMI-STR + {4} HMI-STR-HIST" -f `
                 $nOld, @($new.Lines | Where-Object { -not (& $isStr $_) }).Count, $new.Ver, $sn.Str.Count, $sn.Hist.Count)
+    if ($attemptOnly.Count) {
+        Write-Host ("  instance metadata, not compared: {0} HMI-LIQ-REPLAY line(s) differ in attempt= only (probes since each instance's OnInit, A-50):" -f $attemptOnly.Count) -ForegroundColor DarkYellow
+        foreach ($x in @($attemptOnly | Select-Object -First 4)) {
+            $at = $(if ($x -match ',attempt=(\d+)') { $Matches[1] } else { '?' })
+            Write-Host ("    {0}  attempt={1}" -f ($x -split ' ')[0], $at) -ForegroundColor DarkYellow
+        }
+    }
     $out = Join-Path $dir ("attribution_" + ($old.Src -replace '[^A-Za-z0-9]','_') + "__" + ($new.Src -replace '[^A-Za-z0-9]','_') + ".txt")
     $rows = @()
     foreach ($x in $diff) { $rows += "UNEXPLAINED  $x" }

@@ -2221,5 +2221,38 @@
    "AGREE BOTH WAYS",
    "IDENTICAL apart from the strength rows"
   ]
+ },
+ "s29_versus256_replay_attempt_only": {
+  "args": [
+   "-Source",
+   "USDJPY#0C55,M5",
+   "-Versus",
+   "USDJPY#0D56,M5"
+  ],
+  "expect": [
+   "instance metadata, not compared: 2 HMI-LIQ-REPLAY line(s) differ in attempt= only",
+   "v2.55  attempt=1",
+   "v2.56  attempt=0",
+   "IDENTICAL apart from the strength rows"
+  ],
+  "forbid": [
+   "UNEXPLAINED"
+  ]
+ },
+ "s30_versus256_replay_other_field": {
+  "args": [
+   "-Source",
+   "USDJPY#0C55,M5",
+   "-Versus",
+   "USDJPY#0D56,M5"
+  ],
+  "expect": [
+   "line(s) differ outside the strength rows - UNEXPLAINED",
+   "got=18559"
+  ],
+  "forbid": [
+   "IDENTICAL apart from the strength rows",
+   "instance metadata, not compared"
+  ]
  }
 }

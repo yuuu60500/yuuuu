@@ -2067,3 +2067,16 @@ tools/logtests              s26–s28（验收方两份时间边界反例 + 同�
 docs                        BRI-13 T-3 / T-5 / T-9；docs/04 v2.56 清单；docs/06 Audit Round 37
 Trading Logic Changed:  NO
 ```
+
+## v2.56r3（工具）—— 加法比较把 HMI-LIQ-REPLAY 的 attempt= 当作实例元数据（MQL5 与 r2 相同）
+
+```
+Date:     2026-10-26
+来源:     首次 MT5 运行：XAUUSD 两对 v2.55 / v2.56 各有 2 行只差 HMI-LIQ-REPLAY attempt=（v2.55 实例 10-22 15:59 等过一次流动性历史，
+          g_lh_attempts 只在 OnInit 清零，此后每次构建都是 1；今天挂的 v2.56 是 0）
+
+tools/ReloadTest.ps1   Show-StrAdditive：去掉 attempt= 后两边相同的 REPLAY 行单独列为「instance metadata, not compared」；
+                       其他字段不同仍是 UNEXPLAINED
+tools/logtests         s29（只差 attempt=）/ s30（got= 也不同 → UNEXPLAINED，且不列为元数据），162 组
+docs                   BRI-13 T-9；docs/04；docs/06 Audit Round 40；evidence/v2.56_mt5_run_20261026.txt
+```

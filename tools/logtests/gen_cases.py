@@ -776,5 +776,19 @@ case("s27_versus256_str_before_window", v55v56(new_tweak=_before), VS,
      ["strength rows FAILED their check", "HMI-STR bar=2026.09.06 00:00 outside the build's processed M5 window"], ["IDENTICAL apart from the strength rows"])
 case("s28_reload_str_after_window", [start("2.56")] + s56(1, strs() + shist()) + _after(s56(2, strs() + shist())), R,
      ["ROW CHECK(S) FAILED", "B: HMI-STR bar=2026.10.01 00:00 outside the build's processed M5 window"], NOSTR)
+# MT5 run 2026-10-26: the v2.55 XAUUSD charts waited for liquidity history once (10-22) and keep attempt=1 in every later
+# HMI-LIQ-REPLAY line (g_lh_attempts resets at OnInit only, A-50); the v2.56 charts attached today have 0. That alone is
+# instance metadata - shown, not a difference; any other REPLAY field still is.
+_REP = "HMI-LIQ-REPLAY,USDJPY,need_from=2026.07.02 04:00,req_from=2026.06.29 04:00,got=18558,err=0,fail=-,have_from=2026.06.29 04:00,floor=2025.05.29 21:25,m5_first=2025.05.29 21:25,capped=1,unknown=0,short=0,waiting=0,wait_from=none,state=READY,attempt={}"
+def _rep(att, inst, init, got="18558"): return L(SRC, _REP.format(att).replace("got=18558", f"got={got}") + f",inst={inst},run=7,init={init}")
+def v55v56r(att_old, att_new, got_new="18558"):
+    a = blk(1, ver="2.55", inst="0C55", init=1, extra_rows=[_rep(att_old, "0C55", 1)])
+    nb = blk(1, ver="2.56", inst="0D56", init=2, extra_rows=[_rep(att_new, "0D56", 2, got_new)] + strs(init=2, inst="0D56") + shist(init=2, inst="0D56"))
+    return [start("2.55", inst="0C55")] + a + [start("2.56", inst="0D56", init=2)] + nb
+case("s29_versus256_replay_attempt_only", v55v56r(1, 0), VS,
+     ["instance metadata, not compared: 2 HMI-LIQ-REPLAY line(s) differ in attempt= only", "v2.55  attempt=1", "v2.56  attempt=0",
+      "IDENTICAL apart from the strength rows"], ["UNEXPLAINED"])
+case("s30_versus256_replay_other_field", v55v56r(1, 0, got_new="18559"), VS,
+     ["line(s) differ outside the strength rows - UNEXPLAINED", "got=18559"], ["IDENTICAL apart from the strength rows", "instance metadata, not compared"])
 json.dump(C, open("cases.json", "w"), indent=1)
 print(len(C), "cases")

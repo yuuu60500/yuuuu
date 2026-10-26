@@ -1052,3 +1052,8 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           461F006E、独立三项算术 1292 根 0 差异；r2 修三处 P2（处理窗口校验、COMPACT 分数时间、RELOAD 即时等待），待重新编译与 MT5 运行
    运行状态（2026-10-26，Audit Round 38）：r2 编译 0 / 0（验收方）；第 3 项 160/160、79/79、22/22 复核通过；第 1 项 461F006E。
           第 4–8 项（重载六类、实时 vs 重建、v2.55 vs v2.56、-Str、截图）待 MT5 运行
+   运行状态（2026-10-26 本地 15:41，Audit Round 40）：10 张 v2.56 挂图（ver=2.56、461F006E / A047970C 与配对的 v2.55 相同）；
+          第 4 项同窗口重载 5 组（EURUSD 两实例、XAUUSD 两实例、AUDUSD）六类 IDENTICAL、STR 全部复算通过；
+          第 6 项 5 对 v2.55 / v2.56「IDENTICAL apart from the strength rows」（XAUUSD 两对另列 REPLAY attempt= 实例元数据）；
+          第 7 项 -Str 10 图记录；第 8 项 COMPACT 截图（USDCAD）；第 5 项实时 STR 尚无样本（挂图后未过 H4 收盘）；FULL 截图待补
+          工具 r3（attempt= 元数据）：logtests 162/162

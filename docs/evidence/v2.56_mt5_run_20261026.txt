@@ -1,0 +1,145 @@
+# v2.56r2 MT5 run 2026-10-26, part 1 (user terminal, server = local + 2 h): 10 v2.56 charts attached 15:36-15:38 local beside the 10 v2.55 ones
+# log sha256: c94e273bf760a2ad4c9537bf1d3c83a9d94c3c9376a2d1b0a8be15bb1e924e37  20261026.log (65910 lines, local 09:08 .. 15:41); its first 28961 lines are the 7c34fb63... file of Audit Round 39
+# instances v2.56: EURUSD 198B (461F006E) / 54CC (A047970C), XAUUSD 2AE3 (461F006E) / 6624 (A047970C), AUDUSD 46E1, USDJPY 15F9, GBPUSD 86FE,
+#   USDCHF 7129, NZDUSD A97D, USDCAD E6D0 (461F006E); every BEGIN ver=2.56; def=STR1-N12K3-M3R1-W45.35.20-T35.65; no error line
+# tools: ReloadTest.ps1 / live_coverage.py at the commit that adds this file
+
+## 1. same-window reload (ReloadTest -Source <v2.56>), last two builds
+--- EURUSD#198B,M5 : comparing the last two builds ---
+  A  v2.56 params=461F006E build=4 id=1792585034/12 liq=READY from=2026.10.01 10:00 to=2026.10.26 18:35 warmup_end=2026.10.01 18:20 rows=43 MODEL + 40 LIQ
+  B  v2.56 params=461F006E build=5 id=1792585034/12 liq=READY from=2026.10.01 10:00 to=2026.10.26 18:35 warmup_end=2026.10.01 18:20 rows=43 MODEL + 40 LIQ
+  common region: 2026.10.01 18:25 .. 2026.10.26 18:40  (same window)
+    MODEL  IDENTICAL over 43 / 43 row(s)
+    LIQ    IDENTICAL over 40 / 40 row(s)
+    CTX    IDENTICAL over 9 / 9 event(s)
+    PROT   IDENTICAL over 18 / 18 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 32 / 32 row(s) (REF / BRK)
+    STR    IDENTICAL over 102 / 102 row(s) (strength score)
+    STR    every row recomputes from its inputs (208 row(s)); both histograms add up
+  IDENTICAL inside the comparable region (43 MODEL + 40 LIQ) - no repaint found there.
+--- EURUSD#54CC,M5 : comparing the last two builds ---
+  A  v2.56 params=A047970C build=4 id=1792585034/13 liq=READY from=2026.10.01 10:00 to=2026.10.26 18:35 warmup_end=2026.10.01 18:20 rows=43 MODEL + 40 LIQ
+  B  v2.56 params=A047970C build=5 id=1792585034/13 liq=READY from=2026.10.01 10:00 to=2026.10.26 18:35 warmup_end=2026.10.01 18:20 rows=43 MODEL + 40 LIQ
+  common region: 2026.10.01 18:25 .. 2026.10.26 18:40  (same window)
+    MODEL  IDENTICAL over 43 / 43 row(s)
+    LIQ    IDENTICAL over 40 / 40 row(s)
+    CTX    IDENTICAL over 9 / 9 event(s)
+    PROT   IDENTICAL over 18 / 18 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 32 / 32 row(s) (REF / BRK)
+    STR    IDENTICAL over 102 / 102 row(s) (strength score)
+    STR    every row recomputes from its inputs (208 row(s)); both histograms add up
+  IDENTICAL inside the comparable region (43 MODEL + 40 LIQ) - no repaint found there.
+--- XAUUSD#2AE3,M5 : comparing the last two builds ---
+  A  v2.56 params=461F006E build=4 id=1792585034/14 liq=READY from=2026.09.30 16:00 to=2026.10.26 18:35 warmup_end=2026.10.01 01:20 rows=117 MODEL + 49 LIQ
+  B  v2.56 params=461F006E build=5 id=1792585034/14 liq=READY from=2026.09.30 16:00 to=2026.10.26 18:35 warmup_end=2026.10.01 01:20 rows=117 MODEL + 49 LIQ
+  common region: 2026.10.01 01:25 .. 2026.10.26 18:40  (same window)
+    MODEL  IDENTICAL over 117 / 117 row(s)
+    LIQ    IDENTICAL over 49 / 49 row(s)
+    CTX    IDENTICAL over 12 / 12 event(s)
+    PROT   IDENTICAL over 24 / 24 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 103 / 103 row(s) (REF / BRK)
+    STR    IDENTICAL over 106 / 106 row(s) (strength score)
+    STR    every row recomputes from its inputs (216 row(s)); both histograms add up
+  IDENTICAL inside the comparable region (117 MODEL + 49 LIQ) - no repaint found there.
+--- XAUUSD#6624,M5 : comparing the last two builds ---
+  A  v2.56 params=A047970C build=4 id=1792585034/15 liq=READY from=2026.09.30 16:00 to=2026.10.26 18:35 warmup_end=2026.10.01 01:20 rows=114 MODEL + 49 LIQ
+  B  v2.56 params=A047970C build=5 id=1792585034/15 liq=READY from=2026.09.30 16:00 to=2026.10.26 18:35 warmup_end=2026.10.01 01:20 rows=114 MODEL + 49 LIQ
+  common region: 2026.10.01 01:25 .. 2026.10.26 18:40  (same window)
+    MODEL  IDENTICAL over 114 / 114 row(s)
+    LIQ    IDENTICAL over 49 / 49 row(s)
+    CTX    IDENTICAL over 11 / 11 event(s)
+    PROT   IDENTICAL over 23 / 23 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 102 / 102 row(s) (REF / BRK)
+    STR    IDENTICAL over 106 / 106 row(s) (strength score)
+    STR    every row recomputes from its inputs (216 row(s)); both histograms add up
+  IDENTICAL inside the comparable region (114 MODEL + 49 LIQ) - no repaint found there.
+--- AUDUSD#46E1,M5 : comparing the last two builds ---
+  A  v2.56 params=461F006E build=2 id=1792585034/16 liq=READY from=2026.10.01 09:55 to=2026.10.26 18:30 warmup_end=2026.10.01 18:15 rows=102 MODEL + 45 LIQ
+  B  v2.56 params=461F006E build=3 id=1792585034/16 liq=READY from=2026.10.01 10:00 to=2026.10.26 18:35 warmup_end=2026.10.01 18:20 rows=102 MODEL + 45 LIQ
+  common region: 2026.10.02 18:25 .. 2026.10.26 18:35  (window moved: both warm-ups + 24 h settle)
+    MODEL  IDENTICAL over 102 / 102 row(s)
+    LIQ    IDENTICAL over 41 / 41 row(s)
+    CTX    IDENTICAL over 10 / 10 event(s)
+    PROT   IDENTICAL over 20 / 20 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 97 / 97 row(s) (REF / BRK)
+    STR    IDENTICAL over 96 / 96 row(s) (strength score)
+    STR    every row recomputes from its inputs (208 row(s)); both histograms add up
+  IDENTICAL inside the comparable region (102 MODEL + 41 LIQ) - no repaint found there.
+
+## 2. v2.55 vs v2.56, both built in one M5 bar (ReloadTest -Source <v2.55> -Versus <v2.56>)
+--- EURUSD#3F83,M5  vs  EURUSD#198B,M5 : last complete build of each ---
+  A  v2.55 params=461F006E build=44 id=1792585034/3 liq=READY from=2026.10.01 10:00 to=2026.10.26 18:35 warmup_end=2026.10.01 18:20 rows=43 MODEL + 40 LIQ
+  B  v2.56 params=461F006E build=5 id=1792585034/12 liq=READY from=2026.10.01 10:00 to=2026.10.26 18:35 warmup_end=2026.10.01 18:20 rows=43 MODEL + 40 LIQ
+  DIFFERENT VERSIONS (2.55 / 2.56) - not a repaint test; MODEL upgrade regression only.
+  v2.55 -> v2.56: the strength score is added (BRI-13, display only) - every other line must be identical
+  lines compared: 377 / 377 (all tags but HMI-STR); v2.56 strength rows: 104 HMI-STR + 1 HMI-STR-HIST
+  upgrade regression: IDENTICAL apart from the strength rows - 377 line(s) the same in both; 104 strength row(s) recompute, the histogram adds up
+--- EURUSD#0442,M5  vs  EURUSD#54CC,M5 : last complete build of each ---
+  A  v2.55 params=A047970C build=44 id=1792585034/2 liq=READY from=2026.10.01 10:00 to=2026.10.26 18:35 warmup_end=2026.10.01 18:20 rows=43 MODEL + 40 LIQ
+  B  v2.56 params=A047970C build=5 id=1792585034/13 liq=READY from=2026.10.01 10:00 to=2026.10.26 18:35 warmup_end=2026.10.01 18:20 rows=43 MODEL + 40 LIQ
+  DIFFERENT VERSIONS (2.55 / 2.56) - not a repaint test; MODEL upgrade regression only.
+  v2.55 -> v2.56: the strength score is added (BRI-13, display only) - every other line must be identical
+  lines compared: 376 / 376 (all tags but HMI-STR); v2.56 strength rows: 104 HMI-STR + 1 HMI-STR-HIST
+  upgrade regression: IDENTICAL apart from the strength rows - 376 line(s) the same in both; 104 strength row(s) recompute, the histogram adds up
+--- XAUUSD#159A,M5  vs  XAUUSD#2AE3,M5 : last complete build of each ---
+  A  v2.55 params=461F006E build=43 id=1792585034/4 liq=READY from=2026.09.30 16:00 to=2026.10.26 18:35 warmup_end=2026.10.01 01:20 rows=117 MODEL + 49 LIQ
+  B  v2.56 params=461F006E build=5 id=1792585034/14 liq=READY from=2026.09.30 16:00 to=2026.10.26 18:35 warmup_end=2026.10.01 01:20 rows=117 MODEL + 49 LIQ
+  DIFFERENT VERSIONS (2.55 / 2.56) - not a repaint test; MODEL upgrade regression only.
+  v2.55 -> v2.56: the strength score is added (BRI-13, display only) - every other line must be identical
+  lines compared: 620 / 620 (all tags but HMI-STR); v2.56 strength rows: 108 HMI-STR + 1 HMI-STR-HIST
+  instance metadata, not compared: 2 HMI-LIQ-REPLAY line(s) differ in attempt= only (probes since each instance's OnInit, A-50):
+    v2.55  attempt=1
+    v2.56  attempt=0
+  upgrade regression: IDENTICAL apart from the strength rows - 620 line(s) the same in both; 108 strength row(s) recompute, the histogram adds up
+--- XAUUSD#8C1C,M5  vs  XAUUSD#6624,M5 : last complete build of each ---
+  A  v2.55 params=A047970C build=30 id=1792585034/7 liq=READY from=2026.09.30 16:00 to=2026.10.26 18:35 warmup_end=2026.10.01 01:20 rows=114 MODEL + 49 LIQ
+  B  v2.56 params=A047970C build=5 id=1792585034/15 liq=READY from=2026.09.30 16:00 to=2026.10.26 18:35 warmup_end=2026.10.01 01:20 rows=114 MODEL + 49 LIQ
+  DIFFERENT VERSIONS (2.55 / 2.56) - not a repaint test; MODEL upgrade regression only.
+  v2.55 -> v2.56: the strength score is added (BRI-13, display only) - every other line must be identical
+  lines compared: 613 / 613 (all tags but HMI-STR); v2.56 strength rows: 108 HMI-STR + 1 HMI-STR-HIST
+  instance metadata, not compared: 2 HMI-LIQ-REPLAY line(s) differ in attempt= only (probes since each instance's OnInit, A-50):
+    v2.55  attempt=1
+    v2.56  attempt=0
+  upgrade regression: IDENTICAL apart from the strength rows - 613 line(s) the same in both; 108 strength row(s) recompute, the histogram adds up
+--- AUDUSD#F657,M5  vs  AUDUSD#46E1,M5 : last complete build of each ---
+  A  v2.55 params=461F006E build=30 id=1792585034/5 liq=READY from=2026.10.01 10:00 to=2026.10.26 18:35 warmup_end=2026.10.01 18:20 rows=102 MODEL + 45 LIQ
+  B  v2.56 params=461F006E build=3 id=1792585034/16 liq=READY from=2026.10.01 10:00 to=2026.10.26 18:35 warmup_end=2026.10.01 18:20 rows=102 MODEL + 45 LIQ
+  DIFFERENT VERSIONS (2.55 / 2.56) - not a repaint test; MODEL upgrade regression only.
+  v2.55 -> v2.56: the strength score is added (BRI-13, display only) - every other line must be identical
+  lines compared: 588 / 588 (all tags but HMI-STR); v2.56 strength rows: 104 HMI-STR + 1 HMI-STR-HIST
+  upgrade regression: IDENTICAL apart from the strength rows - 588 line(s) the same in both; 104 strength row(s) recompute, the histogram adds up
+
+## 3. strength distribution record (ReloadTest -Str) - a record, not a calibration
+--- strength score distribution (HMI-STR-HIST, latest complete build per chart) ---
+  AUDUSD#46E1,M5         build 3    2026.07.01 12:00 .. 2026.10.26 16:00  bars 500  ok 413  nodir 73  nodata 14  weak 235 / med 95 / strong 83
+  EURUSD#198B,M5         build 5    2026.07.01 12:00 .. 2026.10.26 16:00  bars 500  ok 418  nodir 68  nodata 14  weak 248 / med 99 / strong 71
+  EURUSD#54CC,M5         build 5    2026.07.01 12:00 .. 2026.10.26 16:00  bars 500  ok 414  nodir 72  nodata 14  weak 246 / med 97 / strong 71
+  GBPUSD#86FE,M5         build 1    2026.07.01 12:00 .. 2026.10.26 16:00  bars 500  ok 352  nodir 134  nodata 14  weak 205 / med 91 / strong 56
+  NZDUSD#A97D,M5         build 1    2026.07.01 12:00 .. 2026.10.26 16:00  bars 500  ok 375  nodir 111  nodata 14  weak 198 / med 111 / strong 66
+  USDCAD#E6D0,M5         build 1    2026.07.01 12:00 .. 2026.10.26 16:00  bars 500  ok 344  nodir 142  nodata 14  weak 145 / med 94 / strong 105
+  USDCHF#7129,M5         build 1    2026.07.01 12:00 .. 2026.10.26 16:00  bars 500  ok 360  nodir 126  nodata 14  weak 185 / med 103 / strong 72
+  USDJPY#15F9,M5         build 1    2026.07.01 12:00 .. 2026.10.26 16:00  bars 500  ok 353  nodir 133  nodata 14  weak 196 / med 97 / strong 60
+  XAUUSD#2AE3,M5         build 5    2026.07.01 08:00 .. 2026.10.26 16:00  bars 500  ok 326  nodir 160  nodata 14  weak 153 / med 84 / strong 89
+  XAUUSD#6624,M5         build 5    2026.07.01 08:00 .. 2026.10.26 16:00  bars 500  ok 328  nodir 158  nodata 14  weak 155 / med 84 / strong 89
+  merged  params A047970C STR1-N12K3-M3R1-W45.35.20-T35.65  (2 chart(s), 742 scored H4 bars)
+    displayed score  P10 0  P25 7  P33 14  P50 30  P67 54  P75 62  P90 81   = 0: 126  = 100: 0
+    tiers (on the unrounded score)  weak 401 (54 %)  med 181 (24 %)  strong 160 (22 %)
+  merged  params 461F006E STR1-N12K3-M3R1-W45.35.20-T35.65  (8 chart(s), 2941 scored H4 bars)
+    displayed score  P10 0  P25 8  P33 15  P50 31  P67 52  P75 60  P90 80   = 0: 503  = 100: 0
+    tiers (on the unrounded score)  weak 1565 (53 %)  med 774 (26 %)  strong 602 (20 %)
+  a record of the distribution, not a calibration (BRI-13 T-4): the tiers stay 35 / 65.
+
+## 4. live vs build (python3 tools/live_coverage.py --ver 2.56): no H4 bar closed between attaching and the last build - no live STR row yet
+== intraday live vs build, v2.56 instances (rows compared per category / differences)
+  instance       day        pairs  MODEL  LIQ  CTX PROT   B8  STR  diff  outside
+  AUDUSD#46E1    20261026       2      0    0    0    0    0    0     0        0
+  EURUSD#198B    20261026       4      0    0    0    0    0    0     0        0
+  EURUSD#54CC    20261026       4      0    0    0    0    0    0     0        0
+  XAUUSD#2AE3    20261026       4      0    0    0    0    0    0     0        0
+  XAUUSD#6624    20261026       4      0    0    0    0    0    0     0        0
+  total
+RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+
+## 5. panel (user screenshot, USDCAD v2.56 COMPACT): 'BEARISH | BOS 7 CLEAN | 强度 弱 15/100 | POI 0 | SESSI…' / '数据截至 2026.10.26 16:00 H4 收盘'
+#   = the log's last HMI-STR row of E6D0: bar=2026.10.26 16:00, net 168, path 1432, recent -135, tr_sum 3226 -> 24.30 / 11.73 / 0 -> raw 15.04, WEAK;
+#   Chinese renders; the first COMPACT line is cut at the edge of a narrow chart window (display stage)
