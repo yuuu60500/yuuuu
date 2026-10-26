@@ -2365,3 +2365,8 @@ v2.55 vs v2.56:          五对（同一根 M5 内各建一次）除强度行外
                          FULL 截图（AUDUSD）：BOS 计数 5 / 结构诊断 CLEAN / 趋势强度 弱 · 25/100 数据截至 16:00 = 日志该根；中文正常
 未完成:                  实时 STR（挂图后尚未过 H4 收盘）、FULL / 暂不评级 / 等待等截图、更多同窗口样本
 ```
+```
+r4（同日）:              用户 MetaEditor 编译 0 errors / 0 warnings（6186 ms）；COMPACT 截图（AUDUSD）第一行完整「BULLISH  BOS 5 CLEAN | POI 0 |
+                         no session」，第二行「强度 弱 25/100   数据截至 2026.10.26 16:00 H4 收盘」= 日志该根 raw 25.40；第三行 CYCLE 仍在
+                         63 字符截断（原有，显示阶段）
+```
