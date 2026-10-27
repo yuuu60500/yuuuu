@@ -89,3 +89,17 @@ v2.56 (running all day; live_coverage --ver 2.56 --offset 3):
 
 RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
 ReloadTest -LiveVsBuild, v2.56 charts: 10 of 10 AGREE BOTH WAYS (no mismatch, no failed check)
+
+## panel screenshots (user, 2026-10-27, after the run above; v2.57 XAUUSD M5)
+COMPACT  row 2  强度 弱 2/100   数据截至 2026.10.27 16:00 H4 收盘
+         row 3  质量 良好 81/100   5 次事件                       (new; the cycle row moved to row 4, still cut at 63 characters - as before)
+FULL     趋势强度  弱 · 2/100   数据截至 2026.10.27 16:00 H4 收盘
+         趋势质量  良好 · 81/100（5 次事件）
+= the log's HMI-STR / HMI-QLT of bar 2026.10.27 16:00, both XAUUSD charts (159A, 8C1C) alike:
+  STR raw 2.494008 score 2 WEAK
+  QLT q_break 80 (4 of 5 breaks held; 10-23 08:00 failed), q_retrace 100 (bear leg from anchor 4141.99 to 3975.61, close 4023.24:
+      r = 4763 / 16638 = 0.286 < 1/3), q_overlap 55.935527, raw 80.983882 -> 81 GOOD, sample FIVE
+  a native case of "强度弱、质量好": the bear leg's structure holds, the last 12 H4 closes move against it
+quality state of every v2.57 chart at the 16:00 bar (for the remaining screenshots):
+  OK FIVE   XAUUSD x2 81 GOOD, AUDUSD 73 GOOD, USDCAD 66 FAIR      OK LOW (3 events)  EURUSD x2 79 GOOD
+  PARTIAL   GBPUSD FEW (1/3, 1 pending)                           NODIR (TRANSITION)  NZDUSD, USDCHF, USDJPY

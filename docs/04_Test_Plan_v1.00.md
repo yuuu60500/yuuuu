@@ -1102,4 +1102,5 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           第 1 项十张 v2.57（8 品种默认 461F006E + EURUSD、XAUUSD 的 A047970C）；第 4 项十张同窗口重载七类 IDENTICAL，
           QLT 每行复算并与本构建 HMI-CTX / HMI-ANCHOR 一致、两份直方图相加正确（十张都是）；第 6 项十对 v2.56 / v2.57
           「IDENTICAL apart from the quality rows」（489–1239 行，含 HMI-STR）；第 7 项 -Qlt 记录。
-          第 5 项（实时 QLT）无样本：挂图后尚未过 H4 收盘；第 8 项截图待补
+          第 5 项（实时 QLT）无样本：挂图后尚未过 H4 收盘；第 8 项：XAUUSD COMPACT / FULL「良好 81/100（5 次事件）」与日志一致，
+          低样本（EURUSD）、样本不足 + 局部（GBPUSD）、暂不评级（NZDUSD / USDCHF / USDJPY）截图待补
