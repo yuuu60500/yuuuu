@@ -1067,3 +1067,5 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           EURUSD 两图与 USDCHF CTX 各 1，0 差异；PROT 只差 leg= 6 行（v2.55 同样 6 行）PENDING REVIEW（A-59）；
           第 6 项十对（八品种默认 + 两个 ATR）「IDENTICAL apart from the strength rows」；第 7 项 -Str 记录；
           第 8 项 COMPACT（r4）/ FULL / 暂不评级（USDJPY）截图与 r4 编译 0 / 0 齐备；工具 r5 logtests 164/164、live_coverage_tests 22/22
+   验收结论（2026-10-27，Audit Round 42）：按已覆盖范围受限通过，v2.56r4 留档为开发与回退基线（docs/baselines/v2.56.md）。
+          保留：PROT leg= 6 条 PENDING REVIEW（全日志 RESULT 仍 NOT PASSED）、LIQ 本版日内无样本、等待 / 样本不足界面未截图、旧长行截断

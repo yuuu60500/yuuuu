@@ -2110,3 +2110,11 @@ tools/live_coverage_tests.py  「live PROT leg changed」改为断言 PENDING RE
 tools/logtests                s31（跨文件 → pending，第二个文件写入时间更早也按名称排序）、s32（同一文件缺实时行 → 仍为不一致）；164 组
 docs                          BRI-13 T-9；docs/04；docs/06 Audit Round 41；evidence/v2.56_mt5_run_20261027.txt
 ```
+
+## v2.56r4 —— 受限开发与回退基线（验收方 2026-10-27）
+
+```
+Date:     2026-10-27
+来源:     验收方「HMI v2.56r4 验收结论与下一步」：受限通过，r4 包 60B2AB93…AD80；下一步 v2.57 质量评分定义稿
+docs      baselines/v2.56.md（指纹、证据、保留限制）；07 基线表；04 v2.56 清单结论；06 Audit Round 42
+```

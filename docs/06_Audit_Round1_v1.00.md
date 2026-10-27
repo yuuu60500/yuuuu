@@ -2391,3 +2391,16 @@ r4（同日）:              用户 MetaEditor 编译 0 errors / 0 warnings（61
 截图:                    r4 COMPACT（AUDUSD 第一行完整、第二行分数与时间；USDJPY「强度 暂不评级」）、FULL、r4 编译 0 / 0
 仍属显示阶段:            v2.55 起就超过 63 字符的行（TRANSITION 下 COMPACT 第一行、CYCLE、FULL POI）
 ```
+
+
+## Audit Round 42 —— v2.56r4 受限通过（验收方 2026-10-27），留档为基线
+
+```
+验收方结果:              r4 编译 0 / 0；logtests 164/164、strength_sim 81/81、live_coverage_tests 22/22、461F006E；两份原始日志指纹一致，
+                         142 + 110 个闭合构建；11622 条强度记录独立复算 0 差异；110 份直方图自洽；十张图实时 STR 与重建一致；
+                         十对跨版本除强度行外一致；截图逐张核对
+措辞更正（采纳）:        同窗口重载是「九张同窗口 + AUDUSD 窗口移动按 settle 比较」；严格逐字段一致的 PROT 只有 USDCAD 1 条，
+                         另 6 条只差 leg= 仍 PENDING REVIEW；跨文件 pending 只说明连续性未被证明，不断言休眠
+保留:                    见 docs/baselines/v2.56.md 第 3 节
+下一步:                  v2.57 质量评分定义稿（原需求 §6），确认后实现；v2.58 面板
+```
