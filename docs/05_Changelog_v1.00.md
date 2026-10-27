@@ -2159,3 +2159,18 @@ docs                          02 BRI-14（Q-10 分母与成因按验收方口径
                               06 Audit Round 44；evidence/v2.57_dev_checks.txt
 Trading Logic Changed:  NO（只显示，Rule 69；现有日志行与参数摘要 461F006E 不变）
 ```
+
+## v2.57 工具 r2 —— 验收方两处 P2（MQL5 与开发版相同）
+
+```
+Date:     2026-10-27
+来源:     验收方「HMI v2.57 开发版代码复核与运行验收要求」：编译 0 / 0，源码与质量计算通过、无指标修改项；ReloadTest 两处 P2，
+          附候选补丁（按交付包 Logs/ 路径），工程师等效合并
+tools/ReloadTest.ps1   QltAudit：同一构建 HMI-STR 与 HMI-QLT 的 H4 收盘集合必须相同（缺 / 多都报，列出前三根）；
+                       Show-LiveVsBuild：每个参与比较的构建各做一次 StrAudit（v2.56+）与 QltAudit（v2.57+），构建侧有错时不给
+                       AGREE BOTH WAYS（候选补丁只做 QLT；STR 的同一缺口一并补上，有效日志的输出不变）
+tools/logtests         q32 构建直方图损坏的实时对比、q33 两次构建都缺全部质量行、q34 都缺一根、q35 STR 直方图损坏的实时对比、
+                       q36 都缺一根强度行；q29（v2.57 构建无质量行）现报 2 项（另违反 STR / QLT 同一组 H4）；200/200。
+                       验收方五个反例日志用新工具：两组对照通过，三组反例拒绝
+docs                   02 BRI-14 Q-12；04 v2.57 清单；06 Audit Round 45
+```

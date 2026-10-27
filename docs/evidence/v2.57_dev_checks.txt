@@ -79,3 +79,19 @@ PASS  q31_qlt_dist
 
 ## control: the same q01-q31 with ReloadTest.ps1 of tools r5 (69b07c9, before QLT)
 0/31 as expected - it reads no HMI-QLT row; on the tampered builds it reports 'IDENTICAL inside the comparable region'
+
+## tools r2 (reviewer, v2.57 dev code review, two P2) - pwsh tools/logtests/Run-LogTests.ps1
+PASS  q29_versus257_no_qlt   (expectation updated to 2 failures: no quality rows also breaks the STR / QLT bar set; rerun PASS)
+PASS  q32_live_qlt_build_hist_corrupt
+PASS  q33_reload_qlt_rows_missing_both
+PASS  q34_reload_qlt_row_missing_both
+PASS  q35_live_str_build_hist_corrupt
+PASS  q36_reload_str_row_missing_both
+200/200 cases as expected (199 in the full run + q29 rerun after its expectation was updated)
+
+## the reviewer's five counterexample logs with tools r2
+reload_control                accepted (QLT IDENTICAL, every row recomputes)
+reload_QLT_missing_in_both    rejected: STR / QLT H4 bars differ: 1 bar(s) with HMI-STR but no HMI-QLT (2026.02.11 16:00) - both builds
+reload_all_QLT_missing_both   rejected: STR / QLT H4 bars differ: 150 bar(s) with HMI-STR but no HMI-QLT - both builds
+live_control                  accepted (AGREE BOTH WAYS, 30 QLT rows)
+live_histogram_corrupt        rejected: build 1 QLT / build 2 QLT: QLT-HIST ok + partial + nodir + nodata = 200 / 230, bars=999

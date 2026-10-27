@@ -1474,6 +1474,9 @@ HMI_QualityEngine.mqh（新）  QltOnH4Bar(h) 在 H4ProcessBar 最后、StrOnH4B
 回撤与价格一致、11 对重叠、整数合成、状态与原因）、对照本构建结构行（事件 = 当前段的 HMI-CTX 突破且冻结价相同、START = 开段那次、
 未列出的段内突破只能比所列成熟事件更老或在 60 根之外、所列收盘 = 该根质量行的 close、锚点 = 最近一行 HMI-ANCHOR、ctx = 最近一行 HMI-CTX、
 锚点不变时极值不回退）、处理窗口、直方图；`-Versus` v2.56 → v2.57 加法模式（HMI-STR 也须逐行相同）；`-Qlt` 分布记录。
+工具 r2（验收方「HMI v2.57 开发版代码复核」两处 P2）：同一构建的 HMI-STR 与 HMI-QLT 必须覆盖同一组 H4 收盘（缺行或多行都报），
+两次构建都缺质量明细时不再给出 IDENTICAL；`-LiveVsBuild` 对每个参与比较的构建各做一次完整的 STR / QLT 构建检查（明细、结构、直方图），
+构建侧有错时不给 AGREE BOTH WAYS（STR 的同一缺口一并补上）。
 `live_coverage.py --ver 2.57` 计 QLT 类别。
 
 **不在本版：** 阶段（§7）、原因（§8）、变化箭头、完整趋势面板与等级颜色、旧长行截断（v2.58）；结构、保护点、BRI-08、Session、MODEL 规则不动。

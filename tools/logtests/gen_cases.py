@@ -1000,10 +1000,32 @@ case("q27_versus257_ctx_changed", v56v57(new_tweak=lambda rr: tamper(rr, lambda 
 case("q28_versus257_qlt_bad", v56v57(new_tweak=lambda rr: tamper(rr, _qrow(_hok), lambda l: setf(l, "score", str(int(fld(l, "score")) + 1)))), VQ,
      ["quality rows FAILED their check", "score="], ["IDENTICAL apart from the quality rows"])
 case("q29_versus257_no_qlt", v56v57(new_qlt=False), VQ,
-     ["quality rows FAILED their check (1)", "0 HMI-QLT-HIST row(s) in build 1 (one expected)"], ["IDENTICAL apart from the quality rows"])
+     ["quality rows FAILED their check (2)", "STR / QLT H4 bars differ: 150 bar(s) with HMI-STR but no HMI-QLT",
+      "0 HMI-QLT-HIST row(s) in build 1 (one expected)"], ["IDENTICAL apart from the quality rows"])
 case("q30_versus257_old_has_qlt", v56v57(old_tweak=lambda rr: rr + qrows(_hok, _hok + 1, inst="0D56", init=1)), VQ,
      ["v2.56 build carries 1 quality row(s)"], ["IDENTICAL apart from the quality rows"])
 case("q31_qlt_dist", [start("2.57")] + QB1, ["-Qlt"],
      ["merged  params ABCD1234 " + QS.DEF_ID, "tiers of the scored bars", "mature events used on the trend bars"], ["CHECK FAILED"])
+# reviewer, v2.57 dev review (two P2): live vs build never checked the builds' own quality output (q32: both QLT-HIST
+# bars=999, rows untouched - "AGREE BOTH WAYS" before); and quality rows missing from BOTH builds left the reload
+# verdict IDENTICAL (q33: all of them; q34: one bar). Every processed H4 bar of a v2.57 build has an STR and a QLT row:
+# the two bar sets must be the same (q36: an STR row missing instead). The live-vs-build build check covers STR too (q35).
+_bars999 = lambda rr: [setf(l, "bars", "999") if "HMI-QLT-HIST," in l else l for l in rr]
+case("q32_live_qlt_build_hist_corrupt", [start("2.57")] + qlb(1, _X2, 1, tweak=_bars999) + _live(_X2, _Y2) + [start("2.57", init=2)] + qlb(2, _Y2, 2, tweak=_bars999),
+     ["-LiveVsBuild"], ["build score check(s) FAILED", "build 1 QLT: QLT-HIST ok + partial + nodir + nodata =", "build 2 QLT: QLT-HIST ok + partial + nodir + nodata ="],
+     ["AGREE BOTH WAYS"])
+_noqlt = lambda rr: [l for l in rr if "HMI-QLT," not in l]
+case("q33_reload_qlt_rows_missing_both", [start("2.57")] + qbuild(1, tweak=_noqlt) + [start("2.57", init=2)] + qbuild(2, init=2, tweak=_noqlt), R,
+     ["STR / QLT H4 bars differ: 150 bar(s) with HMI-STR but no HMI-QLT", "quality rows FAILED their check"], ["IDENTICAL inside"])
+_h34 = _QW + 60
+_no34 = lambda rr: [l for l in rr if not _qrow(_h34)(l)]
+case("q34_reload_qlt_row_missing_both", [start("2.57")] + qbuild(1, tweak=_no34) + [start("2.57", init=2)] + qbuild(2, init=2, tweak=_no34), R,
+     [f"STR / QLT H4 bars differ: 1 bar(s) with HMI-STR but no HMI-QLT ({_qt(_h34)})", "quality rows FAILED their check"], ["IDENTICAL inside"])
+_strok = lambda rr: [setf(l, "ok", str(int(fld(l, "ok")) + 1)) if "HMI-STR-HIST," in l else l for l in rr]
+case("q35_live_str_build_hist_corrupt", [start("2.57")] + qlb(1, _X2, 1, tweak=_strok) + _live(_X2, _Y2) + [start("2.57", init=2)] + qlb(2, _Y2, 2, tweak=_strok),
+     ["-LiveVsBuild"], ["build score check(s) FAILED", "build 1 STR: HIST ok + nodir + nodata ="], ["AGREE BOTH WAYS"])
+_nostr = lambda rr: [l for l in rr if not ("HMI-STR," in l and (",bar=" + _qt(_h34) + ",") in l)]
+case("q36_reload_str_row_missing_both", [start("2.57")] + qbuild(1, tweak=_nostr) + [start("2.57", init=2)] + qbuild(2, init=2, tweak=_nostr), R,
+     [f"0 bar(s) with HMI-STR but no HMI-QLT, 1 with HMI-QLT but no HMI-STR ({_qt(_h34)})"], ["IDENTICAL inside"])
 json.dump(C, open("cases.json", "w"), indent=1)
 print(len(C), "cases")

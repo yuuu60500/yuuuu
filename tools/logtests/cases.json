@@ -2698,7 +2698,8 @@
    "USDJPY#0E57,M5"
   ],
   "expect": [
-   "quality rows FAILED their check (1)",
+   "quality rows FAILED their check (2)",
+   "STR / QLT H4 bars differ: 150 bar(s) with HMI-STR but no HMI-QLT",
    "0 HMI-QLT-HIST row(s) in build 1 (one expected)"
   ],
   "forbid": [
@@ -2730,6 +2731,69 @@
   ],
   "forbid": [
    "CHECK FAILED"
+  ]
+ },
+ "q32_live_qlt_build_hist_corrupt": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "build score check(s) FAILED",
+   "build 1 QLT: QLT-HIST ok + partial + nodir + nodata =",
+   "build 2 QLT: QLT-HIST ok + partial + nodir + nodata ="
+  ],
+  "forbid": [
+   "AGREE BOTH WAYS"
+  ]
+ },
+ "q33_reload_qlt_rows_missing_both": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "STR / QLT H4 bars differ: 150 bar(s) with HMI-STR but no HMI-QLT",
+   "quality rows FAILED their check"
+  ],
+  "forbid": [
+   "IDENTICAL inside"
+  ]
+ },
+ "q34_reload_qlt_row_missing_both": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "STR / QLT H4 bars differ: 1 bar(s) with HMI-STR but no HMI-QLT (2026.02.09 04:00)",
+   "quality rows FAILED their check"
+  ],
+  "forbid": [
+   "IDENTICAL inside"
+  ]
+ },
+ "q35_live_str_build_hist_corrupt": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "build score check(s) FAILED",
+   "build 1 STR: HIST ok + nodir + nodata ="
+  ],
+  "forbid": [
+   "AGREE BOTH WAYS"
+  ]
+ },
+ "q36_reload_str_row_missing_both": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "0 bar(s) with HMI-STR but no HMI-QLT, 1 with HMI-QLT but no HMI-STR (2026.02.09 04:00)"
+  ],
+  "forbid": [
+   "IDENTICAL inside"
   ]
  }
 }

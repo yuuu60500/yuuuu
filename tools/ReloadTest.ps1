@@ -563,6 +563,19 @@ function QltAudit($bk) {
     }
     foreach ($g in @($s.Qlt | Group-Object BarS | Where-Object { $_.Count -gt 1 })) { $out += "bar $($g.Name) has $($g.Count) HMI-QLT rows" }
     if ((VerNum $bk.Ver) -lt [decimal]2.57 -and $s.Qlt.Count -eq 0 -and $s.QHist.Count -eq 0) { return $out }
+    # (reviewer, v2.57 dev review P2) STR and QLT are written for the same processed H4 bars under the same
+    # M5-window condition: a self-consistent histogram does not prove the per-bar quality rows were logged
+    if ((VerNum $bk.Ver) -ge [decimal]2.57) {
+        $sb = @{}; foreach ($r in $s.Str) { $sb[$r.BarS] = $true }
+        $qb = @{}; foreach ($r in $s.Qlt) { $qb[$r.BarS] = $true }
+        $miss = @($sb.Keys | Where-Object { -not $qb.ContainsKey($_) } | Sort-Object)
+        $xtra = @($qb.Keys | Where-Object { -not $sb.ContainsKey($_) } | Sort-Object)
+        if ($miss.Count -or $xtra.Count) {
+            $out += ("STR / QLT H4 bars differ: {0} bar(s) with HMI-STR but no HMI-QLT{1}, {2} with HMI-QLT but no HMI-STR{3}" -f `
+                     $miss.Count, $(if ($miss.Count) { ' (' + (@($miss | Select-Object -First 3) -join ', ') + $(if ($miss.Count -gt 3) { ', ...' }) + ')' }),
+                     $xtra.Count, $(if ($xtra.Count) { ' (' + (@($xtra | Select-Object -First 3) -join ', ') + $(if ($xtra.Count -gt 3) { ', ...' }) + ')' }))
+        }
+    }
     $out += @(QltStructCheck $s)
     if ($s.QHist.Count -ne 1) { return ($out + "$($s.QHist.Count) HMI-QLT-HIST row(s) in build $($bk.Build) (one expected)") }
     if ($s.QHist[0].To -eq [datetime]::MinValue -or $s.QHist[0].To -gt $bk.To) { $out += "QLT-HIST to=$($s.QHist[0].F['to']) after the build's last M5 bar $($bk.ToS)" }
@@ -2403,6 +2416,7 @@ function Show-LiveVsBuild([string]$src) {
     if ($sel.Count -lt 2) { Write-Host "  fewer than two builds - nothing brackets a live stretch yet." -ForegroundColor Yellow; return }
     $pairs = 0; $cmp = 0; $pend = 0; $liveN = 0; $liveCtxN = 0; $strPend = 0; $bad = @(); $okRows = @(); $pendWhy = @(); $liqPend = 0
     $liveProtN = 0; $legPend = 0; $liveB8N = 0; $liveStrN = 0; $strBadL = @(); $liveQltN = 0; $qltBadL = @()
+    $scoreBadB = @(); $auditDone = @{}
     for ($k = 1; $k -lt $sel.Count; $k++) {
         $A = $sel[$k - 1]; $B = $sel[$k]
         $rows = @($lv | Where-Object { $_.Idx -gt $A.EndIdx -and $_.Idx -lt $B.BeginIdx })
@@ -2485,6 +2499,15 @@ function Show-LiveVsBuild([string]$src) {
             $pendWhy += "build $($A.Build)->$($B.Build): no judged event (LIQ pending or edge rows only) - not comparable"
             continue
         }
+        # (reviewer, v2.57 dev review P2) the builds themselves are checked too - rows, structure, histograms:
+        # live rows matching the rebuild prove the two agree, not that the build's score output holds together.
+        # Each build once; the same gap closed for the strength rows (v2.56+)
+        foreach ($sbk in @($A, $B)) {
+            if ($auditDone.ContainsKey($sbk.BeginIdx)) { continue }
+            $auditDone[$sbk.BeginIdx] = $true
+            if ((VerNum $sbk.Ver) -ge [decimal]2.56) { foreach ($w in @(StrAudit $sbk)) { $scoreBadB += "build $($sbk.Build) STR: $w" } }
+            if ((VerNum $sbk.Ver) -ge [decimal]2.57) { foreach ($w in @(QltAudit $sbk)) { $scoreBadB += "build $($sbk.Build) QLT: $w" } }
+        }
         $cmp++
         $liveN += $lIn.Count
         $okRows += $lIn
@@ -2541,18 +2564,22 @@ function Show-LiveVsBuild([string]$src) {
         Write-Host "  $($qltBadL.Count) live quality row(s) FAILED the recomputation:" -ForegroundColor Red
         $qltBadL | Select-Object -First 10 | ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
     }
+    if ($scoreBadB.Count) {
+        Write-Host "  $($scoreBadB.Count) build score check(s) FAILED (rows, structure, histogram of the builds compared):" -ForegroundColor Red
+        $scoreBadB | Select-Object -First 10 | ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
+    }
     if ($okRows.Count) {
         $bm = $okRows | Group-Object { RowLabel $_ } | Sort-Object Name | ForEach-Object { "$($_.Name) $($_.Count)" }
         Write-Host ("  by model: " + ($bm -join '  |  '))
     }
-    if ($bad.Count -eq 0 -and $strBadL.Count -eq 0 -and $qltBadL.Count -eq 0) {
+    if ($bad.Count -eq 0 -and $strBadL.Count -eq 0 -and $qltBadL.Count -eq 0 -and $scoreBadB.Count -eq 0) {
         $what = $(if ($liqPend -eq 0) { 'MODEL + LIQ' } else { "MODEL only; LIQ pending in $liqPend pair(s)" })
         Write-Host "  AGREE BOTH WAYS on every covered bar ($what)." -ForegroundColor $(if ($liqPend -eq 0 -and $strPend -eq 0 -and $legPend -eq 0) { 'Green' } else { 'Yellow' })
         if ($strPend -gt 0) { Write-Host "  $strPend H4 event(s) agree on swing and state but not on the strength number - PENDING REVIEW for those" -ForegroundColor Yellow }
         if ($legPend -gt 0) { Write-Host "  $legPend protected-level row(s) agree but for the leg number - PENDING REVIEW for those" -ForegroundColor Yellow }
         if ($pend -gt 0) { Write-Host "  (the pending pairs above are NOT included in this result)" -ForegroundColor Yellow }
     } elseif ($bad.Count -eq 0) {
-        Write-Host "  no mismatch, but $(if ($strBadL.Count) { 'strength' } else { 'quality' }) rows FAILED their check - not a pass." -ForegroundColor Red
+        Write-Host "  no mismatch, but $(if ($strBadL.Count) { 'strength' } elseif ($qltBadL.Count) { 'quality' } else { 'the builds'' score' }) rows FAILED their check - not a pass." -ForegroundColor Red
     } else {
         Write-Host "  $($bad.Count) MISMATCH(ES) on covered bars:" -ForegroundColor Red
         $bad | Select-Object -First 20 | ForEach-Object { Write-Host ("    {0,-10} [{1}] {2}" -f $_.Side, $_.Pair, $_.Row) }
