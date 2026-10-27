@@ -118,6 +118,31 @@ def days256():
     return d1, d2
 
 
+# v2.57: one HMI-QLT row for the same H4 bar, live and in build 2, and an HMI-QLT-HIST per build - not a row to compare
+QLT = 'HMI-QLT,AUDUSD,live={},bar=2026.10.19 12:00,ctx=BULLISH,state=OK,reason=-,def=QLT1-B60.5.3.3S1-RA-O12F6-W40.35.25-T40.70,' \
+      'dir=1,ev=2026.10.17 12:00@0.69050/START/OK/0.69400|0.69600|0.69400;2026.10.18 00:00@0.69650/BOS/OK/0.70083|0.70300|0.70133;' \
+      '2026.10.18 20:00@0.70350/BOS/OK/0.70600|0.70800|0.71000,b_n=3,b_ok=3,b_fail=0,b_pend=0,q_break=100.000000,anchor=0.69750,' \
+      'anchor_bar=2026.10.18 16:00,ext=0.71050,close=0.71000,leg_pts=1300,retr_pts=50,q_retrace=100.000000,' \
+      'ov=50/483;50/483;217/267;50/383;50/383;167/300;50/450;50/450;50/450;50/450;50/450,ov_sum=2393089,q_overlap=78.244645,' \
+      'raw=94.561161,score={},tier=GOOD,sample=LOW'
+QHIST = 'HMI-QLT-HIST,AUDUSD,live=0,def=QLT1-B60.5.3.3S1-RA-O12F6-W40.35.25-T40.70,from=2026.07.10 04:00,to={},bars=500,ok=300,' \
+        'partial=100,nodir=86,nodata=14,poor=100,fair=100,good=100,few=90,anchor=10,legbad=0,n=10;30;60;100;100;100,h=' + \
+        ';'.join(['3'] * 100) + ';0'
+
+
+def days257():
+    d1, d2 = days256()
+    v = lambda x: x.replace('ver=2.56', 'ver=2.57')
+    d1, d2 = [v(x) for x in d1], [v(x) for x in d2]
+    i1 = next(k for k, x in enumerate(d1) if 'HMI-BUILD-END' in x and 'build=1,' in x)
+    d1 = d1[:i1] + [line('10:00:00.006', QHIST.format('2026.10.19 08:00') + ',' + ID)] + d1[i1:]
+    i = next(k for k, x in enumerate(d1) if 'HMI-STR-WAIT' in x)
+    d1 = d1[:i] + [line('10:05:00.001', QLT.format(1, 95) + ',' + ID)] + d1[i:]
+    j = next(k for k, x in enumerate(d1) if 'HMI-BUILD-END' in x and 'build=2,' in x)
+    d1 = d1[:j] + [line('10:31:00.006', QLT.format(0, 95) + ',' + ID), line('10:31:00.007', QHIST.format('2026.10.19 12:00') + ',' + ID)] + d1[j:]
+    return d1, d2
+
+
 def restart(drop_row=None):
     """the terminal restarted between build 1 and build 2: build 2 onwards carries run=101"""
     def f(d):
@@ -185,6 +210,11 @@ CASES = [
                                              'tr_sum=7000,net=1400,recent=350,s_move=93.333333,s_eff=100.000000,'
                                              's_mom=70.000000,raw=91.000000,score=90'), 1, '2.56'),
     ('v2.56 live HMI-STR missing from the later build', drop('HMI-STR,AUDUSD,live=0,'), 1, '2.56'),
+    # v2.57 (--ver 2.57): HMI-QLT is a category of its own (QLT), judged like STR on the H4 bar
+    ('v2.57 unaltered (QLT-HIST rows not compared)', lambda d: d, 0, '2.57'),
+    ('v2.57 live HMI-QLT score changed', lambda d: [[x.replace(',score=95,', ',score=94,') if 'HMI-QLT,AUDUSD,live=1,' in x else x
+                                                    for x in d[0]], d[1]], 1, '2.57'),
+    ('v2.57 live HMI-QLT missing from the later build', drop('HMI-QLT,AUDUSD,live=0,'), 1, '2.57'),
 ]
 
 
@@ -197,7 +227,7 @@ def main():
         os.makedirs(tmp, exist_ok=True)
         for name, alter, want, *ver in CASES:
             ver = ver[0] if ver else '2.54'
-            d1, d2 = alter(days256() if ver == '2.56' else days255() if ver == '2.55' else days())
+            d1, d2 = alter(days257() if ver == '2.57' else days256() if ver == '2.56' else days255() if ver == '2.55' else days())
             paths = []
             for n, d in (('20261019.log', d1), ('20261020.log', d2)):
                 p = os.path.join(tmp, n)
@@ -225,6 +255,9 @@ def main():
             if name.startswith('v2.56 unaltered'):
                 good = good and 'AUDUSD#T1      20261019       1      1    0    0    0    2    1     0        0' in r.stdout \
                     and 'intraday: MODEL, B8, STR' in r.stdout
+            if name.startswith('v2.57 unaltered'):
+                good = good and 'AUDUSD#T1      20261019       1      1    0    0    0    2    1    1     0        0' in r.stdout \
+                    and 'intraday: MODEL, B8, STR, QLT' in r.stdout
             ok += good
             print(f'  {"ok  " if good else "FAIL"} {name:40} exit {r.returncode} (want {want})  {last[:70]}')
             if not good:

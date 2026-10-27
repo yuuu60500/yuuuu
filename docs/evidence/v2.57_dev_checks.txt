@@ -1,0 +1,81 @@
+# v2.57 development build (BRI-14 quality score, display only) - checks before compile, 2026-10-27
+# MQL5 cannot be compiled here: compile 0/0 and the MT5 run are the user's. These checks cover the logic, the wording and the tools.
+
+## sources (sha256)
+7be4e841d2389214ac0b9d65a8709f5bfc1edb3934b2e012953242c7e17ef6eb  H4M5_Identification.mq5
+0afa713e676098cc2be0a28fded5c5db0e0a9f9f26948e6c11ba59160f7852b0  HMI_QualityEngine.mqh
+53030364aae371c0d55ef55ef81fae4c6fbe8435f9c24147ec30bf69095e1ce4  HMI_H4ContextEngine.mqh
+2b1757fb1dbed28a61e33829b15e9ffa972be8ee083b6c6e91744fad8c541e36  HMI_Defs.mqh
+53f144f86e521f17ab0ae3357169c297c5ffac108dbf47cfaea275ac80d0949c  HMI_ObjectManager.mqh
+23f1e0a5a4c5a30c26dd6cebfaabb32d1b058cce908d36fab71704191acb09c8  HMI_StrengthEngine.mqh
+changed against v2.56r4 (2c826aa):  4 files changed, 18 insertions(+), 2 deletions(-) + new HMI_QualityEngine.mqh
+
+## python3 tools/params_digest.py
+params=461F006E
+
+## python3 tools/quality_mql_mirror.py EURUSD_H1.csv   (HMI_QualityEngine.mqh transliterated, against tools/quality_sim.py)
+staircase: 74 bars, 0 rows differ
+staircase mirror: 74 bars, 0 rows differ
+CHOCH then TRANS_OK: 38 bars, 0 rows differ
+CHOCH then TRANS_OK mirror: 38 bars, 0 rows differ
+CHOCH then TRANS_FAIL: 33 bars, 0 rows differ
+CHOCH then TRANS_FAIL mirror: 33 bars, 0 rows differ
+INVALID anchor: 37 bars, 0 rows differ
+INVALID anchor mirror: 37 bars, 0 rows differ
+failing breaks: 41 bars, 0 rows differ
+failing breaks mirror: 41 bars, 0 rows differ
+EURUSD_H1.csv: 1292 bars, 0 rows differ
+EURUSD_H1.csv mirror: 1292 bars, 0 rows differ
+HMI-QLT rows: 3030 compared, 0 differ;  panel strings: 12120 compared, 0 differ
+PASS
+
+## \uXXXX words of HMI_StrengthEngine.mqh + HMI_QualityEngine.mqh decoded against their comments
+41 macros, 0 mismatches
+
+## python3 tools/quality_sim.py ; --replay ; python3 tools/strength_sim.py (unchanged)
+127/127 PASS
+2/2 PASS
+81/81 PASS
+
+## python3 tools/live_coverage_tests.py
+  ok   v2.57 unaltered (QLT-HIST rows not compared) exit 0 (want 0)  RESULT: inputs complete, 0 differences (categories without a sample ar
+  ok   v2.57 live HMI-QLT score changed         exit 1 (want 1)  RESULT: NOT PASSED - 2 difference(s) on compared rows
+  ok   v2.57 live HMI-QLT missing from the later build exit 1 (want 1)  RESULT: NOT PASSED - 1 difference(s) on compared rows
+25/25
+
+## pwsh tools/logtests/Run-LogTests.ps1  (the v2.57 cases; the other 164 as before)
+PASS  q01_reload_qlt_identical
+PASS  q02_reload_qlt_row_missing
+PASS  q03_reload_qlt_score_tampered
+PASS  q04_reload_qlt_outcome_tampered
+PASS  q05_reload_qlt_event_close
+PASS  q06_reload_qlt_event_level
+PASS  q07_reload_qlt_event_left_out
+PASS  q08_reload_qlt_anchor_moved
+PASS  q09_reload_qlt_protected_as_anchor
+PASS  q10_reload_qlt_after_choch
+PASS  q11_reload_qlt_hist_ok_wrong
+PASS  q12_reload_qlt_hist_missing
+PASS  q13_reload_qlt_dup_bar
+PASS  q14_reload_qlt_def_changed
+PASS  q15_reload_qlt_def_unknown
+PASS  q16_reload_qlt_after_window
+PASS  q17_reload_qlt_start_flag
+PASS  q18_reload_qlt_overlap_tampered
+PASS  q19_reload_qlt_retrace_tampered
+PASS  q20_live_qlt_ok
+PASS  q21_live_qlt_tampered
+PASS  q22_live_qlt_build_missing
+PASS  q23_live_qlt_boundaries_recompute
+PASS  q24_live_qlt_boundary_tier_tampered
+PASS  q25_versus257_additive_ok
+PASS  q26_versus257_str_changed
+PASS  q27_versus257_ctx_changed
+PASS  q28_versus257_qlt_bad
+PASS  q29_versus257_no_qlt
+PASS  q30_versus257_old_has_qlt
+PASS  q31_qlt_dist
+195/195 cases as expected
+
+## control: the same q01-q31 with ReloadTest.ps1 of tools r5 (69b07c9, before QLT)
+0/31 as expected - it reads no HMI-QLT row; on the tampered builds it reports 'IDENTICAL inside the comparable region'

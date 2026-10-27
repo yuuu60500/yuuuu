@@ -2133,3 +2133,29 @@ tools/quality_sim.py   离线模型：多空镜像场景 127/127（含引擎驱�
 docs/04                v2.57 验收清单草案；docs/06 Audit Round 43；docs/evidence/v2.57_quality_offline.txt
 Trading Logic Changed:  NO（只显示，Rule 69；本稿未改代码）
 ```
+
+## v2.57 开发版 —— 趋势质量评分（BRI-14，只显示；未编译）
+
+```
+Date:     2026-10-27
+来源:     验收方「HMI v2.57 质量评分定义稿审核结论」（2026-10-27）：定义可进入 MQL 实现，C-1 至 C-9 按建议固定，C-10 不改权重与阈值
+基线:     v2.56r4 受限基线（MQL 2c826aa）
+MQL5/Indicators/HMI
+  HMI_QualityEngine.mqh（新）  QltOnH4Bar（StrOnH4Bar 之后，只读）、当前段突破跟踪、三项与整数合成、HMI-QLT / HMI-QLT-HIST、
+                              面板 QltPanelText（FULL）/ QltPanelShort（COMPACT），中文 \uXXXX
+  HMI_H4ContextEngine.mqh     取得趋势方向突破的两处写 g_ctx_brk_h / dir / px（只写，质量读）；状态、日志、保护点、锚点不变
+  HMI_Defs.mqh                三个只写诊断全局；HMI_VERSION 2.57
+  H4M5_Identification.mq5     QltOnH4Bar、QltReset（ResetEngine）、QltLogHist（BUILD-END 前）；#property version 2.57
+  HMI_ObjectManager.mqh       FULL 强度行之后一行；COMPACT 强度行之后一行（周期行顺延）；未构建时同样「等待数据」
+tools/quality_mql_mirror.py   编译前核对：MQL 逐行转写，与 quality_sim 比较 3030 行 HMI-QLT、12120 条面板文字 0 差异
+tools/quality_sim.py          comp_case 提到模块级（日志用例复用 C01–C04）；127/127 不变
+tools/ReloadTest.ps1          QLT 类别（重载、实时 vs 重建）、QltVerify 逐行复算、QltAudit / QltStructCheck（对照本构建 HMI-CTX / HMI-ANCHOR、
+                              处理窗口、直方图）、-Versus v2.56 → v2.57 加法模式（Show-StrAdditive 参数化）、-Qlt 分布记录
+tools/live_coverage.py        --ver 2.57 计 QLT；tests 25/25（+3）
+tools/logtests                q01–q31（重载一致 / 缺行 / 分数、事件结果、事件收盘、冻结价、遗漏事件、锚点移动、保护点当锚点、CHOCH 后
+                              仍有分、直方图、重复、def、窗口、START 标记、重叠、回撤 / 实时一致、篡改、缺行、40 / 70 精确边界 /
+                              v2.56 → v2.57 加法一致、STR 改变、CTX 改变、质量行失败、无质量行、旧版带质量行 / -Qlt）
+docs                          02 BRI-14（Q-10 分母与成因按验收方口径、确认记录、Q-12 实现）；01 §2.4；03 模块表；04 v2.57 清单；
+                              06 Audit Round 44；evidence/v2.57_dev_checks.txt
+Trading Logic Changed:  NO（只显示，Rule 69；现有日志行与参数摘要 461F006E 不变）
+```

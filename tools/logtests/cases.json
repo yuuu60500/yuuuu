@@ -2281,5 +2281,455 @@
   "forbid": [
    "AGREE BOTH WAYS"
   ]
+ },
+ "q01_reload_qlt_identical": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "QLT    IDENTICAL over",
+   "every row recomputes and agrees with its build's HMI-CTX / HMI-ANCHOR rows",
+   "IDENTICAL inside the comparable region"
+  ],
+  "forbid": [
+   "FAILED",
+   "MISMATCH"
+  ]
+ },
+ "q02_reload_qlt_row_missing": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "QLT    MISMATCH (1)",
+   "A only  QLT QLT|anchor="
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q03_reload_qlt_score_tampered": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "B: 2026.01.30 04:00: score=",
+   "quality rows FAILED their check"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q04_reload_qlt_outcome_tampered": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "OK, recomputed FAIL"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q05_reload_qlt_event_close": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "the quality row of that bar has"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q06_reload_qlt_event_level": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "but HMI-CTX"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q07_reload_qlt_event_left_out": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "break 2026.01.30 12:00 of the current leg is not listed but is newer than a listed mature event"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q08_reload_qlt_anchor_moved": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "but the latest HMI-ANCHOR row gives"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q09_reload_qlt_protected_as_anchor": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "2026.01.30 12:00: anchor=",
+   "but the latest HMI-ANCHOR row gives"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q10_reload_qlt_after_choch": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "2026.02.03 04:00: ctx=BEARISH but the build's HMI-CTX rows leave TRANSITION"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q11_reload_qlt_hist_ok_wrong": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "QLT-HIST ok + partial + nodir + nodata ="
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q12_reload_qlt_hist_missing": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "0 HMI-QLT-HIST row(s) in build 2 (one expected)"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q13_reload_qlt_dup_bar": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "bar 2026.01.30 04:00 has 2 HMI-QLT rows"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q14_reload_qlt_def_changed": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "QLT    NOT COMPARABLE - quality definition differs",
+   "of the current leg is inside the window but not listed"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows",
+   "QLT    MISMATCH"
+  ]
+ },
+ "q15_reload_qlt_def_unknown": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "is not a definition this tool can recompute"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q16_reload_qlt_after_window": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "HMI-QLT bar=2026.12.31 00:00 outside the build's processed M5 window"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q17_reload_qlt_start_flag": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "marked BOS, the leg opens at"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q18_reload_qlt_overlap_tampered": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "ov_sum="
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q19_reload_qlt_retrace_tampered": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "retr_pts="
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q20_live_qlt_ok": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "quality rows compared: 30 (QLT)",
+   "AGREE BOTH WAYS on every covered bar"
+  ],
+  "forbid": [
+   "MISMATCH(ES)",
+   "FAILED"
+  ]
+ },
+ "q21_live_qlt_tampered": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "live quality row(s) FAILED the recomputation",
+   "MISMATCH(ES) on covered bars"
+  ],
+  "forbid": [
+   "AGREE BOTH WAYS on every covered bar"
+  ]
+ },
+ "q22_live_qlt_build_missing": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "MISMATCH(ES) on covered bars",
+   "live only  [1->2] QLT"
+  ],
+  "forbid": [
+   "AGREE BOTH WAYS"
+  ]
+ },
+ "q23_live_qlt_boundaries_recompute": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "8 MISMATCH(ES) on covered bars",
+   "live only  [1->2] QLT"
+  ],
+  "forbid": [
+   "FAILED the recomputation"
+  ]
+ },
+ "q24_live_qlt_boundary_tier_tampered": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "1 live quality row(s) FAILED the recomputation",
+   "tier=GOOD, recomputed FAIR"
+  ],
+  "forbid": []
+ },
+ "q25_versus257_additive_ok": {
+  "args": [
+   "-Source",
+   "USDJPY#0D56,M5",
+   "-Versus",
+   "USDJPY#0E57,M5"
+  ],
+  "expect": [
+   "the quality score is added (BRI-14, display only)",
+   "IDENTICAL apart from the quality rows"
+  ],
+  "forbid": [
+   "UNEXPLAINED",
+   "FAILED",
+   "NOT JUDGED"
+  ]
+ },
+ "q26_versus257_str_changed": {
+  "args": [
+   "-Source",
+   "USDJPY#0D56,M5",
+   "-Versus",
+   "USDJPY#0E57,M5"
+  ],
+  "expect": [
+   "line(s) differ outside the quality rows - UNEXPLAINED",
+   "HMI-STR,USDJPY"
+  ],
+  "forbid": [
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q27_versus257_ctx_changed": {
+  "args": [
+   "-Source",
+   "USDJPY#0D56,M5",
+   "-Versus",
+   "USDJPY#0E57,M5"
+  ],
+  "expect": [
+   "line(s) differ outside the quality rows - UNEXPLAINED",
+   "HMI-CTX,USDJPY,BOS"
+  ],
+  "forbid": [
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q28_versus257_qlt_bad": {
+  "args": [
+   "-Source",
+   "USDJPY#0D56,M5",
+   "-Versus",
+   "USDJPY#0E57,M5"
+  ],
+  "expect": [
+   "quality rows FAILED their check",
+   "score="
+  ],
+  "forbid": [
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q29_versus257_no_qlt": {
+  "args": [
+   "-Source",
+   "USDJPY#0D56,M5",
+   "-Versus",
+   "USDJPY#0E57,M5"
+  ],
+  "expect": [
+   "quality rows FAILED their check (1)",
+   "0 HMI-QLT-HIST row(s) in build 1 (one expected)"
+  ],
+  "forbid": [
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q30_versus257_old_has_qlt": {
+  "args": [
+   "-Source",
+   "USDJPY#0D56,M5",
+   "-Versus",
+   "USDJPY#0E57,M5"
+  ],
+  "expect": [
+   "v2.56 build carries 1 quality row(s)"
+  ],
+  "forbid": [
+   "IDENTICAL apart from the quality rows"
+  ]
+ },
+ "q31_qlt_dist": {
+  "args": [
+   "-Qlt"
+  ],
+  "expect": [
+   "merged  params ABCD1234 QLT1-B60.5.3.3S1-RA-O12F6-W40.35.25-T40.70",
+   "tiers of the scored bars",
+   "mature events used on the trend bars"
+  ],
+  "forbid": [
+   "CHECK FAILED"
+  ]
  }
 }

@@ -315,6 +315,20 @@ def manch(anchor):
     return None if anchor is None else (anchor[0], MP - anchor[1])
 
 
+def comp_case(R, s, L, x, fails=()):
+    """bars rising s a bar with range R (I/U constant); events at 1, 4, 7 with levels just under their bar's high;
+    a failing event's next close sits on the next bar's low; anchor at h-2 with price ext - L; close = ext - x.
+    -> bars, h, events, anchor (the composite-boundary cases C01-C05; tools/logtests reuses them)"""
+    h = 13
+    rows = [(s * i + R, s * i, s * i + R - 1, s * i) for i in range(h + 1)]
+    evs = [(k, "BOS", p(BASE) + s * k + R - 2) for k in (1, 4, 7)]
+    for k in fails:
+        rows[k + 1] = (rows[k + 1][0], rows[k + 1][1], rows[k + 1][1], rows[k + 1][1])
+    ext = s * h + R
+    rows[h] = (ext, s * h, ext - x, s * h)
+    return obars(rows), h, evs, (h - 2, p(BASE) + ext - L)
+
+
 RESULTS = []
 SAME = ("state", "reason", "n", "s", "fail", "pend", "q_break", "leg", "x", "q_retrace", "so", "q_overlap", "raw", "score",
         "tier", "sample")
@@ -439,17 +453,6 @@ def scenarios():
     # ---- composite: tiers on the unrounded score, display rounded half up ---------------------------------------------
     print("\n== composite 0.40 / 0.35 / 0.25, tiers 40 / 70 on the unrounded score ==")
 
-    def comp(R, s, L, x, fails=()):
-        """bars rising s a bar with range R (I/U constant); events at 1, 4, 7 with levels just under their bar's high;
-        a failing event's next close sits on the next bar's low; anchor at h-2 with price ext - L; close = ext - x"""
-        h = 13
-        rows = [(s * i + R, s * i, s * i + R - 1, s * i) for i in range(h + 1)]
-        evs = [(k, "BOS", p(BASE) + s * k + R - 2) for k in (1, 4, 7)]
-        for k in fails:
-            rows[k + 1] = (rows[k + 1][0], rows[k + 1][1], rows[k + 1][1], rows[k + 1][1])
-        ext = s * h + R
-        rows[h] = (ext, s * h, ext - x, s * h)
-        return obars(rows), h, evs, (h - 2, p(BASE) + ext - L)
     for nm, args, want in (
             ("C01 Q_break 100, Q_retrace 40, Q_overlap 64 -> raw exactly 70 -> 70 GOOD", (680, 320, 900, 600), (F(70), 70, "GOOD")),
             ("C02 Q_retrace 270/7 -> raw exactly 69.5 -> shows 70, tier FAIR", (680, 320, 840, 570), (F(139, 2), 70, "FAIR")),
@@ -457,11 +460,11 @@ def scenarios():
              (F(40), 40, "FAIR")),
             ("C04 Q_retrace 470/21 -> raw exactly 39.5 -> shows 40, tier POOR", (900, 100, 1008, 820, (4,)),
              (F(79, 2), 40, "POOR"))):
-        b, h, evs, an = comp(*args)
+        b, h, evs, an = comp_case(*args)
         unit(nm, b, h, evs, an, dict(state="OK", raw=want[0], score=want[1], tier=want[2]))
-    b, h, evs, an = comp(680, 320, 900, 600)
+    b, h, evs, an = comp_case(680, 320, 900, 600)
     base = quality(b, h, BULL_CTX, evs, an)
-    b2, _, evs2, an2 = comp(680, 320, 900, 600, fails=(4,))
+    b2, _, evs2, an2 = comp_case(680, 320, 900, 600, fails=(4,))
     one = quality(b2, h, BULL_CTX, evs2, an2)
     check("C05 one failure among three: only Q_break moves (100 -> 66.67), raw falls 40/3",
           one["q_retrace"] == base["q_retrace"] and one["q_overlap"] == base["q_overlap"] and

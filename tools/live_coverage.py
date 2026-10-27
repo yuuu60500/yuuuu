@@ -10,12 +10,14 @@ categories that have a sample and the ones that do not (reviewer, v2.54r6 review
            the ARMED / confirming bar's close); cycle= is left out of the key like a MODEL row's ids
     STR    (--ver 2.56 and later) HMI-STR ...,live=1,...  - the strength score of one H4 bar (bar= its close), judged
            like CTX; HMI-STR-HIST (one per build) and HMI-STR-WAIT (a waiting episode, live only) are not rows to compare
+    QLT    (--ver 2.57 and later) HMI-QLT ...,live=1,...  - the quality score of one H4 bar, judged like STR;
+           HMI-QLT-HIST (one per build) is not a row to compare
 
 Intraday: consecutive COMPLETE builds of one instance in one log file (one local day, no sleep in
 between), same params digest. The live rows logged between them, whose run/init must be the earlier
 build's, are compared both ways with the later build's rows of the same window:
     MODEL / LIQ  event time >= earlier 'to' + 10 min (the earlier build covers up to 'to' + 5) and <= later 'to'
-    CTX / PROT / STR   bar > earlier 'to' and <= later 'to'
+    CTX / PROT / STR / QLT   bar > earlier 'to' and <= later 'to'
 Keys drop live= / inst= / run= / init= and, for MODEL / LIQ, only the cycle and block ids (init-relative) -
 symbol, category and direction stay, as in the reviewer's independent parser; str= and leg= are kept.
 Every live row must carry the run/init of the build it follows (checked when the log is read).
@@ -55,7 +57,7 @@ def category(c):
     if c[0] in ('HMI-BUILD', 'HMI-LIVE'):
         return c[2] if len(c) > 2 and c[2] in ('MODEL', 'LIQ') else None
     return {'HMI-CTX': 'CTX', 'HMI-PROT': 'PROT', 'HMI-ANCHOR': 'PROT', 'HMI-CTX-INTERNAL': 'PROT',
-            'HMI-REF': 'B8', 'HMI-BRK': 'B8', 'HMI-STR': 'STR'}.get(c[0])
+            'HMI-REF': 'B8', 'HMI-BRK': 'B8', 'HMI-STR': 'STR', 'HMI-QLT': 'QLT'}.get(c[0])
 
 
 def event_time(c, f):
@@ -71,7 +73,7 @@ def key(c, f, drop=()):
         z = [x for x in c[1:] if not x.startswith(('inst=', 'run=', 'init='))]
         return ('MODEL/LIQ', z[1]) + tuple(z[:3] + z[5:])       # symbol, category, direction; not cycle / block id
     skip = ('live', 'inst', 'run', 'init') + (('cycle',) if c[0] in ('HMI-REF', 'HMI-BRK') else ())   # cycle= is init-relative
-    sub = 'STR' if c[0] == 'HMI-STR' else c[2]                       # an HMI-STR row has no event kind: c[2] is live=
+    sub = {'HMI-STR': 'STR', 'HMI-QLT': 'QLT'}.get(c[0], c[2])        # HMI-STR / HMI-QLT have no event kind: c[2] is live=
     return (c[0], sub) + tuple(sorted((k, v) for k, v in f.items() if k not in skip + drop))
 
 
@@ -183,7 +185,8 @@ def main():
 
     srcs = sorted({s for _, seq, _, _ in days for s in seq})
     try:
-        cats = CATS + (('B8',) if float(a.ver) >= 2.55 else ()) + (('STR',) if float(a.ver) >= 2.56 else ())   # v2.55 BRI-08 / v2.56 BRI-13
+        cats = CATS + (('B8',) if float(a.ver) >= 2.55 else ()) + (('STR',) if float(a.ver) >= 2.56 else ()) + \
+            (('QLT',) if float(a.ver) >= 2.57 else ())             # v2.55 BRI-08 / v2.56 BRI-13 / v2.57 BRI-14
     except ValueError:
         cats = CATS
     cols = lambda c: ' '.join(f'{c[k]:{5 if k == "MODEL" else 4}}' for k in cats)

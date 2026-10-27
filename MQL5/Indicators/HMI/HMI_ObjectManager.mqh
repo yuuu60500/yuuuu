@@ -11,6 +11,7 @@
 #include "HMI_PriceActionEngine.mqh"
 #include "HMI_LiquidityLevels.mqh"
 #include "HMI_StrengthEngine.mqh"     // v2.56: strength line (display only)
+#include "HMI_QualityEngine.mqh"      // v2.57: quality line (display only)
 
 #define TT_MARK  "MK"
 #define TT_CTX   "CX"
@@ -467,6 +468,8 @@ void OM_DrawPanel()
       L[n++] = "HMI v" + HMI_VERSION + "  MARK ONLY - NO ENTRY DECISION";
       C[n] = base;
       L[n++] = StrPanelText();
+      C[n] = base;
+      L[n++] = QltPanelText();
      }
    else if(InpPanelMode == PANEL_FULL)
      {
@@ -478,6 +481,8 @@ void OM_DrawPanel()
                "   " + HMI_U(ZH_STRUCT) + (g_ctx_messy ? " MESSY" : " CLEAN");
       C[n] = base;
       L[n++] = StrPanelText();
+      C[n] = base;
+      L[n++] = QltPanelText();                // v2.57
       C[n] = base;
       L[n++] = "H4 POI: " + IntegerToString(poi_active) + " ACTIVE / " +
                IntegerToString(g_diag_poi_rejected_gap) + " REJECTED-BY-GAP" +
@@ -512,6 +517,8 @@ void OM_DrawPanel()
       string asof = StrPanelAsOf();
       C[n] = base;
       L[n++] = StrPanelShort() + (asof != "" ? "   " + asof : "");
+      C[n] = base;
+      L[n++] = QltPanelShort();               // v2.57: the same H4 as the row above
       C[n] = base;
       L[n++] = OM_PanelCycleLine();
      }

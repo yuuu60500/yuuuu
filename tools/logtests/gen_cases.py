@@ -805,5 +805,205 @@ case_files("s31_live_str_across_log_files", {"20261002.log": [start("2.56")] + _
            ["MISMATCH(ES)", "AGREE BOTH WAYS"])
 case("s32_live_str_same_file_build_only", [start("2.56")] + _n1 + _n2, ["-LiveVsBuild"],
      ["MISMATCH(ES) on covered bars", "build only [1->2] STR"], ["AGREE BOTH WAYS"])
+# ---- v2.57 (BRI-14): quality rows. One model run (tools/quality_sim.py on synthetic bars, seed 3: OK in all three tiers,
+# NODIR, FEW, FEW+ANCHOR, failed breaks, five-event samples, a moved anchor under a kept protected level) written as the MQL writes it: the build's structure rows
+# (HMI-CTX / PROT / ANCHOR / INTERNAL, h4_protect_attr.emit_lines), HMI-STR and HMI-QLT on the bars inside the M5
+# window, both histograms. ReloadTest recomputes every QLT row, checks it against the build's own structure rows and
+# judges QLT as a category; the counterexamples are single-field tampering and rows that are self-consistent but
+# built on the wrong inputs (an event left out, the anchor moved, protected_level used as the anchor, a leg after its CHOCH).
+import quality_sim as QS
+_QB = PA.synth_bars(300, 3)
+_QE, _QR, _QS, _QC = QS.run(_QB)
+_QW = 150                                                    # first H4 bar logged (its close is after the first M5 open)
+def _qt(h): return HB.tstr(_QB[h][0] + 4 * 3600)             # H4 close time
+def _struct(upto, inst, init, live=False):
+    out = []
+    for l in PA.emit_lines(_QB, _QE, "2.57", inst, init):
+        b = HB.dt.datetime.strptime(l.split(",bar=")[1].split(",")[0], "%Y.%m.%d %H:%M")
+        bt = int(b.replace(tzinfo=HB.dt.timezone.utc).timestamp())
+        if bt <= _QB[upto - 1][0] + 4 * 3600:
+            out.append(l.replace(",live=0,", ",live=1,") if live else l)
+    return out
+def _bars_between(lines, lo, hi):
+    """structure lines with lo < bar <= hi (H4 indices, close times)"""
+    a, b = _QB[lo][0] + 4 * 3600, _QB[hi][0] + 4 * 3600
+    out = []
+    for l in lines:
+        t = int(HB.dt.datetime.strptime(l.split(",bar=")[1].split(",")[0], "%Y.%m.%d %H:%M").replace(tzinfo=HB.dt.timezone.utc).timestamp())
+        if a < t <= b: out.append(l)
+    return out
+def qrows(lo, hi, live=0, inst="0001", init=1, recs=None):
+    rr = recs or _QR
+    return [L(SRC, QS.qlt_row(_QB, h, _QC[h], rr[h], live=live, inst=inst, init=init)) for h in range(lo, hi)]
+def srows(lo, hi, live=0, inst="0001", init=1):
+    return [L(SRC, SS.str_row(_QB, h, _QC[h], live=live, inst=inst, init=init, rec=_QS[h])) for h in range(lo, hi)]
+def qhists(upto, inst="0001", init=1):
+    return [L(SRC, SS.hist_row(_QB, _QS[:upto], inst=inst, init=init)), L(SRC, QS.qhist_row(_QB, _QR[:upto], inst=inst, init=init))]
+def qbuild(b, upto=300, ver="2.57", inst="0001", init=1, qlt=True, tweak=None):
+    rows = _struct(upto, inst, init) + srows(_QW, upto, inst=inst, init=init)
+    if qlt: rows += qrows(_QW, upto, inst=inst, init=init)
+    rows += [qhists(upto, inst, init)[0]] + ([qhists(upto, inst, init)[1]] if qlt else [])
+    if tweak: rows = tweak(rows)
+    to = HB.tstr(_QB[upto - 1][0] + 5 * 3600)
+    return blk(b, ver=ver, inst=inst, init=init, marks=[], liqs=[], chain=False, frm=HB.tstr(_QB[_QW][0]), to=to,
+               warm=HB.tstr(_QB[_QW][0]), extra_rows=rows)
+def qq(h, ctx=None, events=None, anchor=None, keep_anchor=True):
+    """a quality row of bar h recomputed by the model from other inputs (self-consistent, wrong on purpose)"""
+    r = _QR[h]
+    ev = events if events is not None else [(k, kind, lv) for (k, kind, lv, _, _) in r["ev"]]
+    an = anchor if anchor is not None else (r["anchor"] if keep_anchor else None)
+    return QS.quality(_QB, h, ctx or _QC[h], ev, an)
+def qswap(h, rec, init=2):
+    """replace bar h's quality row (in build 2, init 2) by the one from rec"""
+    new = L(SRC, QS.qlt_row(_QB, h, _QC[h], rec, init=init))
+    return lambda rows: [new if (",bar=" + _qt(h) + ",") in l and "HMI-QLT," in l else l for l in rows]
+_h5 = next(h for h in range(_QW + 10, 300) if _QR[h]["n"] == 5 and _QR[h]["state"] == "OK")
+_hf = next(h for h in range(_QW, 300) if any(ev[3] == "FAIL" for ev in _QR[h]["ev"]) and _QR[h]["state"] in ("OK", "PARTIAL"))
+_hok = next(h for h in range(_QW, 300) if _QR[h]["state"] == "OK")
+_qrow = lambda h: (lambda l: "HMI-QLT," in l and (",bar=" + _qt(h) + ",") in l)
+NOQ = ["IDENTICAL inside", "AGREE BOTH WAYS", "IDENTICAL apart from the quality rows"]
+QB1, QB2 = qbuild(1), qbuild(2, init=2)
+case("q01_reload_qlt_identical", [start("2.57")] + QB1 + [start("2.57", init=2)] + QB2, R,
+     ["QLT    IDENTICAL over", "every row recomputes and agrees with its build's HMI-CTX / HMI-ANCHOR rows", "IDENTICAL inside the comparable region"],
+     ["FAILED", "MISMATCH"])
+case("q02_reload_qlt_row_missing", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=lambda rr: tamper(rr, _qrow(_hok), lambda l: None)), R,
+     ["QLT    MISMATCH (1)", f"A only  QLT QLT|anchor="], NOQ)
+case("q03_reload_qlt_score_tampered", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=lambda rr: tamper(rr, _qrow(_hok), lambda l: setf(l, "score", str(int(fld(l, "score")) + 1)))), R,
+     ["ROW CHECK(S) FAILED", f"B: {_qt(_hok)}: score=", "quality rows FAILED their check"], NOQ)
+def _flip_outcome(l):
+    ev = fld(l, "ev")
+    return setf(l, "ev", ev.replace("/FAIL/", "/OK/", 1))
+case("q04_reload_qlt_outcome_tampered", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=lambda rr: tamper(rr, _qrow(_hf), _flip_outcome)), R,
+     ["ROW CHECK(S) FAILED", "OK, recomputed FAIL"], NOQ)
+def _close_shift(l):
+    """the first mature OK event's last listed close moved 1 point further in the trend direction: the outcome stays,
+    the row recomputes - only the close of that bar's own quality row shows it"""
+    d = int(fld(l, "dir")); evs = fld(l, "ev").split(";")
+    for i, e in enumerate(evs):
+        p = e.split("/")
+        if p[2] == "OK":
+            cs = p[3].split("|"); cs[-1] = f"{float(cs[-1]) + d * 0.00001:.5f}"; p[3] = "|".join(cs); evs[i] = "/".join(p); break
+    return setf(l, "ev", ";".join(evs))
+_hc = next(h for h in range(_QW + 70, 300) if any(ev[3] == "OK" and ev[0] >= _QW for ev in _QR[h]["ev"]))
+case("q05_reload_qlt_event_close", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=lambda rr: tamper(rr, _qrow(_hc), _close_shift)), R,
+     ["ROW CHECK(S) FAILED", "the quality row of that bar has"], NOQ)
+def _level_shift(l):
+    evs = fld(l, "ev").split(";"); p = evs[0].split("@"); t, rest = p[0], p[1].split("/", 1)
+    evs[0] = f"{t}@{float(rest[0]) - int(fld(l, 'dir')) * 0.00001:.5f}/{rest[1]}"
+    return setf(l, "ev", ";".join(evs))
+case("q06_reload_qlt_event_level", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=lambda rr: tamper(rr, _qrow(_h5), _level_shift)), R,
+     ["ROW CHECK(S) FAILED", "but HMI-CTX"], NOQ)
+_ev5 = [(k, kind, lv) for (k, kind, lv, res, _) in _QR[_h5]["ev"]]
+_mat5 = [e for e, x in zip(_ev5, _QR[_h5]["ev"]) if x[3] != "PEND"]
+_drop = qq(_h5, events=[e for e in _ev5 if e != _mat5[2]])
+case("q07_reload_qlt_event_left_out", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=qswap(_h5, _drop)), R,
+     ["ROW CHECK(S) FAILED", f"break {_qt(_mat5[2][0])} of the current leg is not listed but is newer than a listed mature event"], NOQ)
+_an = _QR[_hok]["anchor"]
+_moved = qq(_hok, anchor=(_an[0], _an[1] - _QR[_hok]["dir"] * 10))
+case("q08_reload_qlt_anchor_moved", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=qswap(_hok, _moved)), R,
+     ["ROW CHECK(S) FAILED", "but the latest HMI-ANCHOR row gives"], NOQ)
+# the two roles merged again: the retrace measured from protected_level where the leg's anchor has moved (BRI-14 C-6)
+def _levels_at(h, rows):
+    t = _QB[h][0] + 4 * 3600
+    last = [r for r in rows if r["bar"] <= t]
+    return last[-1] if last else None
+_tidx = {b[0]: k for k, b in enumerate(_QB)}
+_hp = next(h for h in range(_QW, 300) if _QR[h]["state"] in ("OK", "PARTIAL") and _QR[h]["anchor"] is not None and
+           (_levels_at(h, _QE.prot_rows) or {}).get("level") is not None and
+           abs((_levels_at(h, _QE.prot_rows) or {})["level"] - _levels_at(h, _QE.anchor_rows)["level"]) > 1e-9)
+_pr = _levels_at(_hp, _QE.prot_rows)
+_prot_as_anchor = qq(_hp, anchor=(_tidx[_pr["swing"]], QS.p(_pr["level"])))
+case("q09_reload_qlt_protected_as_anchor", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=qswap(_hp, _prot_as_anchor)), R,
+     ["ROW CHECK(S) FAILED", f"{_qt(_hp)}: anchor=", "but the latest HMI-ANCHOR row gives"], NOQ)
+# a leg that goes on after its CHOCH: the CHOCH bar scored as if the trend still stood
+_hx = next(h for h in range(_QW + 1, 300) if _QC[h] == "TRANSITION" and _QC[h - 1] in ("BULLISH", "BEARISH") and _QR[h - 1]["state"] in ("OK", "PARTIAL"))
+_after_choch = qq(_hx, ctx=_QC[_hx - 1], events=[(k, kind, lv) for (k, kind, lv, _, _) in _QR[_hx - 1]["ev"]], anchor=_QR[_hx - 1]["anchor"])
+def _swap_ctx(h, rec):
+    new = L(SRC, QS.qlt_row(_QB, h, _QC[h - 1], rec, init=2))
+    return lambda rows: [new if (",bar=" + _qt(h) + ",") in l and "HMI-QLT," in l else l for l in rows]
+case("q10_reload_qlt_after_choch", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=_swap_ctx(_hx, _after_choch)), R,
+     ["ROW CHECK(S) FAILED", f"{_qt(_hx)}: ctx={_QC[_hx - 1]} but the build's HMI-CTX rows leave TRANSITION"], NOQ)
+_qh = lambda l: "HMI-QLT-HIST," in l
+case("q11_reload_qlt_hist_ok_wrong", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=lambda rr: tamper(rr, _qh, lambda l: setf(l, "ok", str(int(fld(l, "ok")) - 1)))), R,
+     ["ROW CHECK(S) FAILED", "QLT-HIST ok + partial + nodir + nodata ="], NOQ)
+case("q12_reload_qlt_hist_missing", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=lambda rr: tamper(rr, _qh, lambda l: None)), R,
+     ["ROW CHECK(S) FAILED", "0 HMI-QLT-HIST row(s) in build 2 (one expected)"], NOQ)
+case("q13_reload_qlt_dup_bar", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=lambda rr: rr + qrows(_hok, _hok + 1, init=2)), R,
+     ["ROW CHECK(S) FAILED", f"bar {_qt(_hok)} has 2 HMI-QLT rows"], NOQ)
+# another window in the def: not compared (no MISMATCH); the build's own rows are then checked against ITS window - with 61
+# bars a break 60 bars back should have been listed, so the structure check reports it (it reads the row's def)
+_qd71 = lambda l: l.replace("QLT1-B60.", "QLT1-B61.")
+case("q14_reload_qlt_def_changed", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=lambda rr: [_qd71(l) for l in rr]), R,
+     ["QLT    NOT COMPARABLE - quality definition differs", "of the current leg is inside the window but not listed"], NOQ + ["QLT    MISMATCH"])
+case("q15_reload_qlt_def_unknown", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=lambda rr: [l.replace("QLT1-B60", "QLT9-B60") for l in rr]), R,
+     ["is not a definition this tool can recompute"], NOQ)
+_lastq = _qt(299)
+case("q16_reload_qlt_after_window", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=lambda rr: tamper(rr, _qrow(299), lambda l: setf(l, "bar", "2026.12.31 00:00"))), R,
+     ["ROW CHECK(S) FAILED", "HMI-QLT bar=2026.12.31 00:00 outside the build's processed M5 window"], NOQ)
+def _start_as_bos(l):
+    return setf(l, "ev", fld(l, "ev").replace("/START/", "/BOS/", 1))
+_hs = next(h for h in range(_QW, 300) if _QR[h]["ev"] and _QR[h]["ev"][0][1] == "START" and _QR[h]["ev"][0][0] >= _QW)
+case("q17_reload_qlt_start_flag", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=lambda rr: tamper(rr, _qrow(_hs), _start_as_bos)), R,
+     ["ROW CHECK(S) FAILED", "marked BOS, the leg opens at"], NOQ)
+def _ov_shift(l):
+    ov = fld(l, "ov").split(";"); i, u = ov[0].split("/"); ov[0] = f"{int(i) + 1}/{int(u) + 1}"
+    return setf(l, "ov", ";".join(ov))
+case("q18_reload_qlt_overlap_tampered", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=lambda rr: tamper(rr, _qrow(_hok), _ov_shift)), R,
+     ["ROW CHECK(S) FAILED", "ov_sum="], NOQ)
+_hr = next(h for h in range(_QW, 300) if _QR[h]["x"] is not None and 0 < _QR[h]["x"] < _QR[h]["leg"])
+case("q19_reload_qlt_retrace_tampered", [start("2.57")] + QB1 + [start("2.57", init=2)] + qbuild(2, init=2, tweak=lambda rr: tamper(rr, _qrow(_hr), lambda l: setf(l, "retr_pts", str(int(fld(l, "retr_pts")) + 1)))), R,
+     ["ROW CHECK(S) FAILED", "retr_pts="], NOQ)
+# live vs build, with the exact 40 / 70 boundaries (quality_sim C01-C04) as live rows: they must recompute to the digit
+_X2, _Y2 = 200, 230
+def _live(lo, hi, tweak=None):
+    rows = _bars_between(_struct(hi, "0001", 1, live=True), lo - 1, hi - 1) + srows(lo, hi, live=1) + qrows(lo, hi, live=1)
+    return tweak(rows) if tweak else rows
+def qlb(b, upto, init, tweak=None): return qbuild(b, upto=upto, init=init, tweak=tweak)
+case("q20_live_qlt_ok", [start("2.57")] + qlb(1, _X2, 1) + _live(_X2, _Y2) + [start("2.57", init=2)] + qlb(2, _Y2, 2), ["-LiveVsBuild"],
+     [f"quality rows compared: {_Y2 - _X2} (QLT)", "AGREE BOTH WAYS on every covered bar"], ["MISMATCH(ES)", "FAILED"])
+_okL = lambda l: "HMI-QLT," in l and ",state=OK," in l
+case("q21_live_qlt_tampered", [start("2.57")] + qlb(1, _X2, 1) + _live(_X2, _Y2, lambda rr: tamper(rr, _okL, lambda l: setf(l, "score", str(int(fld(l, "score")) + 1)))) + [start("2.57", init=2)] + qlb(2, _Y2, 2),
+     ["-LiveVsBuild"], ["live quality row(s) FAILED the recomputation", "MISMATCH(ES) on covered bars"], ["AGREE BOTH WAYS on every covered bar"])
+case("q22_live_qlt_build_missing", [start("2.57")] + qlb(1, _X2, 1) + _live(_X2, _Y2) + [start("2.57", init=2)] + qlb(2, _Y2, 2, tweak=lambda rr: tamper(rr, _qrow(_X2 + 5), lambda l: None)),
+     ["-LiveVsBuild"], ["MISMATCH(ES) on covered bars", "live only  [1->2] QLT"], ["AGREE BOTH WAYS"])
+def _bnd_rows(tier_to=None):
+    """the four boundary cases as live rows of bars _X2+2 .. _X2+5 (their bars shifted in time to end there)"""
+    out = {}
+    for i, args in enumerate(((680, 320, 900, 600), (680, 320, 840, 570), (900, 100, 1008, 808, (4,)), (900, 100, 1008, 820, (4,)))):
+        bb, h, evs, an = QS.comp_case(*args)
+        dt_ = _QB[_X2 + 2 + i][0] - bb[h][0]
+        bb = [(b[0] + dt_,) + tuple(b[1:]) for b in bb]
+        r = QS.quality(bb, h, BULL_Q, evs, an)
+        l = L(SRC, QS.qlt_row(bb, h, BULL_Q, r, live=1))
+        if tier_to and i == 1: l = setf(l, "tier", tier_to)
+        out[_qt(_X2 + 2 + i)] = l
+    return lambda rows: [out.get(fld(l, "bar"), l) if "HMI-QLT," in l else l for l in rows]
+BULL_Q = "BULLISH"
+case("q23_live_qlt_boundaries_recompute", [start("2.57")] + qlb(1, _X2, 1) + _live(_X2, _Y2, _bnd_rows()) + [start("2.57", init=2)] + qlb(2, _Y2, 2), ["-LiveVsBuild"],
+     ["8 MISMATCH(ES) on covered bars", "live only  [1->2] QLT"], ["FAILED the recomputation"])
+case("q24_live_qlt_boundary_tier_tampered", [start("2.57")] + qlb(1, _X2, 1) + _live(_X2, _Y2, _bnd_rows("GOOD")) + [start("2.57", init=2)] + qlb(2, _Y2, 2), ["-LiveVsBuild"],
+     ["1 live quality row(s) FAILED the recomputation", "tier=GOOD, recomputed FAIR"], [])
+# v2.56 -> v2.57: the quality score is added and nothing else may change (HMI-STR included)
+def v56v57(old_tweak=None, new_tweak=None, new_qlt=True, frm_new=None):
+    a = qbuild(1, ver="2.56", inst="0D56", init=1, qlt=False, tweak=old_tweak)
+    nb = qbuild(1, ver="2.57", inst="0E57", init=2, qlt=new_qlt, tweak=new_tweak)
+    if frm_new: nb = [setf(l, "from", frm_new) if "HMI-BUILD-BEGIN," in l else l for l in nb]
+    return [start("2.56", inst="0D56")] + a + [start("2.57", inst="0E57", init=2)] + nb
+VQ = ["-Source", "USDJPY#0D56,M5", "-Versus", "USDJPY#0E57,M5"]
+case("q25_versus257_additive_ok", v56v57(), VQ,
+     ["the quality score is added (BRI-14, display only)", "IDENTICAL apart from the quality rows"], ["UNEXPLAINED", "FAILED", "NOT JUDGED"])
+_strL = lambda l: "HMI-STR," in l and ",state=OK," in l
+case("q26_versus257_str_changed", v56v57(new_tweak=lambda rr: tamper(rr, _strL, lambda l: setf(l, "score", str(int(fld(l, "score")) + 1)))), VQ,
+     ["line(s) differ outside the quality rows - UNEXPLAINED", "HMI-STR,USDJPY"], ["IDENTICAL apart from the quality rows"])
+case("q27_versus257_ctx_changed", v56v57(new_tweak=lambda rr: tamper(rr, lambda l: "HMI-CTX," in l and ",BOS," in l, lambda l: setf(l, "close", "1.00000"))), VQ,
+     ["line(s) differ outside the quality rows - UNEXPLAINED", "HMI-CTX,USDJPY,BOS"], ["IDENTICAL apart from the quality rows"])
+case("q28_versus257_qlt_bad", v56v57(new_tweak=lambda rr: tamper(rr, _qrow(_hok), lambda l: setf(l, "score", str(int(fld(l, "score")) + 1)))), VQ,
+     ["quality rows FAILED their check", "score="], ["IDENTICAL apart from the quality rows"])
+case("q29_versus257_no_qlt", v56v57(new_qlt=False), VQ,
+     ["quality rows FAILED their check (1)", "0 HMI-QLT-HIST row(s) in build 1 (one expected)"], ["IDENTICAL apart from the quality rows"])
+case("q30_versus257_old_has_qlt", v56v57(old_tweak=lambda rr: rr + qrows(_hok, _hok + 1, inst="0D56", init=1)), VQ,
+     ["v2.56 build carries 1 quality row(s)"], ["IDENTICAL apart from the quality rows"])
+case("q31_qlt_dist", [start("2.57")] + QB1, ["-Qlt"],
+     ["merged  params ABCD1234 " + QS.DEF_ID, "tiers of the scored bars", "mature events used on the trend bars"], ["CHECK FAILED"])
 json.dump(C, open("cases.json", "w"), indent=1)
 print(len(C), "cases")

@@ -242,6 +242,7 @@ CtxEventType H4TrendOnBar(const int h, const datetime t)
    int bi = H4DetectBreakDir(h, d);
    if(bi >= 0)
      {
+      g_ctx_brk_h = h;  g_ctx_brk_dir = d;  g_ctx_brk_px = g_h4sw[bi].price;   // v2.57: quality event (read only there)
       H4ConsumeSwing(bi, t);
       also = H4ConsumeSameDirBroken(h, d, bi, t, also_list);
       g_ctx_strength++;
@@ -340,6 +341,7 @@ CtxEventType H4ContextOnBar(const int h)
    CtxDedupLog(kind, vdir, t, SwT(broken), SwP(broken), also, also_list);
    if(kind == "BOS" || kind == "TRANS_OK" || kind == "TRANS_FAIL")
      {
+      g_ctx_brk_h = h;  g_ctx_brk_dir = brk;  g_ctx_brk_px = g_h4sw[broken].price;   // v2.57: the leg's opening break
       H4InternalOnBar(h, brk, t);                 // P1: what this close broke, before the level is chosen
       ProtOnBos(brk, broken, h, t, true);         // a new leg begins on this bar
      }

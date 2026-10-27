@@ -9,7 +9,7 @@
 //|  Decisions D-1..D-7: docs/02_Conflict_And_Business_Rule_Issues.. |
 //+------------------------------------------------------------------+
 #property copyright "H4M5 Identification"
-#property version   "2.56"          // keep equal to HMI_VERSION (HMI_Defs.mqh)
+#property version   "2.57"          // keep equal to HMI_VERSION (HMI_Defs.mqh)
 #property description "H4 Context -> H4 POI -> M5 Block -> ARMED -> CISD / MSS / BPR / PA"
 #property description "MARK ONLY - the indicator never decides an entry."
 #property indicator_chart_window
@@ -52,6 +52,7 @@ void H4ProcessBar(const int h)
       g_cyc[g_active_cyc].ctx_changed = true;          // diagnostic only (D-1)
 
    StrOnH4Bar(h);                 // v2.56 strength score: last, reads only (Rule 69)
+   QltOnH4Bar(h);                 // v2.57 quality score: after it, reads only (Rule 69)
   }
 
 //+------------------------------------------------------------------+
@@ -208,6 +209,8 @@ void ResetEngine()
    g_ctx_strength = 0; g_ctx_messy = false; g_ctx_time = 0; g_ctx_bars = 0;
    ProtClear(g_prot);  ProtClear(g_anchor);  g_leg_seq = 0;      // BRI-12
    StrReset();                                                   // v2.56
+   g_ctx_brk_h = -1;  g_ctx_brk_dir = 0;  g_ctx_brk_px = 0.0;     // v2.57
+   QltReset();
    g_diag_poi_rejected_gap = 0;  g_diag_blk_rejected_gap = 0;
    g_alertq_n = 0;
    g_sess.active = false;  g_sess.id = 0;  g_sess.poi_id = 0;
@@ -280,6 +283,7 @@ void BuildHistory()
    g_live = true;
 
    StrLogHist();                       // v2.56: score histogram of the processed H4 window
+   QltLogHist();                       // v2.57: quality histogram, same window
    if(InpLogSignals)
       PrintFormat("HMI-BUILD-END,%s,marks=%d,cycles=%d,pois=%d,blocks=%d,build=%d,liq=%s,liqev=%d,unknown=%d,liqwait=%d,inst=%s,run=%I64d,init=%d",
                   _Symbol, g_log_count, g_cyc_n, g_poi_n, g_blk_n, g_build_seq,

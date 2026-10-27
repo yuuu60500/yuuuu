@@ -6,7 +6,7 @@
 #ifndef HMI_DEFS_MQH
 #define HMI_DEFS_MQH
 
-#define HMI_VERSION      "2.56"
+#define HMI_VERSION      "2.57"
 #define HMI_PREFIX       "HMI"
 
 //--- direction ------------------------------------------------------
@@ -306,6 +306,9 @@ int      g_h4_cursor     = 0;          // next H4 bar index to consume
 HProtLevel g_prot;                     // BRI-12 protected_level of the current trend leg
 HProtLevel g_anchor;                   // BRI-12 leg_anchor of the current trend leg (log only)
 int      g_leg_seq       = 0;          // trend legs begun in this build (log key)
+int      g_ctx_brk_h     = -1;         // v2.57: H4 index of the latest break that the context took in its trend
+int      g_ctx_brk_dir   = 0;          //   direction (BOS / TRANS_OK / TRANS_FAIL), its direction and the
+double   g_ctx_brk_px    = 0.0;        //   primary swing's price - written here, read only by the quality score
 
 //--- M5 ---
 HSwing   g_m5sw[MAX_M5_SWINGS];  int g_m5sw_n = 0;

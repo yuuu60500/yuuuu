@@ -22,6 +22,7 @@ MQL5/Indicators/HMI/
    HMI_H4StructureEngine.mqh        // BOS / CHOCH / Swing 消费
    HMI_H4ContextEngine.mqh          // Context 状态机 + ContextEvent 日志
    HMI_StrengthEngine.mqh           // v2.56 趋势强度评分（BRI-13，只显示）：每根 H4 处理后计算，HMI-STR / HIST / WAIT，面板文字
+   HMI_QualityEngine.mqh            // v2.57 趋势质量评分（BRI-14，只显示）：强度之后计算，当前段突破事件、HMI-QLT / HIST，面板文字
    HMI_H4RangeEngine.mqh            // Versioned TradingRange + Liquidity
    HMI_H4POIEngine.mqh              // OB 候选 + FVG 连接 + POI 生命周期
    HMI_M5BlockEngine.mqh            // RefinementSession + M5 OB + Breaker + Block 生命周期
