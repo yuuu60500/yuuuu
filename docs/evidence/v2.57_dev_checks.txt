@@ -87,7 +87,7 @@ PASS  q33_reload_qlt_rows_missing_both
 PASS  q34_reload_qlt_row_missing_both
 PASS  q35_live_str_build_hist_corrupt
 PASS  q36_reload_str_row_missing_both
-200/200 cases as expected (199 in the full run + q29 rerun after its expectation was updated)
+200/200 cases as expected (q29 rerun after its expectation was updated; then the whole suite once more in one run: 200/200)
 
 ## the reviewer's five counterexample logs with tools r2
 reload_control                accepted (QLT IDENTICAL, every row recomputes)
