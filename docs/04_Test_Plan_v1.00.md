@@ -1061,3 +1061,9 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           第 8 项截图以 r4 为准。FULL 的 POI 行、CYCLE 行、LIQ WAITING 行及 TRANSITION 下 COMPACT 第一行在 v2.55 已超 63 字符
           （原有，显示阶段处理）
    r4 编译 0 / 0（用户 2026-10-26）；第 8 项 COMPACT（r4）与 FULL 截图已有，暂不评级（USDJPY 过渡）截图待补；第 5 项待 H4 收盘后
+   运行状态（2026-10-27，Audit Round 41；docs/evidence/v2.56_mt5_run_20261027.txt）：
+          第 4 项 10-27 十张 v2.56 同窗口重载六类 IDENTICAL（AUDUSD 窗口移动后同样一致），STR 全部复算通过；
+          第 5 项十张图各有实时 STR（10-26 服务器 20:00 那根）0 差异；另 GBPUSD MODEL 6 / B8 5、USDCAD MODEL 1 / PROT 1 / B8 4、
+          EURUSD 两图与 USDCHF CTX 各 1，0 差异；PROT 只差 leg= 6 行（v2.55 同样 6 行）PENDING REVIEW（A-59）；
+          第 6 项十对（八品种默认 + 两个 ATR）「IDENTICAL apart from the strength rows」；第 7 项 -Str 记录；
+          第 8 项 COMPACT（r4）/ FULL / 暂不评级（USDJPY）截图与 r4 编译 0 / 0 齐备；工具 r5 logtests 164/164、live_coverage_tests 22/22

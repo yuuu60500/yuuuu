@@ -2254,5 +2254,32 @@
    "IDENTICAL apart from the strength rows",
    "instance metadata, not compared"
   ]
+ },
+ "s31_live_str_across_log_files": {
+  "args": [
+   "-LiveVsBuild",
+   "-Days",
+   "2"
+  ],
+  "expect": [
+   "the builds are in different log files (20261002.log -> 20261003.log)",
+   "nothing comparable yet - no PASS can be given"
+  ],
+  "forbid": [
+   "MISMATCH(ES)",
+   "AGREE BOTH WAYS"
+  ]
+ },
+ "s32_live_str_same_file_build_only": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "MISMATCH(ES) on covered bars",
+   "build only [1->2] STR"
+  ],
+  "forbid": [
+   "AGREE BOTH WAYS"
+  ]
  }
 }

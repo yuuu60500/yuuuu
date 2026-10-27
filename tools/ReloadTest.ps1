@@ -144,13 +144,22 @@ if (-not $dir) {
 }
 Write-Host "log folder : $dir" -ForegroundColor Cyan
 
-$logs = Get-ChildItem -Path $dir -Filter *.log | Sort-Object LastWriteTime | Select-Object -Last $Days
+$logs = @(Get-ChildItem -Path $dir -Filter *.log)
+# MT5 names its Experts logs by local date (YYYYMMDD.log): their order is in the name. A file that was
+# copied, unzipped or checked out has an arbitrary write time, so only other names fall back to it.
+if ($logs.Count -and @($logs | Where-Object { $_.Name -notmatch '^\d{8}\.log$' }).Count -eq 0) { $logs = @($logs | Sort-Object Name | Select-Object -Last $Days) }
+else { $logs = @($logs | Sort-Object LastWriteTime | Select-Object -Last $Days) }
 if (-not $logs) { Write-Host "no .log file in $dir" -ForegroundColor Red; exit }
 Write-Host "log file(s): $(($logs | ForEach-Object Name) -join ', ')" -ForegroundColor Cyan
 
 # Oldest first, so LIVE rows keep their real order relative to the rebuild.
 $all = @()
-foreach ($f in $logs) { $all += Get-Content $f.FullName }
+# (v2.56 run, 2026-10-26/27) where each log file starts: MT5 begins a file per local day, and two builds in
+# different files have a night between them - the terminal may have slept with the same run (hibernation
+# keeps the process), so the stretch is not provably live (A-60). -LiveVsBuild sets such a pair aside.
+$fileStart = New-Object System.Collections.Generic.List[int]
+foreach ($f in $logs) { $fileStart.Add($all.Count); $all += Get-Content $f.FullName }
+function FileOf([int]$i) { $k = 0; for ($j = 0; $j -lt $fileStart.Count; $j++) { if ($i -ge $fileStart[$j]) { $k = $j } }; return $k }
 
 # v2.48: every HMI line ends in ",inst=XXXX" (the indicator instance), the
 # build header carries it too. MT5 only tags a line with (SYMBOL,TF), so two
@@ -2132,6 +2141,8 @@ function Show-LiveVsBuild([string]$src) {
         elseif ($A.Ver -ne $B.Ver)                       { $why = "version $($A.Ver) -> $($B.Ver)" }
         elseif ($A.Id -and $B.Id -and ($A.Id -split '/')[0] -ne ($B.Id -split '/')[0]) {
             $why = "terminal restarted between the builds (run $(($A.Id -split '/')[0]) -> $(($B.Id -split '/')[0])): not a continuous live stretch (A-60)" }
+        elseif ((FileOf $A.EndIdx) -ne (FileOf $B.BeginIdx)) {
+            $why = "the builds are in different log files ($($logs[(FileOf $A.EndIdx)].Name) -> $($logs[(FileOf $B.BeginIdx)].Name)): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep)" }
         elseif ($A.Params -eq '?' -or $B.Params -eq '?') { $why = 'parameter digest not logged (pre-v2.44)' }
         elseif ($A.Params -ne $B.Params)                 { $why = "parameters changed ($($A.Params) -> $($B.Params))" }
         if ($ce -lt $cs)                                 { $why = 'no fully covered bar between the two builds' }

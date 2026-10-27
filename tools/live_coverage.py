@@ -32,7 +32,8 @@ Live rows at the edges of a stretch (an event stamped after the later build's 't
 Exit status 1, and a last line RESULT: NOT PASSED, when the input has a problem (a build that is incomplete or never
 closed, an END without BEGIN, a live row whose run/init is not its build's, a row that cannot be parsed), a compared
 intraday row differs, an edge row is in neither build, or a cross-sleep row is not matched (a leg-only match counts as
-not matched: it is reported as PENDING REVIEW, as ReloadTest does, and the RESULT is not a pass). Zero differences on the
+not matched: it is reported as PENDING REVIEW, as ReloadTest does, and the RESULT is not a pass). An intraday PROT row that
+differs only in leg= is likewise PENDING REVIEW, counted apart from the differences (v2.56 run, 2026-10-26). Zero differences on the
 compared rows alone is not a pass.
 
     python3 tools/live_coverage.py [--ver 2.56] [--offset 2] LOG [LOG ...]    (logs in date order)
@@ -188,10 +189,11 @@ def main():
     cols = lambda c: ' '.join(f'{c[k]:{5 if k == "MODEL" else 4}}' for k in cats)
     total = collections.defaultdict(collections.Counter)
     diffs = 0
+    legpend = 0
     edges = []
     restarts = []
     print(f'== intraday live vs build, v{a.ver} instances (rows compared per category / differences)')
-    print(f'  {"instance":14} {"day":10} pairs  ' + ' '.join(f'{k:>{5 if k == "MODEL" else 4}}' for k in cats) + '  diff  outside')
+    print(f'  {"instance":14} {"day":10} pairs  ' + ' '.join(f'{k:>{5 if k == "MODEL" else 4}}' for k in cats) + '  diff  outside  leg only')
     for src in srcs:
         for name, seq, _, _ in days:
             bb = [b for b in seq.get(src, []) if b['status'] == 'COMPLETE']
@@ -201,6 +203,7 @@ def main():
             d = 0
             pairs = 0
             outside = 0
+            lg = 0
             for x, y in zip(bb, bb[1:]):
                 if x['head']['params'] != y['head']['params']:
                     continue
@@ -218,6 +221,13 @@ def main():
                     lv = [r.key() for r in inw]
                     bd = [r.key() for r in y['rows'] if r.cat == cat and lo <= r.time <= hi]
                     k, dd = compare(lv, bd)
+                    if cat == 'PROT':
+                        # the same row but for leg= (legs count from each build's own H4 start, and a rebuild after an
+                        # H4 close starts one bar later, A-59): PENDING REVIEW as in ReloadTest, not a difference
+                        _, dn = compare([r.key(('leg',)) for r in inw],
+                                        [r.key(('leg',)) for r in y['rows'] if r.cat == cat and lo <= r.time <= hi])
+                        lg += (dd - dn) // 2
+                        dd = dn
                     n[cat] += k
                     d += dd
                     used.update(id(r) for r in inw)
@@ -231,12 +241,13 @@ def main():
             if pairs:
                 total[src].update(n)
                 diffs += d
-                print(f'  {src:14} {name:10} {pairs:5}  {cols(n)}  {d:4}  {outside:7}')
+                legpend += lg
+                print(f'  {src:14} {name:10} {pairs:5}  {cols(n)}  {d:4}  {outside:7}  {lg:8}')
     print('  total')
     for src in srcs:
         t = total[src]
         print(f'  {src:14} {"":10} {"":5}  {cols(t)}')
-    print(f'  differences on compared rows: {diffs}')
+    print(f'  differences on compared rows: {diffs}' + (f'   (+ {legpend} PROT row(s) the same but for leg= - PENDING REVIEW)' if legpend else ''))
     print('  ("outside": live rows of a stretch whose event time is at its edges; not counted, listed below)')
     edge_bad = 0
     edge_ok = collections.defaultdict(collections.Counter)
@@ -330,6 +341,8 @@ def main():
         print(f'  across a sleep: {xbad} row(s) not matched - see above')
     xbad += rbad
     bad = [f'{n} {w}' for n, w in ((input_bad, 'input problem(s)'), (diffs, 'difference(s) on compared rows'),
+                                    (legpend, 'intraday PROT row(s) the same but for leg= - PENDING REVIEW (A-59: the rebuild\'s H4 '
+                                              'window starts later)'),
                                     (edge_bad, 'edge row(s) in neither build'), (xbad, 'cross-sleep / restart row(s) not matched'),
                                     (xleg, 'cross-sleep row(s) the same but for leg= - PENDING REVIEW (leg counts from each '
                                            "build's own H4 start, which moved)")) if n]

@@ -790,5 +790,20 @@ case("s29_versus256_replay_attempt_only", v55v56r(1, 0), VS,
       "IDENTICAL apart from the strength rows"], ["UNEXPLAINED"])
 case("s30_versus256_replay_other_field", v55v56r(1, 0, got_new="18559"), VS,
      ["line(s) differ outside the strength rows - UNEXPLAINED", "got=18559"], ["IDENTICAL apart from the strength rows", "instance metadata, not compared"])
+# v2.56 run 2026-10-26/27: the terminal slept between the last build of one day and the first of the next, with the same
+# run (hibernation). Two builds in different log files are not a provable live stretch (A-60): PENDING, never compared.
+# The files are read in date-name order (MT5 names them YYYYMMDD.log), whatever their write times.
+def case_files(name, files, args, expect, forbid=()):
+    os.makedirs(name, exist_ok=True)
+    for fn, lines in files.items():
+        open(os.path.join(name, fn), "w", encoding="utf-8").write("\n".join(lines) + "\n")
+    C[name] = dict(args=args, expect=expect, forbid=list(forbid))
+_n1 = blk(1, ver="2.56", init=1, to=_tA, extra_rows=strs(_X, init=1) + shist(_X, init=1))
+_n2 = blk(2, ver="2.56", init=1, to=_tB, extra_rows=strs(_Y, init=1) + shist(_Y, init=1))
+case_files("s31_live_str_across_log_files", {"20261002.log": [start("2.56")] + _n1, "20261003.log": _n2}, ["-LiveVsBuild", "-Days", "2"],
+           ["the builds are in different log files (20261002.log -> 20261003.log)", "nothing comparable yet - no PASS can be given"],
+           ["MISMATCH(ES)", "AGREE BOTH WAYS"])
+case("s32_live_str_same_file_build_only", [start("2.56")] + _n1 + _n2, ["-LiveVsBuild"],
+     ["MISMATCH(ES) on covered bars", "build only [1->2] STR"], ["AGREE BOTH WAYS"])
 json.dump(C, open("cases.json", "w"), indent=1)
 print(len(C), "cases")

@@ -2095,3 +2095,18 @@ tools/strength_sim.py    compact_text；P07 COMPACT 行、P08 强度各行 ≤ 6
                          在 v2.55 就超过 63 个字符
 docs                     BRI-13 T-3；docs/04；docs/06 Audit Round 40 补记
 ```
+
+## v2.56 工具 r5 —— 运行证据中的两处判读（MQL5 与 r4 相同）
+
+```
+Date:     2026-10-27
+来源:     MT5 运行 10-26 下午 / 10-27 早上
+
+tools/live_coverage.py        日内 PROT 行只差 leg= → PENDING REVIEW（「leg only」列），不再算差异（与 ReloadTest、跨休眠一致）；
+                              10-26 两版各 6 行（EURUSD 两图、USDCHF：H4 20:00 收盘后的重建窗口起点后移一根，段号少 1，A-59）
+tools/ReloadTest.ps1          -LiveVsBuild：两次构建分处两个日志文件 → 整对 pending（A-60：夜间休眠时 run= 不变，旧规则只认重启）；
+                              文件名全是 YYYYMMDD.log 时按名称排序（复制 / 解压后写入时间不可靠）
+tools/live_coverage_tests.py  「live PROT leg changed」改为断言 PENDING REVIEW；22/22
+tools/logtests                s31（跨文件 → pending，第二个文件写入时间更早也按名称排序）、s32（同一文件缺实时行 → 仍为不一致）；164 组
+docs                          BRI-13 T-9；docs/04；docs/06 Audit Round 41；evidence/v2.56_mt5_run_20261027.txt
+```

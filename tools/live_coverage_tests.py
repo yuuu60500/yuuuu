@@ -220,6 +220,8 @@ def main():
             if name.startswith('v2.55 unaltered'):
                 good = good and 'AUDUSD#T1      20261019       1      1    0    0    0    2     0        0' in r.stdout \
                     and 'intraday: MODEL, B8' in r.stdout
+            if name == 'live PROT leg changed':
+                good = good and 'PENDING REVIEW' in last and 'difference' not in last
             if name.startswith('v2.56 unaltered'):
                 good = good and 'AUDUSD#T1      20261019       1      1    0    0    0    2    1     0        0' in r.stdout \
                     and 'intraday: MODEL, B8, STR' in r.stdout

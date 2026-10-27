@@ -1186,5 +1186,9 @@ HMI-STR-WAIT,<sym>,live=1,state=NODATA,reason=WAIT,src=H4|M5|BUILD|RELOAD,last=<
 
 `live_coverage.py --ver 2.56` 计 STR 类别，HIST 与 WAIT 行不比较。
 
+工具 r5（MT5 运行 10-26 / 10-27 发现，与 v2.56 规则无关，v2.55 同样受益）：日内 PROT 行只差 `leg=`（重建在 H4 收盘后
+窗口起点后移一根，A-59）在 live_coverage.py 中与 ReloadTest 一样记为 PENDING REVIEW，不算差异；ReloadTest -LiveVsBuild
+两次构建分处两个日志文件（夜间，可能休眠而进程不变）时整对 pending（A-60），日志按 MT5 的日期文件名排序（复制、解压后写入时间不可靠）。
+
 **不在本版：** 质量评分（v2.57：Q_break、回撤健康度、K 线重叠）、阶段与原因（§7 / §8）、变化箭头与完整趋势面板（v2.58）、图形调整；
 H4 结构、保护点、BRI-08、Session、MODEL 规则不动。

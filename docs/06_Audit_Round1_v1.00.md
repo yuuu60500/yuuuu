@@ -2370,3 +2370,24 @@ r4（同日）:              用户 MetaEditor 编译 0 errors / 0 warnings（61
                          no session」，第二行「强度 弱 25/100   数据截至 2026.10.26 16:00 H4 收盘」= 日志该根 raw 25.40；第三行 CYCLE 仍在
                          63 字符截断（原有，显示阶段）
 ```
+
+
+## Audit Round 41 —— v2.56 运行证据第二部分（10-26 下午、10-27 早上）
+
+```
+时间口径:                服务器 = 本地 + 3 h（欧洲 10-25 退出夏令时，券商 11-01 才调）；之前的证据按 + 2 h 正确，本周 live_coverage 用 --offset 3
+代码:                    10-26 16:10:18 与 16:23:03 全部 v2.56 图同时重载（两次编译），最迟 16:23 起为 r4（只改 COMPACT，日志与 r2 相同）；
+                         同一 run 跨两天（夜间休眠，未重启）
+实时 vs 重建:            十张 v2.56 图各有 1 条实时 STR（服务器 10-26 20:00 那根）与重建相同；GBPUSD MODEL 6 / B8 5、USDCAD MODEL 1 / PROT 1 /
+                         B8 4（含 10-27 两条）、EURUSD 两图与 USDCHF 的 CTX 各 1，0 差异
+段号:                    EURUSD 两图与 USDCHF 在 20:00 的 BOS / CHOCH 及 PROT / ANCHOR 实时与重建逐字段相同，只有 leg= 差 1（6 / 5、11 / 10）：
+                         20:00 收盘后的重建 H4 窗口（500 根）起点后移一根，最早一段移出窗口（A-59）；v2.55 同一时段同样 6 行。
+                         live_coverage.py 日内把它算成差异（12）而 ReloadTest 判 PENDING —— 工具口径不一致，r5 统一为 PENDING REVIEW
+跨夜:                    ReloadTest -LiveVsBuild -Days 2 把 10-26 最后一次构建 → 10-27 第一次构建当作实时区间，夜间（终端休眠）重建行全部
+                         「build only」。run= 不变（休眠不是重启），旧规则只认重启 —— r5：两次构建分处两个日志文件即 pending（A-60）
+同窗口 / 跨版本:         10-27 十张 v2.56 同窗口重载六类 IDENTICAL；十对 v2.55 / v2.56（八品种默认 + EURUSD、XAUUSD ATR）除强度行外逐行相同
+                         （XAUUSD 两对另列 REPLAY attempt= 实例元数据）
+分布记录:                默认 8 图 2961 根：P50 31、P90 80，弱 53% / 中等 26% / 强 21%，满分 0 —— 只记录
+截图:                    r4 COMPACT（AUDUSD 第一行完整、第二行分数与时间；USDJPY「强度 暂不评级」）、FULL、r4 编译 0 / 0
+仍属显示阶段:            v2.55 起就超过 63 字符的行（TRANSITION 下 COMPACT 第一行、CYCLE、FULL POI）
+```

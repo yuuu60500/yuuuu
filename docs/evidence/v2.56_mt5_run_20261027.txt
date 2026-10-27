@@ -1,0 +1,453 @@
+# v2.56 MT5 run, part 2: 2026-10-26 15:41 .. 17:08 local and 2026-10-27 09:09 .. 09:54 local (user terminal; server = local + 3 h this week:
+#   Europe left summer time on 10-25, the broker clock follows on 11-01)
+# logs: 769244f8d124ddd339acd3ea83f74ef50f71da6333cd150e94e78b4614d96156  20261026.log (106068 lines, to 17:08 local; its first 65910 lines are the c94e273b... file of part 1)
+#       7e37c7d8c49d64858b1493220f45172a18f17650a29b86e3b03cbef87b5d2d3d  20261027.log (52120 lines, 09:09 .. 09:54 local)
+# code: all v2.56 charts reloaded together at 16:10:18 and 16:23:03 (two MetaEditor compiles); from 16:23 at the latest they run r4,
+#   which changes the COMPACT panel only - the log output of r2 and r4 is the same. The same terminal run (1792585034) on both days:
+#   the computer hibernated overnight (no restart)
+# tools: the commit that adds this file (live_coverage.py intraday leg-only = PENDING; ReloadTest pairs across log files = PENDING)
+
+## 1. python3 tools/live_coverage.py --ver 2.56 --offset 3 20261026.log 20261027.log
+== intraday live vs build, v2.56 instances (rows compared per category / differences)
+  instance       day        pairs  MODEL  LIQ  CTX PROT   B8  STR  diff  outside  leg only
+  AUDUSD#46E1    20261026       9      0    0    0    0    0    1     0        0         0
+  AUDUSD#46E1    20261027       2      0    0    0    0    0    0     0        0         0
+  EURUSD#198B    20261026      10      0    0    1    2    0    1     0        0         2
+  EURUSD#198B    20261027       4      0    0    0    0    0    0     0        0         0
+  EURUSD#54CC    20261026      10      0    0    1    2    0    1     0        0         2
+  EURUSD#54CC    20261027       4      0    0    0    0    0    0     0        0         0
+  GBPUSD#86FE    20261026       3      6    0    0    0    5    1     0        1         0
+  GBPUSD#86FE    20261027       2      0    0    0    0    0    0     0        0         0
+  NZDUSD#A97D    20261026       3      0    0    0    0    0    1     0        0         0
+  NZDUSD#A97D    20261027       3      0    0    0    0    0    0     0        0         0
+  USDCAD#E6D0    20261026       4      1    0    0    1    2    1     0        0         0
+  USDCAD#E6D0    20261027       2      0    0    0    0    2    0     0        0         0
+  USDCHF#7129    20261026       3      0    0    1    2    0    1     0        0         2
+  USDCHF#7129    20261027       2      0    0    0    0    0    0     0        0         0
+  USDJPY#15F9    20261026       3      0    0    0    0    0    1     0        0         0
+  USDJPY#15F9    20261027       2      0    0    0    0    0    0     0        0         0
+  XAUUSD#2AE3    20261026       8      0    0    0    0    0    1     0        0         0
+  XAUUSD#2AE3    20261027       4      0    0    0    0    0    0     0        0         0
+  XAUUSD#6624    20261026       8      0    0    0    0    0    1     0        0         0
+  XAUUSD#6624    20261027       4      0    0    0    0    0    0     0        0         0
+  total
+  AUDUSD#46E1                          0    0    0    0    0    1
+  EURUSD#198B                          0    0    1    2    0    1
+  EURUSD#54CC                          0    0    1    2    0    1
+  GBPUSD#86FE                          6    0    0    0    5    1
+  NZDUSD#A97D                          0    0    0    0    0    1
+  USDCAD#E6D0                          1    0    0    1    4    1
+  USDCHF#7129                          0    0    1    2    0    1
+  USDJPY#15F9                          0    0    0    0    0    1
+  XAUUSD#2AE3                          0    0    0    0    0    1
+  XAUUSD#6624                          0    0    0    0    0    1
+  differences on compared rows: 0   (+ 6 PROT row(s) the same but for leg= - PENDING REVIEW)
+  ("outside": live rows of a stretch whose event time is at its edges; not counted, listed below)
+
+== edge rows (outside the judged window, not counted in the table)
+  GBPUSD#86FE 20261026  live 16:20:00.228  MODEL in the later build   later build 16:23:03.849 local to=2026.10.26 19:15  HMI-LIVE,GBPUSD,MODEL,-1,2958,2958,OB,PA ENGULFING,2026.10.26 19:20:00,1.33513,1970.01.01 
+
+== across a sleep (A-60) - rows logged after the last build of a day, checked against the next first build
+  GBPUSD#86FE 20261027: 3 live row(s) after the last build (09:24:58.845 local, to=2026.10.27 12:15)
+    no later log - not checked
+  USDCAD#E6D0 20261027: 2 live row(s) after the last build (09:24:51.321 local, to=2026.10.27 12:15)
+    no later log - not checked
+
+== category coverage, v2.56
+  AUDUSD#46E1    intraday: STR                      across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  EURUSD#198B    intraday: CTX, PROT, STR           across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, B8
+  EURUSD#54CC    intraday: CTX, PROT, STR           across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, B8
+  GBPUSD#86FE    intraday: MODEL, B8, STR           across a sleep only: -                  edge only: -            no sample: LIQ, CTX, PROT
+  NZDUSD#A97D    intraday: STR                      across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  USDCAD#E6D0    intraday: MODEL, PROT, B8, STR     across a sleep only: -                  edge only: -            no sample: LIQ, CTX
+  USDCHF#7129    intraday: CTX, PROT, STR           across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, B8
+  USDJPY#15F9    intraday: STR                      across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  XAUUSD#2AE3    intraday: STR                      across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  XAUUSD#6624    intraday: STR                      across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+
+RESULT: NOT PASSED - 6 intraday PROT row(s) the same but for leg= - PENDING REVIEW (A-59: the rebuild's H4 window starts later)
+
+## 2. the same for the v2.55 charts (--ver 2.55)
+== intraday live vs build, v2.55 instances (rows compared per category / differences)
+  instance       day        pairs  MODEL  LIQ  CTX PROT   B8  diff  outside  leg only
+  AUDUSD#F657    20261026       8      0    1    0    0    0     0        0         0
+  AUDUSD#F657    20261027       2      0    0    0    0    0     0        0         0
+  EURUSD#0442    20261026      15      0    4    1    2    0     0        0         2
+  EURUSD#0442    20261027       4      0    0    0    0    0     0        0         0
+  EURUSD#3F83    20261026      15      0    4    1    2    0     0        0         2
+  EURUSD#3F83    20261027       4      0    0    0    0    0     0        0         0
+  GBPUSD#3674    20261026       5     10    0    0    0    7     0        0         0
+  GBPUSD#3674    20261027       2      0    0    0    0    0     0        0         0
+  NZDUSD#58F3    20261026       5      0    2    0    0    0     0        0         0
+  NZDUSD#58F3    20261027       3      0    0    0    0    0     0        0         0
+  USDCAD#9646    20261026       7      1    1    0    1    2     0        0         0
+  USDCAD#9646    20261027       2      0    0    0    0    2     0        0         0
+  USDCHF#209F    20261026       5      1    3    1    2    0     0        0         2
+  USDCHF#209F    20261027       2      0    0    0    0    0     0        0         0
+  USDJPY#D61E    20261026       5      0    0    0    0    0     0        0         0
+  USDJPY#D61E    20261027       2      0    0    0    0    0     0        0         0
+  XAUUSD#159A    20261026      14     10    0    0    0   10     0        0         0
+  XAUUSD#159A    20261027       4      0    0    0    0    0     0        0         0
+  XAUUSD#8C1C    20261026      14     10    0    0    0   10     0        0         0
+  XAUUSD#8C1C    20261027       4      0    0    0    0    0     0        0         0
+  total
+  AUDUSD#F657                          0    1    0    0    0
+  EURUSD#0442                          0    4    1    2    0
+  EURUSD#3F83                          0    4    1    2    0
+  GBPUSD#3674                         10    0    0    0    7
+  NZDUSD#58F3                          0    2    0    0    0
+  USDCAD#9646                          1    1    0    1    4
+  USDCHF#209F                          1    3    1    2    0
+  USDJPY#D61E                          0    0    0    0    0
+  XAUUSD#159A                         10    0    0    0   10
+  XAUUSD#8C1C                         10    0    0    0   10
+  differences on compared rows: 0   (+ 6 PROT row(s) the same but for leg= - PENDING REVIEW)
+  ("outside": live rows of a stretch whose event time is at its edges; not counted, listed below)
+
+== across a sleep (A-60) - rows logged after the last build of a day, checked against the next first build
+  GBPUSD#3674 20261027: 3 live row(s) after the last build (09:24:58.920 local, to=2026.10.27 12:15)
+    no later log - not checked
+  USDCAD#9646 20261027: 2 live row(s) after the last build (09:24:51.406 local, to=2026.10.27 12:15)
+RESULT: NOT PASSED - 6 intraday PROT row(s) the same but for leg= - PENDING REVIEW (A-59: the rebuild's H4 window starts later)
+
+## 3. ReloadTest -LiveVsBuild -Days 2 (both files)
+--- AUDUSD#46E1,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 2   comparable: 1   pending review: 1   liquidity pending: 0
+    pending: build 2->3: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 0 (+ 0 H4 structure event(s))
+  strength rows compared: 1 (STR)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- AUDUSD#F657,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 2   comparable: 1   pending review: 1   liquidity pending: 0
+    pending: build 31->32: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 1 (+ 0 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- EURUSD#0442,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 3   comparable: 2   pending review: 1   liquidity pending: 0
+    pending: build 44->45: 2 protected-level row(s) agree but for the leg number (the rebuild's H4 history starts later)
+    pending: build 48->49: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 4 (+ 1 H4 structure event(s))
+  protected-level rows compared: 2 (PROT / ANCHOR / INTERNAL)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+  2 protected-level row(s) agree but for the leg number - PENDING REVIEW for those
+--- EURUSD#198B,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 2   comparable: 1   pending review: 1   liquidity pending: 0
+    pending: build 1->2: 2 protected-level row(s) agree but for the leg number (the rebuild's H4 history starts later)
+    pending: build 5->6: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 0 (+ 1 H4 structure event(s))
+  protected-level rows compared: 2 (PROT / ANCHOR / INTERNAL)
+  strength rows compared: 1 (STR)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+  2 protected-level row(s) agree but for the leg number - PENDING REVIEW for those
+--- EURUSD#3F83,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 3   comparable: 2   pending review: 1   liquidity pending: 0
+    pending: build 44->45: 2 protected-level row(s) agree but for the leg number (the rebuild's H4 history starts later)
+    pending: build 48->49: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 4 (+ 1 H4 structure event(s))
+  protected-level rows compared: 2 (PROT / ANCHOR / INTERNAL)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+  2 protected-level row(s) agree but for the leg number - PENDING REVIEW for those
+--- EURUSD#54CC,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 2   comparable: 1   pending review: 1   liquidity pending: 0
+    pending: build 1->2: 2 protected-level row(s) agree but for the leg number (the rebuild's H4 history starts later)
+    pending: build 5->6: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 0 (+ 1 H4 structure event(s))
+  protected-level rows compared: 2 (PROT / ANCHOR / INTERNAL)
+  strength rows compared: 1 (STR)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+  2 protected-level row(s) agree but for the leg number - PENDING REVIEW for those
+--- GBPUSD#3674,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 4   comparable: 3   pending review: 1   liquidity pending: 0
+    pending: build 9->10: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 10 (+ 0 H4 structure event(s))
+  BRI-08 rows compared: 7 (REF / BRK)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- GBPUSD#86FE,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 4   comparable: 3   pending review: 1   liquidity pending: 0
+    pending: build 1->1: 1 live row(s) on an edge bar, not provably covered
+    pending: build 2->3: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 6 (+ 0 H4 structure event(s))
+  BRI-08 rows compared: 5 (REF / BRK)
+  strength rows compared: 1 (STR)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- NZDUSD#58F3,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 2   comparable: 1   pending review: 1   liquidity pending: 0
+    pending: build 9->10: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 2 (+ 0 H4 structure event(s))
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- NZDUSD#A97D,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 2   comparable: 1   pending review: 1   liquidity pending: 0
+    pending: build 2->3: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 0 (+ 0 H4 structure event(s))
+  strength rows compared: 1 (STR)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDCAD#9646,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 4   comparable: 3   pending review: 1   liquidity pending: 0
+    pending: build 10->11: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 2 (+ 0 H4 structure event(s))
+  protected-level rows compared: 1 (PROT / ANCHOR / INTERNAL)
+  BRI-08 rows compared: 4 (REF / BRK)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDCAD#E6D0,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 3   comparable: 2   pending review: 1   liquidity pending: 0
+    pending: build 3->4: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 1 (+ 0 H4 structure event(s))
+  protected-level rows compared: 1 (PROT / ANCHOR / INTERNAL)
+  BRI-08 rows compared: 4 (REF / BRK)
+  strength rows compared: 1 (STR)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDCHF#209F,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 3   comparable: 2   pending review: 1   liquidity pending: 0
+    pending: build 7->8: 2 protected-level row(s) agree but for the leg number (the rebuild's H4 history starts later)
+    pending: build 8->9: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 4 (+ 1 H4 structure event(s))
+  protected-level rows compared: 2 (PROT / ANCHOR / INTERNAL)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+  2 protected-level row(s) agree but for the leg number - PENDING REVIEW for those
+--- USDCHF#7129,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 2   comparable: 1   pending review: 1   liquidity pending: 0
+    pending: build 1->2: 2 protected-level row(s) agree but for the leg number (the rebuild's H4 history starts later)
+    pending: build 2->3: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 0 (+ 1 H4 structure event(s))
+  protected-level rows compared: 2 (PROT / ANCHOR / INTERNAL)
+  strength rows compared: 1 (STR)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+  2 protected-level row(s) agree but for the leg number - PENDING REVIEW for those
+--- USDJPY#15F9,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 2   comparable: 1   pending review: 1   liquidity pending: 0
+    pending: build 2->3: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 0 (+ 0 H4 structure event(s))
+  strength rows compared: 1 (STR)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- USDJPY#D61E,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 1   comparable: 0   pending review: 1   liquidity pending: 0
+    pending: build 24->25: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  nothing comparable yet - no PASS can be given.
+--- XAUUSD#159A,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 4   comparable: 3   pending review: 1   liquidity pending: 0
+    pending: build 45->46: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 10 (+ 0 H4 structure event(s))
+  BRI-08 rows compared: 10 (REF / BRK)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- XAUUSD#2AE3,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 2   comparable: 1   pending review: 1   liquidity pending: 0
+    pending: build 3->4: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 0 (+ 0 H4 structure event(s))
+  strength rows compared: 1 (STR)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- XAUUSD#6624,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 2   comparable: 1   pending review: 1   liquidity pending: 0
+    pending: build 3->4: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 0 (+ 0 H4 structure event(s))
+  strength rows compared: 1 (STR)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+--- XAUUSD#8C1C,M5 : LIVE vs BUILD ---
+  build pairs with a live stretch: 4   comparable: 3   pending review: 1   liquidity pending: 0
+    pending: build 32->33: the builds are in different log files (20261026.log -> 20261027.log): a night between them, not a provably continuous live stretch (A-60; live_coverage.py checks it as cross-sleep) (0 live row(s))
+  live events compared: 10 (+ 0 H4 structure event(s))
+  BRI-08 rows compared: 10 (REF / BRK)
+  AGREE BOTH WAYS on every covered bar (MODEL + LIQ).
+
+## 4. same-window reload, 10-27 (last two builds of each v2.56 chart)
+--- EURUSD#198B,M5 : comparing the last two builds ---
+  A  v2.56 params=461F006E build=9 id=1792585034/44 liq=READY from=2026.10.02 03:45 to=2026.10.27 12:20 warmup_end=2026.10.02 12:05 rows=43 MODEL + 41 LIQ
+  common region: 2026.10.02 12:10 .. 2026.10.27 12:25  (same window)
+    MODEL  IDENTICAL over 43 / 43 row(s)
+    LIQ    IDENTICAL over 41 / 41 row(s)
+    CTX    IDENTICAL over 11 / 11 event(s)
+    PROT   IDENTICAL over 22 / 22 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 32 / 32 row(s) (REF / BRK)
+    STR    IDENTICAL over 102 / 102 row(s) (strength score)
+    STR    every row recomputes from its inputs (210 row(s)); both histograms add up
+  IDENTICAL inside the comparable region (43 MODEL + 41 LIQ) - no repaint found there.
+--- EURUSD#54CC,M5 : comparing the last two builds ---
+  A  v2.56 params=A047970C build=9 id=1792585034/42 liq=READY from=2026.10.02 03:45 to=2026.10.27 12:20 warmup_end=2026.10.02 12:05 rows=43 MODEL + 41 LIQ
+  common region: 2026.10.02 12:10 .. 2026.10.27 12:25  (same window)
+    MODEL  IDENTICAL over 43 / 43 row(s)
+    LIQ    IDENTICAL over 41 / 41 row(s)
+    CTX    IDENTICAL over 11 / 11 event(s)
+    PROT   IDENTICAL over 22 / 22 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 32 / 32 row(s) (REF / BRK)
+    STR    IDENTICAL over 102 / 102 row(s) (strength score)
+    STR    every row recomputes from its inputs (210 row(s)); both histograms add up
+  IDENTICAL inside the comparable region (43 MODEL + 41 LIQ) - no repaint found there.
+--- XAUUSD#2AE3,M5 : comparing the last two builds ---
+  A  v2.56 params=461F006E build=7 id=1792585034/45 liq=READY from=2026.10.01 09:45 to=2026.10.27 12:20 warmup_end=2026.10.01 18:05 rows=144 MODEL + 48 LIQ
+  common region: 2026.10.01 18:10 .. 2026.10.27 12:25  (same window)
+    MODEL  IDENTICAL over 144 / 144 row(s)
+    LIQ    IDENTICAL over 48 / 48 row(s)
+    CTX    IDENTICAL over 12 / 12 event(s)
+    PROT   IDENTICAL over 24 / 24 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 123 / 123 row(s) (REF / BRK)
+    STR    IDENTICAL over 107 / 107 row(s) (strength score)
+    STR    every row recomputes from its inputs (218 row(s)); both histograms add up
+  IDENTICAL inside the comparable region (144 MODEL + 48 LIQ) - no repaint found there.
+--- XAUUSD#6624,M5 : comparing the last two builds ---
+  A  v2.56 params=A047970C build=7 id=1792585034/43 liq=READY from=2026.10.01 09:45 to=2026.10.27 12:20 warmup_end=2026.10.01 18:05 rows=139 MODEL + 48 LIQ
+  common region: 2026.10.01 18:10 .. 2026.10.27 12:25  (same window)
+    MODEL  IDENTICAL over 139 / 139 row(s)
+    LIQ    IDENTICAL over 48 / 48 row(s)
+    CTX    IDENTICAL over 11 / 11 event(s)
+    PROT   IDENTICAL over 23 / 23 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 121 / 121 row(s) (REF / BRK)
+    STR    IDENTICAL over 107 / 107 row(s) (strength score)
+    STR    every row recomputes from its inputs (218 row(s)); both histograms add up
+  IDENTICAL inside the comparable region (139 MODEL + 48 LIQ) - no repaint found there.
+--- AUDUSD#46E1,M5 : comparing the last two builds ---
+  A  v2.56 params=461F006E build=4 id=1792585034/36 liq=READY from=2026.10.02 03:40 to=2026.10.27 12:15 warmup_end=2026.10.02 12:00 rows=102 MODEL + 44 LIQ
+  common region: 2026.10.03 12:10 .. 2026.10.27 12:20  (window moved: both warm-ups + 24 h settle)
+    MODEL  IDENTICAL over 102 / 102 row(s)
+    LIQ    IDENTICAL over 42 / 42 row(s)
+    CTX    IDENTICAL over 10 / 10 event(s)
+    PROT   IDENTICAL over 20 / 20 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 97 / 97 row(s) (REF / BRK)
+    STR    IDENTICAL over 99 / 99 row(s) (strength score)
+    STR    every row recomputes from its inputs (210 row(s)); both histograms add up
+  IDENTICAL inside the comparable region (102 MODEL + 42 LIQ) - no repaint found there.
+--- USDJPY#15F9,M5 : comparing the last two builds ---
+  A  v2.56 params=461F006E build=4 id=1792585034/38 liq=READY from=2026.10.02 03:40 to=2026.10.27 12:15 warmup_end=2026.10.02 12:00 rows=118 MODEL + 48 LIQ
+  common region: 2026.10.02 12:05 .. 2026.10.27 12:20  (same window)
+    MODEL  IDENTICAL over 118 / 118 row(s)
+    LIQ    IDENTICAL over 48 / 48 row(s)
+    CTX    IDENTICAL over 12 / 12 event(s)
+    PROT   IDENTICAL over 22 / 22 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 105 / 105 row(s) (REF / BRK)
+    STR    IDENTICAL over 102 / 102 row(s) (strength score)
+    STR    every row recomputes from its inputs (210 row(s)); both histograms add up
+  IDENTICAL inside the comparable region (118 MODEL + 48 LIQ) - no repaint found there.
+--- GBPUSD#86FE,M5 : comparing the last two builds ---
+  A  v2.56 params=461F006E build=4 id=1792585034/39 liq=READY from=2026.10.02 03:30 to=2026.10.27 12:15 warmup_end=2026.10.02 11:50 rows=133 MODEL + 48 LIQ
+  common region: 2026.10.02 11:55 .. 2026.10.27 12:20  (same window)
+    MODEL  IDENTICAL over 133 / 133 row(s)
+    LIQ    IDENTICAL over 48 / 48 row(s)
+    CTX    IDENTICAL over 15 / 15 event(s)
+    PROT   IDENTICAL over 22 / 22 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 124 / 124 row(s) (REF / BRK)
+    STR    IDENTICAL over 103 / 103 row(s) (strength score)
+    STR    every row recomputes from its inputs (210 row(s)); both histograms add up
+  IDENTICAL inside the comparable region (133 MODEL + 48 LIQ) - no repaint found there.
+--- USDCHF#7129,M5 : comparing the last two builds ---
+  A  v2.56 params=461F006E build=4 id=1792585034/37 liq=READY from=2026.10.02 03:40 to=2026.10.27 12:15 warmup_end=2026.10.02 12:00 rows=67 MODEL + 44 LIQ
+  common region: 2026.10.02 12:05 .. 2026.10.27 12:20  (same window)
+    MODEL  IDENTICAL over 67 / 67 row(s)
+    LIQ    IDENTICAL over 44 / 44 row(s)
+    CTX    IDENTICAL over 11 / 11 event(s)
+    PROT   IDENTICAL over 23 / 23 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 71 / 71 row(s) (REF / BRK)
+    STR    IDENTICAL over 102 / 102 row(s) (strength score)
+    STR    every row recomputes from its inputs (210 row(s)); both histograms add up
+  IDENTICAL inside the comparable region (67 MODEL + 44 LIQ) - no repaint found there.
+--- NZDUSD#A97D,M5 : comparing the last two builds ---
+  A  v2.56 params=461F006E build=5 id=1792585034/40 liq=READY from=2026.10.02 03:40 to=2026.10.27 12:15 warmup_end=2026.10.02 12:00 rows=166 MODEL + 48 LIQ
+  common region: 2026.10.02 12:05 .. 2026.10.27 12:20  (same window)
+    MODEL  IDENTICAL over 166 / 166 row(s)
+    LIQ    IDENTICAL over 48 / 48 row(s)
+    CTX    IDENTICAL over 10 / 10 event(s)
+    PROT   IDENTICAL over 17 / 17 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 149 / 149 row(s) (REF / BRK)
+    STR    IDENTICAL over 102 / 102 row(s) (strength score)
+    STR    every row recomputes from its inputs (210 row(s)); both histograms add up
+  IDENTICAL inside the comparable region (166 MODEL + 48 LIQ) - no repaint found there.
+--- USDCAD#E6D0,M5 : comparing the last two builds ---
+  A  v2.56 params=461F006E build=5 id=1792585034/41 liq=READY from=2026.10.02 03:40 to=2026.10.27 12:15 warmup_end=2026.10.02 12:00 rows=288 MODEL + 47 LIQ
+  common region: 2026.10.02 12:05 .. 2026.10.27 12:20  (same window)
+    MODEL  IDENTICAL over 288 / 288 row(s)
+    LIQ    IDENTICAL over 47 / 47 row(s)
+    CTX    IDENTICAL over 11 / 11 event(s)
+    PROT   IDENTICAL over 23 / 23 row(s) (PROT / ANCHOR / INTERNAL)
+    B8     IDENTICAL over 276 / 276 row(s) (REF / BRK)
+    STR    IDENTICAL over 102 / 102 row(s) (strength score)
+    STR    every row recomputes from its inputs (210 row(s)); both histograms add up
+  IDENTICAL inside the comparable region (288 MODEL + 47 LIQ) - no repaint found there.
+
+## 5. v2.55 vs v2.56, 10-27 09:25 (each pair built in one M5 bar), all ten pairs
+--- EURUSD#3F83,M5  vs  EURUSD#198B,M5 : last complete build of each ---
+  A  v2.55 params=461F006E build=53 id=1792585034/3 liq=READY from=2026.10.02 03:45 to=2026.10.27 12:20 warmup_end=2026.10.02 12:05 rows=43 MODEL + 41 LIQ
+  B  v2.56 params=461F006E build=10 id=1792585034/44 liq=READY from=2026.10.02 03:45 to=2026.10.27 12:20 warmup_end=2026.10.02 12:05 rows=43 MODEL + 41 LIQ
+  DIFFERENT VERSIONS (2.55 / 2.56) - not a repaint test; MODEL upgrade regression only.
+  lines compared: 385 / 385 (all tags but HMI-STR); v2.56 strength rows: 105 HMI-STR + 1 HMI-STR-HIST
+  upgrade regression: IDENTICAL apart from the strength rows - 385 line(s) the same in both; 105 strength row(s) recompute, the histogram adds up
+--- EURUSD#0442,M5  vs  EURUSD#54CC,M5 : last complete build of each ---
+  A  v2.55 params=A047970C build=53 id=1792585034/2 liq=READY from=2026.10.02 03:45 to=2026.10.27 12:20 warmup_end=2026.10.02 12:05 rows=43 MODEL + 41 LIQ
+  B  v2.56 params=A047970C build=10 id=1792585034/42 liq=READY from=2026.10.02 03:45 to=2026.10.27 12:20 warmup_end=2026.10.02 12:05 rows=43 MODEL + 41 LIQ
+  DIFFERENT VERSIONS (2.55 / 2.56) - not a repaint test; MODEL upgrade regression only.
+  lines compared: 385 / 385 (all tags but HMI-STR); v2.56 strength rows: 105 HMI-STR + 1 HMI-STR-HIST
+  upgrade regression: IDENTICAL apart from the strength rows - 385 line(s) the same in both; 105 strength row(s) recompute, the histogram adds up
+--- XAUUSD#159A,M5  vs  XAUUSD#2AE3,M5 : last complete build of each ---
+  A  v2.55 params=461F006E build=50 id=1792585034/4 liq=READY from=2026.10.01 09:45 to=2026.10.27 12:20 warmup_end=2026.10.01 18:05 rows=144 MODEL + 48 LIQ
+  B  v2.56 params=461F006E build=8 id=1792585034/45 liq=READY from=2026.10.01 09:45 to=2026.10.27 12:20 warmup_end=2026.10.01 18:05 rows=144 MODEL + 48 LIQ
+  DIFFERENT VERSIONS (2.55 / 2.56) - not a repaint test; MODEL upgrade regression only.
+  lines compared: 682 / 682 (all tags but HMI-STR); v2.56 strength rows: 109 HMI-STR + 1 HMI-STR-HIST
+  instance metadata, not compared: 2 HMI-LIQ-REPLAY line(s) differ in attempt= only (probes since each instance's OnInit, A-50):
+    v2.55  attempt=1
+    v2.56  attempt=0
+  upgrade regression: IDENTICAL apart from the strength rows - 682 line(s) the same in both; 109 strength row(s) recompute, the histogram adds up
+--- XAUUSD#8C1C,M5  vs  XAUUSD#6624,M5 : last complete build of each ---
+  A  v2.55 params=A047970C build=37 id=1792585034/7 liq=READY from=2026.10.01 09:45 to=2026.10.27 12:20 warmup_end=2026.10.01 18:05 rows=139 MODEL + 48 LIQ
+  B  v2.56 params=A047970C build=8 id=1792585034/43 liq=READY from=2026.10.01 09:45 to=2026.10.27 12:20 warmup_end=2026.10.01 18:05 rows=139 MODEL + 48 LIQ
+  DIFFERENT VERSIONS (2.55 / 2.56) - not a repaint test; MODEL upgrade regression only.
+  lines compared: 672 / 672 (all tags but HMI-STR); v2.56 strength rows: 109 HMI-STR + 1 HMI-STR-HIST
+  instance metadata, not compared: 2 HMI-LIQ-REPLAY line(s) differ in attempt= only (probes since each instance's OnInit, A-50):
+    v2.55  attempt=1
+    v2.56  attempt=0
+  upgrade regression: IDENTICAL apart from the strength rows - 672 line(s) the same in both; 109 strength row(s) recompute, the histogram adds up
+--- AUDUSD#F657,M5  vs  AUDUSD#46E1,M5 : last complete build of each ---
+  A  v2.55 params=461F006E build=34 id=1792585034/5 liq=READY from=2026.10.02 03:45 to=2026.10.27 12:20 warmup_end=2026.10.02 12:05 rows=102 MODEL + 44 LIQ
+  B  v2.56 params=461F006E build=5 id=1792585034/36 liq=READY from=2026.10.02 03:45 to=2026.10.27 12:20 warmup_end=2026.10.02 12:05 rows=102 MODEL + 44 LIQ
+  DIFFERENT VERSIONS (2.55 / 2.56) - not a repaint test; MODEL upgrade regression only.
+  lines compared: 581 / 581 (all tags but HMI-STR); v2.56 strength rows: 105 HMI-STR + 1 HMI-STR-HIST
+  upgrade regression: IDENTICAL apart from the strength rows - 581 line(s) the same in both; 105 strength row(s) recompute, the histogram adds up
+--- USDJPY#D61E,M5  vs  USDJPY#15F9,M5 : last complete build of each ---
+  A  v2.55 params=461F006E build=27 id=1792585034/6 liq=READY from=2026.10.02 03:40 to=2026.10.27 12:15 warmup_end=2026.10.02 12:00 rows=118 MODEL + 48 LIQ
+  B  v2.56 params=461F006E build=5 id=1792585034/38 liq=READY from=2026.10.02 03:40 to=2026.10.27 12:15 warmup_end=2026.10.02 12:00 rows=118 MODEL + 48 LIQ
+  DIFFERENT VERSIONS (2.55 / 2.56) - not a repaint test; MODEL upgrade regression only.
+  lines compared: 600 / 600 (all tags but HMI-STR); v2.56 strength rows: 105 HMI-STR + 1 HMI-STR-HIST
+  upgrade regression: IDENTICAL apart from the strength rows - 600 line(s) the same in both; 105 strength row(s) recompute, the histogram adds up
+--- GBPUSD#3674,M5  vs  GBPUSD#86FE,M5 : last complete build of each ---
+  A  v2.55 params=461F006E build=12 id=1792585034/8 liq=READY from=2026.10.02 03:30 to=2026.10.27 12:15 warmup_end=2026.10.02 11:50 rows=133 MODEL + 48 LIQ
+  B  v2.56 params=461F006E build=5 id=1792585034/39 liq=READY from=2026.10.02 03:30 to=2026.10.27 12:15 warmup_end=2026.10.02 11:50 rows=133 MODEL + 48 LIQ
+  DIFFERENT VERSIONS (2.55 / 2.56) - not a repaint test; MODEL upgrade regression only.
+  lines compared: 629 / 629 (all tags but HMI-STR); v2.56 strength rows: 105 HMI-STR + 1 HMI-STR-HIST
+  upgrade regression: IDENTICAL apart from the strength rows - 629 line(s) the same in both; 105 strength row(s) recompute, the histogram adds up
+--- USDCHF#209F,M5  vs  USDCHF#7129,M5 : last complete build of each ---
+  A  v2.55 params=461F006E build=11 id=1792585034/9 liq=READY from=2026.10.02 03:40 to=2026.10.27 12:15 warmup_end=2026.10.02 12:00 rows=67 MODEL + 44 LIQ
+  B  v2.56 params=461F006E build=5 id=1792585034/37 liq=READY from=2026.10.02 03:40 to=2026.10.27 12:15 warmup_end=2026.10.02 12:00 rows=67 MODEL + 44 LIQ
+  DIFFERENT VERSIONS (2.55 / 2.56) - not a repaint test; MODEL upgrade regression only.
+  lines compared: 501 / 501 (all tags but HMI-STR); v2.56 strength rows: 105 HMI-STR + 1 HMI-STR-HIST
+  upgrade regression: IDENTICAL apart from the strength rows - 501 line(s) the same in both; 105 strength row(s) recompute, the histogram adds up
+--- NZDUSD#58F3,M5  vs  NZDUSD#A97D,M5 : last complete build of each ---
+  A  v2.55 params=461F006E build=13 id=1792585034/10 liq=READY from=2026.10.02 03:40 to=2026.10.27 12:15 warmup_end=2026.10.02 12:00 rows=166 MODEL + 48 LIQ
+  B  v2.56 params=461F006E build=6 id=1792585034/40 liq=READY from=2026.10.02 03:40 to=2026.10.27 12:15 warmup_end=2026.10.02 12:00 rows=166 MODEL + 48 LIQ
+  DIFFERENT VERSIONS (2.55 / 2.56) - not a repaint test; MODEL upgrade regression only.
+  lines compared: 744 / 744 (all tags but HMI-STR); v2.56 strength rows: 105 HMI-STR + 1 HMI-STR-HIST
+  upgrade regression: IDENTICAL apart from the strength rows - 744 line(s) the same in both; 105 strength row(s) recompute, the histogram adds up
+--- USDCAD#9646,M5  vs  USDCAD#E6D0,M5 : last complete build of each ---
+  A  v2.55 params=461F006E build=13 id=1792585034/11 liq=READY from=2026.10.02 03:40 to=2026.10.27 12:15 warmup_end=2026.10.02 12:00 rows=288 MODEL + 47 LIQ
+  B  v2.56 params=461F006E build=6 id=1792585034/41 liq=READY from=2026.10.02 03:40 to=2026.10.27 12:15 warmup_end=2026.10.02 12:00 rows=288 MODEL + 47 LIQ
+  DIFFERENT VERSIONS (2.55 / 2.56) - not a repaint test; MODEL upgrade regression only.
+  lines compared: 1118 / 1118 (all tags but HMI-STR); v2.56 strength rows: 105 HMI-STR + 1 HMI-STR-HIST
+  upgrade regression: IDENTICAL apart from the strength rows - 1118 line(s) the same in both; 105 strength row(s) recompute, the histogram adds up
+
+## 6. strength distribution record, 10-27 (ReloadTest -Str) - a record, not a calibration
+--- strength score distribution (HMI-STR-HIST, latest complete build per chart) ---
+  AUDUSD#46E1,M5         build 5    2026.07.02 08:00 .. 2026.10.27 12:00  bars 500  ok 412  nodir 74  nodata 14  weak 239 / med 90 / strong 83
+  EURUSD#198B,M5         build 10   2026.07.02 08:00 .. 2026.10.27 12:00  bars 500  ok 427  nodir 59  nodata 14  weak 252 / med 103 / strong 72
+  EURUSD#54CC,M5         build 10   2026.07.02 08:00 .. 2026.10.27 12:00  bars 500  ok 426  nodir 60  nodata 14  weak 251 / med 103 / strong 72
+  GBPUSD#86FE,M5         build 5    2026.07.02 08:00 .. 2026.10.27 12:00  bars 500  ok 350  nodir 136  nodata 14  weak 203 / med 88 / strong 59
+  NZDUSD#A97D,M5         build 6    2026.07.02 08:00 .. 2026.10.27 12:00  bars 500  ok 377  nodir 109  nodata 14  weak 200 / med 111 / strong 66
+  USDCAD#E6D0,M5         build 6    2026.07.02 08:00 .. 2026.10.27 12:00  bars 500  ok 338  nodir 148  nodata 14  weak 145 / med 89 / strong 104
+  USDCHF#7129,M5         build 5    2026.07.02 08:00 .. 2026.10.27 12:00  bars 500  ok 364  nodir 122  nodata 14  weak 187 / med 103 / strong 74
+  USDJPY#15F9,M5         build 5    2026.07.02 08:00 .. 2026.10.27 12:00  bars 500  ok 362  nodir 124  nodata 14  weak 196 / med 102 / strong 64
+  XAUUSD#2AE3,M5         build 8    2026.07.02 04:00 .. 2026.10.27 12:00  bars 500  ok 331  nodir 155  nodata 14  weak 161 / med 84 / strong 86
+  XAUUSD#6624,M5         build 8    2026.07.02 04:00 .. 2026.10.27 12:00  bars 500  ok 333  nodir 153  nodata 14  weak 163 / med 84 / strong 86
+  merged  params 461F006E STR1-N12K3-M3R1-W45.35.20-T35.65  (8 chart(s), 2961 scored H4 bars)
+    displayed score  P10 0  P25 7  P33 15  P50 31  P67 52  P75 60  P90 80   = 0: 512  = 100: 0
+    tiers (on the unrounded score)  weak 1583 (53 %)  med 770 (26 %)  strong 608 (21 %)
+  merged  params A047970C STR1-N12K3-M3R1-W45.35.20-T35.65  (2 chart(s), 759 scored H4 bars)
+    displayed score  P10 0  P25 7  P33 14  P50 29  P67 54  P75 61  P90 81   = 0: 130  = 100: 0
+    tiers (on the unrounded score)  weak 414 (55 %)  med 187 (25 %)  strong 158 (21 %)
+  a record of the distribution, not a calibration (BRI-13 T-4): the tiers stay 35 / 65.
+
+## 7. screenshots (r4): COMPACT AUDUSD row 1 'BULLISH BOS 5 CLEAN | POI 0 | no session' complete, row 2 '强度 弱 25/100 数据截至 2026.10.26 16:00 H4 收盘';
+#   COMPACT USDJPY row 2 '强度 暂不评级 数据截至 2026.10.26 20:00 H4 收盘' (TRANSITION); FULL AUDUSD (part 1); MetaEditor r4 0 errors / 0 warnings;
+#   rows already over 63 characters in v2.55 still cut (COMPACT row 1 under TRANSITION 'no sess', CYCLE, FULL POI) - display stage
