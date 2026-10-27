@@ -1,0 +1,91 @@
+# v2.57 dev (MQL as reviewed, 39B2EA17...0D77) - first MT5 run, log 20261027.log (local 09:09 .. 15:55; server = local + 3 h)
+# 20261027.rar sha256 20df32df35e5908092f269b4f8e87cbe2702e08428a9d09e39c6317997d02480; 20261027.log sha256 3a3af5267305903986ea7218ae14fde38f50ce396397af17b82f8409db6f5c01
+# tools: ReloadTest.ps1 r2 (8f4a641), live_coverage.py; the v2.57 charts took over the v2.55 charts' instance tags (one source holds v2.55 builds, then v2.57)
+
+## v2.57 attached (starting lines) - ten charts, 15:53 .. 15:54 local
+15:53:06.809 HMI v2.57 starting on EURUSD PERIOD_M5  instance=0442 run=1792585034 init=46
+15:53:16.898 HMI v2.57 starting on EURUSD PERIOD_M5  instance=3F83 run=1792585034 init=47
+15:53:22.541 HMI v2.57 starting on XAUUSD PERIOD_M5  instance=159A run=1792585034 init=48
+15:53:30.324 HMI v2.57 starting on XAUUSD PERIOD_M5  instance=8C1C run=1792585034 init=49
+15:53:37.976 HMI v2.57 starting on AUDUSD PERIOD_M5  instance=F657 run=1792585034 init=50
+15:53:45.867 HMI v2.57 starting on USDJPY PERIOD_M5  instance=D61E run=1792585034 init=51
+15:53:52.510 HMI v2.57 starting on GBPUSD PERIOD_M5  instance=3674 run=1792585034 init=52
+15:53:58.963 HMI v2.57 starting on USDCHF PERIOD_M5  instance=209F run=1792585034 init=53
+15:54:05.394 HMI v2.57 starting on NZDUSD PERIOD_M5  instance=58F3 run=1792585034 init=54
+15:54:11.708 HMI v2.57 starting on USDCAD PERIOD_M5  instance=9646 run=1792585034 init=55
+
+## same-window reload, last two builds of every chart (ReloadTest -Source)
+AUDUSD#46E1    v2.56  IDENTICAL inside the comparable region (102 MODEL + 45 LIQ) - no repaint found there.
+AUDUSD#F657    v2.57  IDENTICAL inside the comparable region (102 MODEL + 45 LIQ) - no repaint found there.   QLT IDENTICAL over 102 / 102 row(s) (quality score)
+EURUSD#0442    v2.57  IDENTICAL inside the comparable region (43 MODEL + 41 LIQ) - no repaint found there.   QLT IDENTICAL over 102 / 102 row(s) (quality score)
+EURUSD#198B    v2.56  IDENTICAL inside the comparable region (43 MODEL + 41 LIQ) - no repaint found there.
+EURUSD#3F83    v2.57  IDENTICAL inside the comparable region (43 MODEL + 41 LIQ) - no repaint found there.   QLT IDENTICAL over 102 / 102 row(s) (quality score)
+EURUSD#54CC    v2.56  IDENTICAL inside the comparable region (43 MODEL + 41 LIQ) - no repaint found there.
+GBPUSD#3674    v2.57  IDENTICAL inside the comparable region (142 MODEL + 48 LIQ) - no repaint found there.   QLT IDENTICAL over 102 / 102 row(s) (quality score)
+GBPUSD#86FE    v2.56  IDENTICAL inside the comparable region (142 MODEL + 48 LIQ) - no repaint found there.
+NZDUSD#58F3    v2.57  IDENTICAL inside the comparable region (135 MODEL + 48 LIQ) - no repaint found there.   QLT IDENTICAL over 102 / 102 row(s) (quality score)
+NZDUSD#A97D    v2.56  IDENTICAL inside the comparable region (135 MODEL + 48 LIQ) - no repaint found there.
+USDCAD#9646    v2.57  IDENTICAL inside the comparable region (295 MODEL + 47 LIQ) - no repaint found there.   QLT IDENTICAL over 102 / 102 row(s) (quality score)
+USDCAD#E6D0    v2.56  IDENTICAL inside the comparable region (295 MODEL + 47 LIQ) - no repaint found there.
+USDCHF#209F    v2.57  IDENTICAL inside the comparable region (67 MODEL + 43 LIQ) - no repaint found there.   QLT IDENTICAL over 102 / 102 row(s) (quality score)
+USDCHF#7129    v2.56  IDENTICAL inside the comparable region (67 MODEL + 43 LIQ) - no repaint found there.
+USDJPY#15F9    v2.56  IDENTICAL inside the comparable region (83 MODEL + 46 LIQ) - no repaint found there.
+USDJPY#D61E    v2.57  IDENTICAL inside the comparable region (83 MODEL + 46 LIQ) - no repaint found there.   QLT IDENTICAL over 102 / 102 row(s) (quality score)
+XAUUSD#159A    v2.57  IDENTICAL inside the comparable region (144 MODEL + 51 LIQ) - no repaint found there.   QLT IDENTICAL over 106 / 106 row(s) (quality score)
+XAUUSD#2AE3    v2.56  IDENTICAL inside the comparable region (144 MODEL + 51 LIQ) - no repaint found there.
+XAUUSD#6624    v2.56  IDENTICAL inside the comparable region (139 MODEL + 51 LIQ) - no repaint found there.
+XAUUSD#8C1C    v2.57  IDENTICAL inside the comparable region (139 MODEL + 51 LIQ) - no repaint found there.   QLT IDENTICAL over 106 / 106 row(s) (quality score)
+every v2.57 reload also: "QLT every row recomputes and agrees with its build's HMI-CTX / HMI-ANCHOR rows; both histograms add up" (10 of 10); windows: 20 of 20 same window
+
+## v2.56 -> v2.57, same symbol / params / window (ReloadTest -Source <v2.56> -Versus <v2.57>)
+AUDUSD#F657    upgrade regression: IDENTICAL apart from the quality rows - 687 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+EURUSD#0442    upgrade regression: IDENTICAL apart from the quality rows - 489 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+EURUSD#3F83    upgrade regression: IDENTICAL apart from the quality rows - 490 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+GBPUSD#3674    upgrade regression: IDENTICAL apart from the quality rows - 757 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+NZDUSD#58F3    upgrade regression: IDENTICAL apart from the quality rows - 765 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+USDCAD#9646    upgrade regression: IDENTICAL apart from the quality rows - 1239 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+USDCHF#209F    upgrade regression: IDENTICAL apart from the quality rows - 605 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+USDJPY#D61E    upgrade regression: IDENTICAL apart from the quality rows - 610 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+XAUUSD#159A    upgrade regression: IDENTICAL apart from the quality rows - 797 line(s) the same in both; 108 quality row(s) recompute, the histogram adds up
+XAUUSD#8C1C    upgrade regression: IDENTICAL apart from the quality rows - 787 line(s) the same in both; 108 quality row(s) recompute, the histogram adds up
+
+## -Qlt (record, BRI-14 C-10: weights and tiers unchanged)
+  --- quality score distribution (HMI-QLT-HIST, latest complete build per chart) ---
+    AUDUSD#F657,M5         build 3    2026.07.02 12:00 .. 2026.10.27 16:00  bars 500  ok 242  partial 171 (few 171, no anchor 64)  nodir 76  nodata 11  poor 22 / fair 124 / good 96  n 27;83;61;71;62;109
+    EURUSD#0442,M5         build 5    2026.07.02 12:00 .. 2026.10.27 16:00  bars 500  ok 271  partial 157 (few 157, no anchor 7)  nodir 61  nodata 11  poor 19 / fair 87 / good 165  n 24;65;68;44;56;171
+    EURUSD#3F83,M5         build 5    2026.07.02 12:00 .. 2026.10.27 16:00  bars 500  ok 271  partial 156 (few 156, no anchor 7)  nodir 62  nodata 11  poor 17 / fair 82 / good 172  n 24;67;65;47;55;169
+    GBPUSD#3674,M5         build 3    2026.07.02 12:00 .. 2026.10.27 16:00  bars 500  ok 125  partial 226 (few 226, no anchor 20)  nodir 138  nodata 11  poor 13 / fair 45 / good 67  n 30;89;107;51;34;40
+    NZDUSD#58F3,M5         build 3    2026.07.02 12:00 .. 2026.10.27 16:00  bars 500  ok 279  partial 99 (few 99, no anchor 23)  nodir 111  nodata 11  poor 9 / fair 124 / good 146  n 27;37;35;78;33;168
+    USDCAD#9646,M5         build 3    2026.07.02 12:00 .. 2026.10.27 16:00  bars 500  ok 188  partial 153 (few 153, no anchor 80)  nodir 148  nodata 11  poor 2 / fair 79 / good 107  n 27;86;40;37;17;134
+    USDCHF#209F,M5         build 3    2026.07.02 12:00 .. 2026.10.27 16:00  bars 500  ok 161  partial 204 (few 204, no anchor 10)  nodir 124  nodata 11  poor 6 / fair 38 / good 117  n 28;74;102;36;65;60
+    USDJPY#D61E,M5         build 3    2026.07.02 12:00 .. 2026.10.27 16:00  bars 500  ok 157  partial 207 (few 207, no anchor 68)  nodir 125  nodata 11  poor 1 / fair 59 / good 97  n 29;96;82;29;93;35
+    XAUUSD#159A,M5         build 5    2026.07.02 08:00 .. 2026.10.27 16:00  bars 500  ok 163  partial 170 (few 170, no anchor 62)  nodir 156  nodata 11  poor 15 / fair 54 / good 94  n 33;75;62;87;25;51
+    XAUUSD#8C1C,M5         build 5    2026.07.02 08:00 .. 2026.10.27 16:00  bars 500  ok 181  partial 154 (few 154, no anchor 62)  nodir 154  nodata 11  poor 19 / fair 65 / good 97  n 33;75;46;82;48;51
+    merged  params 461F006E QLT1-B60.5.3.3S1-RA-O12F6-W40.35.25-T40.70  (8 chart(s), 2973 trend H4 bars, total available on 1586 = 53 %)
+      mature events used on the trend bars: n=0 225  n=1 605  n=2 557  n=3 433  n=4 385  n=5 768
+      displayed score  P10 45  P25 61  P50 72  P75 79  P90 87
+      tiers of the scored bars (on the unrounded score)  poor 87 (5 %)  fair 610 (38 %)  good 889 (56 %)
+    merged  params A047970C QLT1-B60.5.3.3S1-RA-O12F6-W40.35.25-T40.70  (2 chart(s), 762 trend H4 bars, total available on 452 = 59 %)
+      mature events used on the trend bars: n=0 57  n=1 142  n=2 111  n=3 129  n=4 103  n=5 220
+      displayed score  P10 43  P25 59  P50 74  P75 81  P90 88
+      tiers of the scored bars (on the unrounded score)  poor 36 (8 %)  fair 147 (33 %)  good 269 (60 %)
+    a record of the distribution, not a calibration (BRI-14 C-10): weights 40 / 35 / 25 and tiers 40 / 70 stay.
+
+## live vs build
+v2.57: no live stretch yet (attached after the server 16:00 H4 close; the next closes at server 20:00 = local 17:00) -
+RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+v2.56 (running all day; live_coverage --ver 2.56 --offset 3):
+== category coverage, v2.56
+  AUDUSD#46E1    intraday: LIQ, STR                 across a sleep only: -                  edge only: -            no sample: MODEL, CTX, PROT, B8
+  EURUSD#198B    intraday: STR                      across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  EURUSD#54CC    intraday: STR                      across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  GBPUSD#86FE    intraday: MODEL, B8, STR           across a sleep only: -                  edge only: -            no sample: LIQ, CTX, PROT
+  NZDUSD#A97D    intraday: LIQ, STR                 across a sleep only: -                  edge only: -            no sample: MODEL, CTX, PROT, B8
+  USDCAD#E6D0    intraday: MODEL, B8, STR           across a sleep only: -                  edge only: -            no sample: LIQ, CTX, PROT
+  USDCHF#7129    intraday: STR                      across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  USDJPY#15F9    intraday: STR                      across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  XAUUSD#2AE3    intraday: MODEL, LIQ, STR          across a sleep only: -                  edge only: -            no sample: CTX, PROT, B8
+  XAUUSD#6624    intraday: MODEL, LIQ, STR          across a sleep only: -                  edge only: -            no sample: CTX, PROT, B8
+
+RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+ReloadTest -LiveVsBuild, v2.56 charts: 10 of 10 AGREE BOTH WAYS (no mismatch, no failed check)
