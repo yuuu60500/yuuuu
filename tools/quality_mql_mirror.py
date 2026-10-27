@@ -18,7 +18,11 @@ import h4_protect_sim as P                                       # noqa: E402
 import h4_dedup_sim as B                                         # noqa: E402
 from h4_dedup_sim import BULL_CTX, BEAR_CTX, H4, tstr            # noqa: E402
 
-MQH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "MQL5", "Indicators", "HMI")
+_HERE = os.path.dirname(os.path.abspath(__file__))
+MQH = next((d for d in (os.path.join(_HERE, "..", "MQL5", "Indicators", "HMI"), os.path.join(_HERE, "..", "Indicators", "HMI"))
+            if os.path.isfile(os.path.join(d, "HMI_QualityEngine.mqh"))), None)   # the repository, or a delivery package
+if MQH is None:
+    sys.exit("HMI_QualityEngine.mqh not found next to tools/ (../MQL5/Indicators/HMI or ../Indicators/HMI)")
 
 # ---- QltOnH4Bar + QltLog (StrL = the MQL StrL: round((a - b) / _Point)) ------------------------------------------
 PT = B.POINT
