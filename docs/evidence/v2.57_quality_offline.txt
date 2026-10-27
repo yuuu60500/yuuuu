@@ -1,0 +1,179 @@
+# v2.57 quality score (docs/02 BRI-14 定义稿: requirement §6, Q_break 40% / Q_retrace 35% / Q_overlap 25%) - offline model, 2026-10-27
+# data: backtesting.py 0.6.6 backtesting/test/EURUSD.csv, sha256 81e977905a006cc8fbc034ebdb83c999a8ed6ba00191dc7ea5ef5b386fb74a82 (shipped as Tools/data/EURUSD_H1.csv)
+# tools/quality_sim.py sha256 28e869d2085ebf9f6e0950644eb1ff92ce0b055585fe4a74510db797e81c0c6b
+# definition only: no MQL change in this draft; the model reads the unchanged v2.54 structure model (tools/h4_protect_sim.py)
+
+## python3 tools/quality_sim.py
+== Q_break: observation, maturity, failure, sample size (BULLISH and the mirrored BEARISH) ==
+PASS  B01 three mature successes, one event 1 bar old: n 3 (pending not counted) -> 100, low sample [bull]  OK/- n3 ok3 pend1 brk 100.000000 ret 100.000000 ovl 33.333400 raw 83.333350 83 GOOD
+PASS  B01 three mature successes, one event 1 bar old: n 3 (pending not counted) -> 100, low sample [bear]  OK/- n3 ok3 pend1 brk 100.000000 ret 100.000000 ovl 33.333400 raw 83.333350 83 GOOD
+PASS  B02 one close 1 point back under the level (no margin) -> FAIL: 2 / 3 [bull]  OK/- n3 ok2 pend0 brk 66.666667 ret 100.000000 ovl 32.471427 raw 69.784523 70 FAIR
+PASS  B02 one close 1 point back under the level (no margin) -> FAIL: 2 / 3 [bear]  OK/- n3 ok2 pend0 brk 66.666667 ret 100.000000 ovl 32.471427 raw 69.784523 70 FAIR
+PASS  B03 a close exactly at the level is not a failure [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 100.000000 ovl 32.306009 raw 83.076502 83 GOOD
+PASS  B03 a close exactly at the level is not a failure [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 100.000000 ovl 32.306009 raw 83.076502 83 GOOD
+PASS  B04 failure seen at k+1 stays pending until k+3 (h = 18) [bull]  PARTIAL/FEW n2 ok2 pend1 brk NA ret 100.000000 ovl 33.333400 raw NA None NA
+PASS  B04 failure seen at k+1 stays pending until k+3 (h = 18) [bear]  PARTIAL/FEW n2 ok2 pend1 brk NA ret 100.000000 ovl 33.333400 raw NA None NA
+PASS  B04 failure seen at k+1 stays pending until k+3 (h = 19) [bull]  PARTIAL/FEW n2 ok2 pend1 brk NA ret 100.000000 ovl 32.216973 raw NA None NA
+PASS  B04 failure seen at k+1 stays pending until k+3 (h = 19) [bear]  PARTIAL/FEW n2 ok2 pend1 brk NA ret 100.000000 ovl 32.216973 raw NA None NA
+PASS  B04 failure seen at k+1 stays pending until k+3 (h = 20) [bull]  OK/- n3 ok2 pend0 brk 66.666667 ret 100.000000 ovl 34.814373 raw 70.370260 70 GOOD
+PASS  B04 failure seen at k+1 stays pending until k+3 (h = 20) [bear]  OK/- n3 ok2 pend0 brk 66.666667 ret 100.000000 ovl 34.814373 raw 70.370260 70 GOOD
+PASS  B05 0 mature event(s) -> PARTIAL / FEW: no Q_break, no total (not 0, not 50, not 100) [bull]  PARTIAL/FEW n0 ok0 pend1 brk NA ret 100.000000 ovl 33.333400 raw NA None NA
+PASS  B05 0 mature event(s) -> PARTIAL / FEW: no Q_break, no total (not 0, not 50, not 100) [bear]  PARTIAL/FEW n0 ok0 pend1 brk NA ret 100.000000 ovl 33.333400 raw NA None NA
+PASS  B05 1 mature event(s) -> PARTIAL / FEW: no Q_break, no total (not 0, not 50, not 100) [bull]  PARTIAL/FEW n1 ok1 pend1 brk NA ret 100.000000 ovl 33.333400 raw NA None NA
+PASS  B05 1 mature event(s) -> PARTIAL / FEW: no Q_break, no total (not 0, not 50, not 100) [bear]  PARTIAL/FEW n1 ok1 pend1 brk NA ret 100.000000 ovl 33.333400 raw NA None NA
+PASS  B05 2 mature event(s) -> PARTIAL / FEW: no Q_break, no total (not 0, not 50, not 100) [bull]  PARTIAL/FEW n2 ok2 pend1 brk NA ret 100.000000 ovl 33.333400 raw NA None NA
+PASS  B05 2 mature event(s) -> PARTIAL / FEW: no Q_break, no total (not 0, not 50, not 100) [bear]  PARTIAL/FEW n2 ok2 pend1 brk NA ret 100.000000 ovl 33.333400 raw NA None NA
+PASS  B06 six mature events: the latest 5 count (the oldest, a failure, drops out) -> 100, 5 次事件 [bull]  OK/- n5 ok5 pend0 brk 100.000000 ret 100.000000 ovl 33.333400 raw 83.333350 83 GOOD
+PASS  B06 six mature events: the latest 5 count (the oldest, a failure, drops out) -> 100, 5 次事件 [bear]  OK/- n5 ok5 pend0 brk 100.000000 ret 100.000000 ovl 33.333400 raw 83.333350 83 GOOD
+PASS  B06 five of them: the failure is in -> 80 [bull]  OK/- n5 ok4 pend0 brk 80.000000 ret 100.000000 ovl 33.333400 raw 75.333350 75 GOOD
+PASS  B06 five of them: the failure is in -> 80 [bear]  OK/- n5 ok4 pend0 brk 80.000000 ret 100.000000 ovl 33.333400 raw 75.333350 75 GOOD
+PASS  B07 an event 59 bars back is inside the 60-bar window [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 100.000000 ovl 33.333400 raw 83.333350 83 GOOD
+PASS  B07 an event 59 bars back is inside the 60-bar window [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 100.000000 ovl 33.333400 raw 83.333350 83 GOOD
+PASS  B07 an event 60 bars back is outside -> 2 events, FEW [bull]  PARTIAL/FEW n2 ok2 pend0 brk NA ret 100.000000 ovl 33.333400 raw NA None NA
+PASS  B07 an event 60 bars back is outside -> 2 events, FEW [bear]  PARTIAL/FEW n2 ok2 pend0 brk NA ret 100.000000 ovl 33.333400 raw NA None NA
+
+== Q_retrace: leg_anchor, extreme after the anchor bar, piecewise score ==
+PASS  R01 leg 300, close 0 under the extreme (r = 0) -> Q_retrace 100.0000 [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 100.000000 ovl 80.584427 raw 95.146107 95 GOOD
+PASS  R01 leg 300, close 0 under the extreme (r = 0) -> Q_retrace 100.0000 [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 100.000000 ovl 80.584427 raw 95.146107 95 GOOD
+PASS  R01 leg 300, close 100 under the extreme (r = 1/3) -> Q_retrace 100.0000 [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 100.000000 ovl 80.377818 raw 95.094455 95 GOOD
+PASS  R01 leg 300, close 100 under the extreme (r = 1/3) -> Q_retrace 100.0000 [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 100.000000 ovl 80.377818 raw 95.094455 95 GOOD
+PASS  R01 leg 300, close 101 under the extreme (r = 101/300) -> Q_retrace 99.4000 [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 99.400000 ovl 80.400155 raw 94.890039 95 GOOD
+PASS  R01 leg 300, close 101 under the extreme (r = 101/300) -> Q_retrace 99.4000 [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 99.400000 ovl 80.400155 raw 94.890039 95 GOOD
+PASS  R01 leg 300, close 150 under the extreme (r = 1/2) -> Q_retrace 70.0000 [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 70.000000 ovl 81.152609 raw 84.788152 85 GOOD
+PASS  R01 leg 300, close 150 under the extreme (r = 1/2) -> Q_retrace 70.0000 [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 70.000000 ovl 81.152609 raw 84.788152 85 GOOD
+PASS  R01 leg 300, close 200 under the extreme (r = 2/3) -> Q_retrace 40.0000 [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 40.000000 ovl 81.558455 raw 74.389614 74 GOOD
+PASS  R01 leg 300, close 200 under the extreme (r = 2/3) -> Q_retrace 40.0000 [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 40.000000 ovl 81.558455 raw 74.389614 74 GOOD
+PASS  R01 leg 300, close 250 under the extreme (r = 5/6) -> Q_retrace 20.0000 [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 20.000000 ovl 81.808209 raw 67.452052 67 FAIR
+PASS  R01 leg 300, close 250 under the extreme (r = 5/6) -> Q_retrace 20.0000 [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 20.000000 ovl 81.808209 raw 67.452052 67 FAIR
+PASS  R01 leg 300, close 300 under the extreme (r = 1) -> Q_retrace 0.0000 [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 0.000000 ovl 81.977391 raw 60.494348 60 FAIR
+PASS  R01 leg 300, close 300 under the extreme (r = 1) -> Q_retrace 0.0000 [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 0.000000 ovl 81.977391 raw 60.494348 60 FAIR
+PASS  R01 leg 300, close 330 under the extreme (r = 11/10) -> Q_retrace 0.0000 [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 0.000000 ovl 82.055018 raw 60.513755 61 FAIR
+PASS  R01 leg 300, close 330 under the extreme (r = 11/10) -> Q_retrace 0.0000 [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 0.000000 ovl 82.055018 raw 60.513755 61 FAIR
+PASS  R02 the anchor bar's own high (500) is not the extreme: the extreme is taken from the next bar on [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 70.000000 ovl 86.072400 raw 86.018100 86 GOOD
+PASS  R02 the anchor bar's own high (500) is not the extreme: the extreme is taken from the next bar on [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 70.000000 ovl 86.072400 raw 86.018100 86 GOOD
+PASS  R03 a wick-only new high (350, close 290): the extreme is the high -> leg 350, x 60 [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 100.000000 ovl 80.836955 raw 95.209239 95 GOOD
+PASS  R03 a wick-only new high (350, close 290): the extreme is the high -> leg 350, x 60 [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 100.000000 ovl 80.836955 raw 95.209239 95 GOOD
+PASS  R04 no leg_anchor (INVALID leg) -> PARTIAL / ANCHOR; Q_break and Q_overlap still shown [bull]  PARTIAL/ANCHOR n3 ok3 pend0 brk 100.000000 ret NA ovl 81.152609 raw NA None NA
+PASS  R04 no leg_anchor (INVALID leg) -> PARTIAL / ANCHOR; Q_break and Q_overlap still shown [bear]  PARTIAL/ANCHOR n3 ok3 pend0 brk 100.000000 ret NA ovl 81.152609 raw NA None NA
+PASS  R05 extreme not beyond the anchor (leg 0) -> PARTIAL / LEG [bull]  PARTIAL/LEG n3 ok3 pend0 brk 100.000000 ret NA ovl 81.152609 raw NA None NA
+PASS  R05 extreme not beyond the anchor (leg 0) -> PARTIAL / LEG [bear]  PARTIAL/LEG n3 ok3 pend0 brk 100.000000 ret NA ovl 81.152609 raw NA None NA
+PASS  R06 FEW and no anchor -> both reasons [bull]  PARTIAL/FEW+ANCHOR n2 ok2 pend0 brk NA ret NA ovl 81.152609 raw NA None NA
+PASS  R06 FEW and no anchor -> both reasons [bear]  PARTIAL/FEW+ANCHOR n2 ok2 pend0 brk NA ret NA ovl 81.152609 raw NA None NA
+
+== Q_overlap: 11 adjacent pairs of the latest 12 bars, fixed point 1e-6 per pair ==
+PASS  O01 every bar above the previous one (gap): overlap 0 -> 100 [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 100.000000 ovl 100.000000 raw 100.000000 100 GOOD
+PASS  O01 every bar above the previous one (gap): overlap 0 -> 100 [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 100.000000 ovl 100.000000 raw 100.000000 100 GOOD
+PASS  O02 identical bars: overlap 1 -> 0 [bull]  OK/- n3 ok2 pend0 brk 66.666667 ret 100.000000 ovl 0.000000 raw 61.666667 62 FAIR
+PASS  O02 identical bars: overlap 1 -> 0 [bear]  OK/- n3 ok2 pend0 brk 66.666667 ret 100.000000 ovl 0.000000 raw 61.666667 62 FAIR
+PASS  O03 range 90, step 30: I 60 / U 120 = 0.5 -> 50 [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 100.000000 ovl 50.000000 raw 87.500000 88 GOOD
+PASS  O03 range 90, step 30: I 60 / U 120 = 0.5 -> 50 [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 100.000000 ovl 50.000000 raw 87.500000 88 GOOD
+PASS  O04 zero-range bars at one price (U = 0): overlap 1 by definition -> 0; data valid (not NODATA) [bull]  OK/- n3 ok0 pend0 brk 0.000000 ret 100.000000 ovl 0.000000 raw 35.000000 35 POOR
+PASS  O04 zero-range bars at one price (U = 0): overlap 1 by definition -> 0; data valid (not NODATA) [bear]  OK/- n3 ok0 pend0 brk 0.000000 ret 100.000000 ovl 0.000000 raw 35.000000 35 POOR
+PASS  O05 a zero-range bar inside the previous range: I = 0 -> overlap 0 (literal formula; BRI-14 C-5) [bull]  OK/- n3 ok2 pend0 brk 66.666667 ret 100.000000 ovl 100.000000 raw 86.666667 87 GOOD
+PASS  O05 a zero-range bar inside the previous range: I = 0 -> overlap 0 (literal formula; BRI-14 C-5) [bear]  OK/- n3 ok2 pend0 brk 66.666667 ret 100.000000 ovl 100.000000 raw 86.666667 87 GOOD
+PASS  O06 I / U = 1/3 every pair: floor(1e6 / 3) = 333333 -> 66.666700 (exact 66.6667 only to 1e-6) [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 100.000000 ovl 66.666700 raw 91.666675 92 GOOD
+PASS  O06 I / U = 1/3 every pair: floor(1e6 / 3) = 333333 -> 66.666700 (exact 66.6667 only to 1e-6) [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 100.000000 ovl 66.666700 raw 91.666675 92 GOOD
+PASS  O07 only the latest 12 bars count: bar 1 (h-12) far away -> Q_overlap unchanged (50) [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 71.894737 ovl 50.000000 raw 77.663158 78 GOOD
+PASS  O07 only the latest 12 bars count: bar 1 (h-12) far away -> Q_overlap unchanged (50) [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 71.894737 ovl 50.000000 raw 77.663158 78 GOOD
+
+== composite 0.40 / 0.35 / 0.25, tiers 40 / 70 on the unrounded score ==
+PASS  C01 Q_break 100, Q_retrace 40, Q_overlap 64 -> raw exactly 70 -> 70 GOOD [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 40.000000 ovl 64.000000 raw 70.000000 70 GOOD
+PASS  C01 Q_break 100, Q_retrace 40, Q_overlap 64 -> raw exactly 70 -> 70 GOOD [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 40.000000 ovl 64.000000 raw 70.000000 70 GOOD
+PASS  C02 Q_retrace 270/7 -> raw exactly 69.5 -> shows 70, tier FAIR [bull]  OK/- n3 ok3 pend0 brk 100.000000 ret 38.571429 ovl 64.000000 raw 69.500000 70 FAIR
+PASS  C02 Q_retrace 270/7 -> raw exactly 69.5 -> shows 70, tier FAIR [bear]  OK/- n3 ok3 pend0 brk 100.000000 ret 38.571429 ovl 64.000000 raw 69.500000 70 FAIR
+PASS  C03 Q_break 200/3, Q_retrace 500/21, Q_overlap 20 -> raw exactly 40 -> 40 FAIR [bull]  OK/- n3 ok2 pend0 brk 66.666667 ret 23.809524 ovl 20.000000 raw 40.000000 40 FAIR
+PASS  C03 Q_break 200/3, Q_retrace 500/21, Q_overlap 20 -> raw exactly 40 -> 40 FAIR [bear]  OK/- n3 ok2 pend0 brk 66.666667 ret 23.809524 ovl 20.000000 raw 40.000000 40 FAIR
+PASS  C04 Q_retrace 470/21 -> raw exactly 39.5 -> shows 40, tier POOR [bull]  OK/- n3 ok2 pend0 brk 66.666667 ret 22.380952 ovl 20.000000 raw 39.500000 40 POOR
+PASS  C04 Q_retrace 470/21 -> raw exactly 39.5 -> shows 40, tier POOR [bear]  OK/- n3 ok2 pend0 brk 66.666667 ret 22.380952 ovl 20.000000 raw 39.500000 40 POOR
+PASS  C05 one failure among three: only Q_break moves (100 -> 66.67), raw falls 40/3
+PASS  D01 h = 10 (11 bars): NODATA / HISTORY [bull]  NODATA/HISTORY
+PASS  D01 h = 10 (11 bars): NODATA / HISTORY [bear]  NODATA/HISTORY
+PASS  X01 RANGE / TRANSITION: NODIR, no item but the overlap record
+PASS  X02 the same rising bars and levels under BEARISH: every close is above the level -> every event fails (OK/- n3 ok0 pend0 brk 0.000000 ret 100.000000 ovl 33.333400 raw 43.333350 43 FAIR)
+
+== with the H4 context engine: events, legs, leg_anchor (bull, and the mirror as bear) ==
+PASS  E01 staircase [bull] events: the leg's opening break (START, bar 14) and each continuation BOS (23, 31, 40, 49, 58, 67)
+PASS  E01 staircase [bull] a BOS matures 3 bars later; total from the 3rd mature event (bar 34, 低样本); 5 次事件 from bar 52
+PASS  E01 staircase [bull] bar 61: six mature events, the latest five (23 .. 58) count; bar 14 drops out
+PASS  E01 staircase [bull] bar 37: anchor = the swing low 1750 (bar 28) from BOS 31; extreme 3050 -> leg 1300, x 550 -> Q_retrace 160 - 180 x 550/1300 = 83.8462
+PASS  E01 staircase [bear] events: the leg's opening break (START, bar 14) and each continuation BOS (23, 31, 40, 49, 58, 67)
+PASS  E01 staircase [bear] a BOS matures 3 bars later; total from the 3rd mature event (bar 34, 低样本); 5 次事件 from bar 52
+PASS  E01 staircase [bear] bar 61: six mature events, the latest five (23 .. 58) count; bar 14 drops out
+PASS  E01 staircase [bear] bar 37: anchor = the swing low 1750 (bar 28) from BOS 31; extreme 3050 -> leg 1300, x 550 -> Q_retrace 160 - 180 x 550/1300 = 83.8462
+PASS  staircase: bull and bear agree on every bar (74 bars)
+PASS  E10 staircase, def S0 [bull] without the opening break (def S0) the 3rd mature event comes at bar 43, not 34
+PASS  E10 staircase, def S0 [bear] without the opening break (def S0) the 3rd mature event comes at bar 43, not 34
+PASS  staircase, def S0: bull and bear agree on every bar (74 bars)
+PASS  E02 failing breaks [bull] every break slips back under its level within 3 bars (1 to 10 points, no margin): bar 30 n 3, 0 OK -> Q_break 0 (not FEW, not excluded)
+PASS  E11 failing breaks [bull] bar 40: strength 75 STRONG with quality 39.236566 POOR (breaks 0/4 held, overlap 36.037173, retrace 86.363636) - 强度强但质量差
+PASS  E02 failing breaks [bear] every break slips back under its level within 3 bars (1 to 10 points, no margin): bar 30 n 3, 0 OK -> Q_break 0 (not FEW, not excluded)
+PASS  E11 failing breaks [bear] bar 40: strength 75 STRONG with quality 39.236566 POOR (breaks 0/4 held, overlap 36.037173, retrace 86.363636) - 强度强但质量差
+PASS  failing breaks: bull and bear agree on every bar (41 bars)
+PASS  E12 orderly pullback [bull] staircase bar 36 (third bar of a normal pullback): strength 45 MED, quality 93.032586 GOOD (3/3 breaks held, r 0.295) - 强度一般但质量好
+PASS  E12 orderly pullback [bear] staircase bar 36 (third bar of a normal pullback): strength 45 MED, quality 93.032586 GOOD (3/3 breaks held, r 0.295) - 强度一般但质量好
+PASS  orderly pullback: bull and bear agree on every bar (74 bars)
+PASS  E03 CHOCH then TRANS_OK [bull] protected low broken at bar 22: that bar NODIR (no quality of the old direction); bar before PARTIAL
+PASS  E04 CHOCH then TRANS_OK [bull] TRANS_OK at bar 33: new leg in the other direction - its own opening break only (pending), the old leg's event (bar 14) gone, the new leg's anchor
+PASS  E04 CHOCH then TRANS_OK [bull] bars 34 / 35 break again: three pending events, none mature -> FEW 0/3, 待确认 3; bar 37: 2 mature, 1 pending
+PASS  E03 CHOCH then TRANS_OK [bear] protected low broken at bar 22: that bar NODIR (no quality of the old direction); bar before PARTIAL
+PASS  E04 CHOCH then TRANS_OK [bear] TRANS_OK at bar 33: new leg in the other direction - its own opening break only (pending), the old leg's event (bar 14) gone, the new leg's anchor
+PASS  E04 CHOCH then TRANS_OK [bear] bars 34 / 35 break again: three pending events, none mature -> FEW 0/3, 待确认 3; bar 37: 2 mature, 1 pending
+PASS  CHOCH then TRANS_OK: bull and bear agree on every bar (38 bars)
+PASS  E05 CHOCH then TRANS_FAIL [bull] TRANS_FAIL at bar 30: same direction as the old leg, still a new leg - the old leg's mature success (bar 14) is not inherited: n 0, pending 1
+PASS  E05 CHOCH then TRANS_FAIL [bear] TRANS_FAIL at bar 30: same direction as the old leg, still a new leg - the old leg's mature success (bar 14) is not inherited: n 0, pending 1
+PASS  CHOCH then TRANS_FAIL: bull and bear agree on every bar (33 bars)
+PASS  E06 anchor moves, protected kept [bull] bar 19 closes 2 points beyond the anchor (within the margin, no CHOCH): x > leg, clamped -> Q_retrace 0
+PASS  E06 anchor moves, protected kept [bull] BOS at 23: protected KEEP_WORSE (stays 1.10350), leg_anchor MOVE to 1.10330; bar 29 measures from the anchor: leg 2020, x 850 -> 84.2574 (from protected it would be leg 2000)
+PASS  E06 anchor moves, protected kept [bear] bar 19 closes 2 points beyond the anchor (within the margin, no CHOCH): x > leg, clamped -> Q_retrace 0
+PASS  E06 anchor moves, protected kept [bear] BOS at 23: protected KEEP_WORSE (stays 1.10350), leg_anchor MOVE to 1.10330; bar 29 measures from the anchor: leg 2020, x 850 -> 84.2574 (from protected it would be leg 2000)
+PASS  anchor moves, protected kept: bull and bear agree on every bar (33 bars)
+PASS  E07 INVALID anchor [bull] leg opens with no legal pullback point (anchor INVALID): bars 14 .. 20 PARTIAL FEW+ANCHOR, no retrace item; the BOS at 21 sets the anchor -> retrace from bar 21
+PASS  E07 INVALID anchor [bear] leg opens with no legal pullback point (anchor INVALID): bars 14 .. 20 PARTIAL FEW+ANCHOR, no retrace item; the BOS at 21 sets the anchor -> retrace from bar 21
+PASS  INVALID anchor: bull and bear agree on every bar (37 bars)
+
+== no future, read only ==
+PASS  E08 every bar of every engine scenario: the record from bars[:h+1] equals the full run (446 bars)
+PASS  E09 quality reads only: context, PROT, ANCHOR and INTERNAL rows identical with and without it
+
+== panel (display; the MQL wording must match) ==
+PASS  P01 total with 3 or 4 mature events: tier, score, 低样本 and the count
+PASS  P02 five mature events: 5 次事件 (no claim of statistical confidence)
+PASS  P03 fewer than 3 mature: 样本不足 with the count and the pending events; no total; the valid items as 局部表现
+PASS  P04 no anchor as well: both reasons, no retrace item
+PASS  P05 enough breaks but no anchor: 不可用, Q_break shown as a local item
+PASS  P06 RANGE / TRANSITION / history
+PASS  P07 waiting: the last valid total with its time; after a PARTIAL / NODIR bar no number
+PASS  P08 every quality row fits an OBJ_LABEL (63 characters; longest 54: 趋势质量  等待数据（上次有效结果 一般 · 100/100，2026.10.26 12:00 H4 收盘）)
+
+127/127 PASS
+
+## python3 tools/quality_sim.py --replay EURUSD_H1.csv
+replay EURUSD_H1.csv: 1292 H4 bars 2017.04.19 08:00 .. 2018.02.07 12:00
+PASS  R1 prefix: the record of h from bars[:h+1] equals the full run (every 37th bar from 40)
+PASS  R2 mirror: mirrored bars give the same record on every bar (0 differ)
+
+record only - nothing below changes the definition
+states: NODATA/HISTORY 11, NODIR/- 322, OK/- 561, PARTIAL/FEW 273, PARTIAL/FEW+ANCHOR 125
+trend bars 959: total available 561 (58.5%)
+mature events used (n) over trend bars: n=0 73  n=1 187  n=2 138  n=3 175  n=4 160  n=5 226
+distinct mature events: OK 58  FAIL 31
+sparsity, the same bars under other event rules (Q_break available = n >= 3):
+  definition: leg, 60 bars, opening break counts (S1)    561 / 959 ( 58.5%)
+  without the opening break (S0)                         436 / 959 ( 45.5%)
+  original 12-bar window, S1                              32 / 959 (  3.3%)
+  original 12-bar window, S0                              29 / 959 (  3.0%)
+items over bars with a total:
+  Q_break   P10  60.00  P25  66.67  P50  80.00  P75 100.00  P90 100.00   = 0: 0  = 100: 228
+  Q_retrace P10  40.87  P25  75.63  P50 100.00  P75 100.00  P90 100.00   = 0: 0  = 100: 324
+  Q_overlap P10  50.22  P25  53.45  P50  57.39  P75  61.74  P90  65.91   = 0: 0  = 100: 0
+  raw       P10  58.38  P25  68.93  P50  79.23  P75  87.99  P90  90.22   = 0: 0  = 100: 0
+  tiers (40 / 70 on raw): POOR 1  FAIR 146  GOOD 414  of 561
+strength tier x quality tier (bars with both): WEAK/POOR 1  WEAK/FAIR 128  WEAK/GOOD 183  MED/POOR 0  MED/FAIR 12  MED/GOOD 106  STRONG/POOR 0  STRONG/FAIR 6  STRONG/GOOD 125
+
+2/2 PASS
+
+## proposed log rows (BRI-14 Q-9), model output for the staircase scenario (E01): bars 13 (RANGE), 33 (FEW), 34 (first total), and the build histogram
+HMI-QLT,USDJPY,live=0,bar=2026.09.09 08:00,ctx=RANGE,state=NODIR,reason=-,def=QLT1-B60.5.3.3S1-RA-O12F6-W40.35.25-T40.70,dir=0,ev=-,b_n=0,b_ok=0,b_fail=0,b_pend=0,q_break=NA,anchor=NA,anchor_bar=-,ext=NA,close=1.11000,leg_pts=NA,retr_pts=NA,q_retrace=NA,ov=250/300;50/450;50/450;50/450;50/450;200/300;50/450;50/450;200/300;50/450;50/450,ov_sum=3055553,q_overlap=72.222245,raw=NA,score=NA,tier=NA,sample=-,inst=0001,run=7,init=1
+HMI-QLT,USDJPY,live=0,bar=2026.09.12 16:00,ctx=BULLISH,state=PARTIAL,reason=FEW,def=QLT1-B60.5.3.3S1-RA-O12F6-W40.35.25-T40.70,dir=1,ev=2026.09.09 12:00@1.11050/START/OK/1.11400|1.11600|1.11400;2026.09.11 00:00@1.11650/BOS/OK/1.12083|1.12300|1.12133;2026.09.12 08:00@1.12350/BOS/PEND/1.12600|1.12800,b_n=2,b_ok=2,b_fail=0,b_pend=1,q_break=NA,anchor=1.11750,anchor_bar=2026.09.11 16:00,ext=1.12850,close=1.12800,leg_pts=1100,retr_pts=50,q_retrace=100.000000,ov=50/484;50/483;50/483;217/267;50/383;50/383;167/300;50/450;50/450;50/450;50/450,ov_sum=2385283,q_overlap=78.315609,raw=NA,score=NA,tier=NA,sample=FEW,inst=0001,run=7,init=1
+HMI-QLT,USDJPY,live=0,bar=2026.09.12 20:00,ctx=BULLISH,state=OK,reason=-,def=QLT1-B60.5.3.3S1-RA-O12F6-W40.35.25-T40.70,dir=1,ev=2026.09.09 12:00@1.11050/START/OK/1.11400|1.11600|1.11400;2026.09.11 00:00@1.11650/BOS/OK/1.12083|1.12300|1.12133;2026.09.12 08:00@1.12350/BOS/OK/1.12600|1.12800|1.13000,b_n=3,b_ok=3,b_fail=0,b_pend=0,q_break=100.000000,anchor=1.11750,anchor_bar=2026.09.11 16:00,ext=1.13050,close=1.13000,leg_pts=1300,retr_pts=50,q_retrace=100.000000,ov=50/483;50/483;217/267;50/383;50/383;167/300;50/450;50/450;50/450;50/450;50/450,ov_sum=2393089,q_overlap=78.244645,raw=94.561161,score=95,tier=GOOD,sample=LOW,inst=0001,run=7,init=1
+HMI-QLT-HIST,USDJPY,live=0,def=QLT1-B60.5.3.3S1-RA-O12F6-W40.35.25-T40.70,from=2026.09.07 04:00,to=2026.09.19 08:00,bars=74,ok=40,partial=20,nodir=3,nodata=11,poor=0,fair=0,good=40,few=20,anchor=0,legbad=0,n=3;9;8;9;9;22,h=0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;0;1;0;0;3;10;9;17;0;0;0;0;0,inst=0001,run=7,init=1

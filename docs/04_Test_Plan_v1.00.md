@@ -1069,3 +1069,24 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           第 8 项 COMPACT（r4）/ FULL / 暂不评级（USDJPY）截图与 r4 编译 0 / 0 齐备；工具 r5 logtests 164/164、live_coverage_tests 22/22
    验收结论（2026-10-27，Audit Round 42）：按已覆盖范围受限通过，v2.56r4 留档为开发与回退基线（docs/baselines/v2.56.md）。
           保留：PROT leg= 6 条 PENDING REVIEW（全日志 RESULT 仍 NOT PASSED）、LIQ 本版日内无样本、等待 / 样本不足界面未截图、旧长行截断
+
+### v2.57 验收清单草案（BRI-14 定义稿：质量评分，只显示；基线 v2.56r4 受限基线；定义确认后才实现）
+
+```
+0  编译 0 errors / 0 warnings；源文件 ASCII，面板中文由 \uXXXX 解码
+1  版本 2.57；BEGIN ver=2.57；params=461F006E 不变；HMI-STR 的 def 不变；HMI-QLT 的 def=QLT1-B60.5.3.3S1-RA-O12F6-W40.35.25-T40.70
+   （确认项 C-1 选 S0 时为 …S0…）
+2  新日志行（BRI-14 Q-9）：HMI-QLT（构建与 HMI-STR 同一区间、实时每根 H4）；HMI-QLT-HIST（每次构建一行，END 之前）；等待共用 HMI-STR-WAIT
+3  离线：python3 tools/quality_sim.py → 127/127（Q_break 观察 / 成熟 / 失败 / 样本数 / 60 根窗口 / 最近 5 个、回撤分段与锚点、重叠定点、
+          40 / 70 未取整边界、引擎驱动的段与锚点场景、强度强质量差 E11、强度一般质量好 E12、面板文字；多空镜像）；
+          --replay EURUSD_H1.csv → 前缀一致、镜像 0 差异、稀疏与分布记录
+          ReloadTest 日志用例（实现时补）：QLT 重载一致 / 缺行 / 事件结果、计数、分项、raw 篡改 / 事件与 HMI-CTX 不符 / 锚点与 HMI-ANCHOR 不符 /
+          CHOCH 后仍有分 / 直方图 / def 改变 / 处理窗口 / 实时一致 / v2.56 → v2.57 加法
+4  同窗口重载：MODEL / LIQ / CTX / PROT / B8 / STR / QLT 七类 IDENTICAL，QLT 逐行复算全部通过
+5  实时 vs 重建：QLT 逐行全字段相同（ReloadTest -LiveVsBuild；live_coverage.py --ver 2.57）；0 行写「无样本」
+6  跨版本 v2.56r4 vs v2.57（同品种两图、同一根 M5 内各建一次）：除 HMI-QLT / HMI-QLT-HIST 外逐行相同（含 HMI-STR），其他差异 UNEXPLAINED
+7  分布记录：ReloadTest -Qlt（各图最新构建的 HMI-QLT-HIST：状态、等级、n 分布）—— 记录，不据此改阈值或权重
+8  面板截图：COMPACT 新增的质量行（有总分 / 样本不足 + 局部 / 暂不评级）；FULL 的趋势质量行；行长 ≤ 63 字符
+```
+   状态（2026-10-27）：定义稿交验收方确认（docs/02 BRI-14 Q-11 的 C-1 至 C-10）；MQL 未改，第 0–2、4–8 项待实现后执行；
+          第 3 项离线部分 127/127、2/2（docs/evidence/v2.57_quality_offline.txt）
