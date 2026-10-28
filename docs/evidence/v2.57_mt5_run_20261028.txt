@@ -1,0 +1,56 @@
+# v2.57 MT5 run, part 2: 20261027.log full day (local 09:09 .. 17:01) + 20261028.log (local 09:10, first builds after the night)
+# 20261027.rar sha256 28aaad87537a51bad0655684c6fef23a68c8798344c2fe11f1f988ad05ed7518; 20261027.log ec73e5daf2efc9414fff2d32e5c0b140bfa4f7108202b9020f44089c97cb4e6d; 20261028.log 973c63bb489c29def3358c73e97e245bae2bb0cb3c767f92d8f8472bbbe1489b
+# server = local + 3 h; tools r2
+
+## same-window reload, 10-27 evening (last two v2.57 builds at local 17:00 - 17:01, M5 window to 19:55 server)
+AUDUSD#F657    IDENTICAL inside the comparable region (102 MODEL + 45 LIQ) - no repaint found there.   QLT IDENTICAL over 102 / 102 row(s) (quality score)
+EURUSD#0442    IDENTICAL inside the comparable region (43 MODEL + 41 LIQ) - no repaint found there.   QLT IDENTICAL over 102 / 102 row(s) (quality score)
+EURUSD#3F83    IDENTICAL inside the comparable region (43 MODEL + 41 LIQ) - no repaint found there.   QLT IDENTICAL over 102 / 102 row(s) (quality score)
+GBPUSD#3674    IDENTICAL inside the comparable region (142 MODEL + 48 LIQ) - no repaint found there.   QLT IDENTICAL over 102 / 102 row(s) (quality score)
+NZDUSD#58F3    IDENTICAL inside the comparable region (135 MODEL + 48 LIQ) - no repaint found there.   QLT IDENTICAL over 102 / 102 row(s) (quality score)
+USDCAD#9646    IDENTICAL inside the comparable region (295 MODEL + 47 LIQ) - no repaint found there.   QLT IDENTICAL over 102 / 102 row(s) (quality score)
+USDCHF#209F    IDENTICAL inside the comparable region (67 MODEL + 43 LIQ) - no repaint found there.   QLT IDENTICAL over 102 / 102 row(s) (quality score)
+USDJPY#D61E    IDENTICAL inside the comparable region (83 MODEL + 46 LIQ) - no repaint found there.   QLT IDENTICAL over 102 / 102 row(s) (quality score)
+XAUUSD#159A    IDENTICAL inside the comparable region (143 MODEL + 51 LIQ) - no repaint found there.   QLT IDENTICAL over 106 / 106 row(s) (quality score)
+XAUUSD#8C1C    IDENTICAL inside the comparable region (138 MODEL + 51 LIQ) - no repaint found there.   QLT IDENTICAL over 106 / 106 row(s) (quality score)
+every one: QLT rows recompute and agree with the build's HMI-CTX / HMI-ANCHOR rows, STR / QLT on the same H4 bars, histograms add up (10 of 10)
+
+## v2.56 -> v2.57, same symbol / params / window: 10-27 17:00 builds and 10-28 09:10 builds
+v27 AUDUSD#F657    upgrade regression: IDENTICAL apart from the quality rows - 686 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+v27 EURUSD#0442    upgrade regression: IDENTICAL apart from the quality rows - 489 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+v27 EURUSD#3F83    upgrade regression: IDENTICAL apart from the quality rows - 490 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+v27 GBPUSD#3674    upgrade regression: IDENTICAL apart from the quality rows - 756 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+v27 NZDUSD#58F3    upgrade regression: IDENTICAL apart from the quality rows - 765 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+v27 USDCAD#9646    upgrade regression: IDENTICAL apart from the quality rows - 1239 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+v27 USDCHF#209F    upgrade regression: IDENTICAL apart from the quality rows - 605 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+v27 USDJPY#D61E    upgrade regression: IDENTICAL apart from the quality rows - 610 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+v27 XAUUSD#159A    upgrade regression: IDENTICAL apart from the quality rows - 796 line(s) the same in both; 108 quality row(s) recompute, the histogram adds up
+v27 XAUUSD#8C1C    upgrade regression: IDENTICAL apart from the quality rows - 786 line(s) the same in both; 108 quality row(s) recompute, the histogram adds up
+v28 AUDUSD#F657    upgrade regression: IDENTICAL apart from the quality rows - 691 line(s) the same in both; 105 quality row(s) recompute, the histogram adds up
+v28 EURUSD#0442    upgrade regression: IDENTICAL apart from the quality rows - 480 line(s) the same in both; 105 quality row(s) recompute, the histogram adds up
+v28 EURUSD#3F83    upgrade regression: IDENTICAL apart from the quality rows - 479 line(s) the same in both; 105 quality row(s) recompute, the histogram adds up
+v28 GBPUSD#3674    upgrade regression: IDENTICAL apart from the quality rows - 777 line(s) the same in both; 105 quality row(s) recompute, the histogram adds up
+v28 NZDUSD#58F3    upgrade regression: IDENTICAL apart from the quality rows - 770 line(s) the same in both; 105 quality row(s) recompute, the histogram adds up
+v28 USDCAD#9646    upgrade regression: IDENTICAL apart from the quality rows - 1242 line(s) the same in both; 105 quality row(s) recompute, the histogram adds up
+v28 USDCHF#209F    upgrade regression: IDENTICAL apart from the quality rows - 603 line(s) the same in both; 105 quality row(s) recompute, the histogram adds up
+v28 USDJPY#D61E    upgrade regression: IDENTICAL apart from the quality rows - 609 line(s) the same in both; 105 quality row(s) recompute, the histogram adds up
+v28 XAUUSD#159A    upgrade regression: IDENTICAL apart from the quality rows - 831 line(s) the same in both; 109 quality row(s) recompute, the histogram adds up
+v28 XAUUSD#8C1C    upgrade regression: IDENTICAL apart from the quality rows - 819 line(s) the same in both; 109 quality row(s) recompute, the histogram adds up
+
+## -Qlt, 10-28 09:10 builds (record only)
+    merged  params A047970C QLT1-B60.5.3.3S1-RA-O12F6-W40.35.25-T40.70  (2 chart(s), 756 trend H4 bars, total available on 453 = 60 %)
+      mature events used on the trend bars: n=0 54  n=1 149  n=2 100  n=3 125  n=4 103  n=5 225
+      displayed score  P10 46  P25 60  P50 74  P75 81  P90 88
+      tiers of the scored bars (on the unrounded score)  poor 28 (6 %)  fair 146 (32 %)  good 279 (62 %)
+    merged  params 461F006E QLT1-B60.5.3.3S1-RA-O12F6-W40.35.25-T40.70  (8 chart(s), 2933 trend H4 bars, total available on 1625 = 55 %)
+      mature events used on the trend bars: n=0 221  n=1 607  n=2 480  n=3 439  n=4 370  n=5 816
+      displayed score  P10 46  P25 60  P50 72  P75 79  P90 83
+      tiers of the scored bars (on the unrounded score)  poor 79 (5 %)  fair 650 (40 %)  good 896 (55 %)
+    a record of the distribution, not a calibration (BRI-14 C-10): weights 40 / 35 / 25 and tiers 40 / 70 stay.
+
+## live vs build
+v2.57: no live row yet. 10-27: the charts were refreshed at local 17:00:54 .. 17:01:44 (to = 19:55 server); the 20:00 server H4 bar is
+processed live only when the 20:00 - 20:05 M5 bar closes (local 17:05) - the refresh came first, and the log ends at 17:01:44.
+10-28: one build per chart at 09:10, nothing after it. live_coverage --ver 2.57 (both files):
+RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+v2.56 (ReloadTest -LiveVsBuild -Days 2): 10 of 10 charts AGREE BOTH WAYS on the 10-27 daytime stretch; the night pair (two log files) pending (A-60)

@@ -1104,3 +1104,6 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           「IDENTICAL apart from the quality rows」（489–1239 行，含 HMI-STR）；第 7 项 -Qlt 记录。
           第 5 项（实时 QLT）无样本：挂图后尚未过 H4 收盘；第 8 项：XAUUSD COMPACT / FULL「良好 81/100（5 次事件）」与日志一致，
           低样本（EURUSD）、样本不足 + 局部（GBPUSD）、暂不评级（NZDUSD / USDCHF / USDJPY）截图待补
+   运行第二部分（10-27 全天 + 10-28 09:10；docs/evidence/v2.57_mt5_run_20261028.txt）：10-27 傍晚十张同窗口重载七类 IDENTICAL、QLT 全部通过；
+          v2.56 / v2.57 二十对（10-27 17:00、10-28 09:10）「IDENTICAL apart from the quality rows」；-Qlt 记录。第 5 项仍无样本：
+          10-27 的刷新（本地 17:01）早于 20:00 那根 H4 的实时处理（本地 17:05），之后休眠
