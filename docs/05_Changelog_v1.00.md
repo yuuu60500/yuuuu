@@ -2184,3 +2184,22 @@ Date:     2026-10-28
 docs      baselines/v2.57.md（指纹、证据、未闭合对照块、保留限制）；07 基线表；04 v2.57 清单结论；06 Audit Round 49；
           evidence/v2.57_mt5_run_20261028b.txt 更正：截图时的切换重建不在包内日志（止于 14:09:04）
 ```
+
+## v2.58 开发版 —— 最终面板：阶段、原因、强度箭头、排版（BRI-15，只显示；未编译）
+
+```
+Date:     2026-10-28
+基线:     v2.57 开发与回退基线（MQL 833c7a3，工具 r2 8f4a641）
+来源:     验收方「HMI v2.57 运行验收结论与最终面板收尾要求」：直接进入 v2.58，沿用原需求 §2 / §5.4 / §7 / §8，不另开定义轮
+MQL       HMI_StageEngine.mqh（新）：StgOnH4Bar 在 QltOnH4Bar 之后；阶段（§7 九级）、原因（§8，≤ 2，先状态再风险，最后强项）、
+          强度箭头（§5.4）；HMI-STG / HMI-STG-HIST；趋势面板六行；FULL 诊断分项行；长行折行（StgWrap）
+          HMI_ObjectManager.mqh：两个背景框面板（OM_DrawBox 测宽排版，四角可选，每次重画先删后建）；趋势面板默认右上角；
+          诊断面板（左上角）只留诊断内容，长行折行不截断
+          HMI_Style.mqh：趋势面板角落 / 位置 / 字号 / 标签色、过渡色、背景色、边框色（样式输入，不进参数摘要）
+          HMI_Defs.mqh / H4M5_Identification.mq5：版本 2.58、调用点、ResetEngine、StgLogHist
+          现有日志行（含 HMI-STR / HMI-QLT）、交易参数与摘要 461F006E 不变；没有改任何引擎
+tools     stage_sim.py（新，86/86，--replay 4/4）；stage_mql_mirror.py（新，PASS）；ReloadTest.ps1 STG 类别、逐行复算、结构对照、
+          v2.57 → v2.58 加法模式、-Stg；live_coverage.py --ver 2.58 计 STG；logtests 228/228（+g01–g28）；live_coverage_tests 28/28
+docs      02 BRI-15；01 §2.4；03；04 v2.58 清单；06 Audit Round 50；evidence/v2.58_dev_checks.txt
+```
+

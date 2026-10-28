@@ -28,7 +28,17 @@ input int    InpPanelFontSize     = 8;
 input bool   InpPanelColorByContext = true;       // colour the context row by direction
 input color  InpPanelCtxBullColor   = clrLimeGreen;
 input color  InpPanelCtxBearColor   = clrTomato;
-input color  InpPanelCtxRangeColor  = clrSilver;  // RANGE and TRANSITION
+input color  InpPanelCtxRangeColor  = clrSilver;  // RANGE (and TRANSITION on the diagnostic panel)
+input color  InpPanelCtxTransColor  = clrGold;    // v2.58 trend panel: TRANSITION (requirement §2: yellow)
+input color  InpPanelBgColor        = clrNONE;    // v2.58: panel background; clrNONE = the chart's own background
+input color  InpPanelBorderColor    = clrDimGray;
+
+input group "=== Style: trend panel (v2.58) ==="
+input ENUM_BASE_CORNER InpTrendCorner = CORNER_RIGHT_UPPER;   // requirement §2: top right
+input int    InpTrendX            = 10;
+input int    InpTrendY            = 18;
+input int    InpTrendFontSize     = 9;
+input color  InpTrendLabelColor   = clrSilver;     // the left column (H4 趋势 / 趋势强度 / ...)
 
 //================== H4 POI =========================================
 input group "=== Style: H4 POI zone ==="

@@ -1480,3 +1480,152 @@ HMI_QualityEngine.mqh（新）  QltOnH4Bar(h) 在 H4ProcessBar 最后、StrOnH4B
 `live_coverage.py --ver 2.57` 计 QLT 类别。
 
 **不在本版：** 阶段（§7）、原因（§8）、变化箭头、完整趋势面板与等级颜色、旧长行截断（v2.58）；结构、保护点、BRI-08、Session、MODEL 规则不动。
+
+
+## BRI-15 —— v2.58 最终面板：阶段、原因、强度箭头、排版（只显示；实现记录）
+
+来源：《HMI 趋势面板改造需求（工程师版）》（docs/requirements/）§2 面板、§5.4 变化箭头、§7 当前阶段、§8 主要原因；验收方「HMI v2.57 运行验收结论与
+最终面板收尾要求」（2026-10-28）：直接实现，不再另开质量定义轮；阶段、原因只读取现有结构与分项，不改变信号链；附加箭头与图案美化若影响收尾放到
+后续；对新增阶段 / 原因给出可核对依据。下文 G-1 … G-14 是原文没有写到、实现时必须定下的取法，逐条写明，验收时可改。
+
+强度（BRI-13）、质量（BRI-14）的定义与日志不变；结构、保护点、BRI-08、POI、Session、MODEL 不动；参数摘要 461F006E 不变（新输入只是显示样式）。
+
+### S-1 当前阶段（原需求 §7，按优先级取第一个成立的）
+
+记号：bar h = 刚处理的 H4；D = +1 多头 / −1 空头；T = 强度记录的 14 根 TR 之和（ATR14 = T / 14，与强度同一 ATR）；x、L、ext = 质量记录的
+回撤项（leg_anchor 起算，x 已限制在 0..L）；价格一律整数 point。
+
+| 代码 | 条件 | 面板 |
+|---|---|---|
+| NODATA | 强度 NODATA / HISTORY（已收盘 H4 不足 15 根） | 样本不足 |
+| NOATR | 强度 NODATA / ATR（14 根 TR 全为 0） | 不可用 |
+| TRANS | TRANSITION | 反转待确认 |
+| RANGE | RANGE | 区间震荡 |
+| BUILD | 趋势，但没有合法保护点（P-6a INVALID 且之后未 SET），或回撤项不可用（质量 LEG / SCALE） | 结构待完善 |
+| DEEP | 3x > 2L（r > 2/3） | 深度回撤 |
+| PUSH | refresh 且 near | 延续推进 |
+| CONSOL | near 且非 refresh | 高位整理（多）/ 低位整理（空） |
+| PULLBACK | 其余 | 正常回撤 |
+
+```
+refresh   bar h 的最高价（多）/ 最低价（空）严格越过本段 a+1 .. h−1 的极值（a = leg_anchor 摆动 K 线）；a+1 .. h−1 无 K 线 → 非 refresh
+near      dist = D·(ext − C[h])（不限幅，ext 含本根），56·dist ≤ T  ⇔  dist ≤ 0.25·ATR14
+```
+
+### S-2 主要原因（原需求 §8）：最多两条，先状态，再风险；状态与风险都没有时才列强项
+
+```
+状态   PROT_BROKEN   TRANSITION 由有效收盘越过保护点打开（P-4）         多头保护低点已破 / 空头保护高点已破
+       SWING_BROKEN  TRANSITION 由 P-6b 回退规则打开（该段无保护点）      多头低点已破（无保护点）/ 空头高点已破（无保护点）
+       TIMEOUT       由 TRANSITION 超时（InpH4TransitionMaxBars）进入的 RANGE    过渡超 18 根未确认（显示输入的实际值）
+       NO_PROT       BUILD：缺少保护点                                    缺少保护点
+       LEG           BUILD：回撤项不可用                                  波段长度无效
+风险   DEEP          3x > 2L                                              回撤偏深
+       BRK_FAIL      质量记录采用的成熟事件中有失败                        近期突破失败
+       COUNTER       S_mom = 0 且 recent < 0                              近期逆向运行
+       CHOP          path > 0 且 S_eff < 35（100e < 35·path）              价格往返明显
+强项   MOVE          S_move ≥ 65（100m ≥ 195T）                           同向推进明显
+       RET           Q_retrace ≥ 70（num_r ≥ 70L，即 r ≤ 1/2）              回撤较浅
+       BRK           n ≥ 3 且全部守住                                     突破全部守住
+       EFF           S_eff ≥ 65                                           推进效率高
+       MOM           S_mom ≥ 65（100q ≥ 65T）                             近期推进有力
+       OVL           Q_overlap ≥ 70                                       K 线重叠少
+趋势中一条都没有 → 无突出分项；NODATA / NOATR / 初始 RANGE → —
+```
+
+### S-3 强度箭头（原需求 §5.4）
+
+强度 OK 时：ref = h − 3；ref 也是强度 OK 且同一趋势段（g_leg_seq 相同）→ d = 当前显示分 − ref 显示分：d ≥ 5 ↑，d ≤ −5 ↓，否则 →；
+其余（不足 3 根、ref 未评分、跨段）→ 新趋势。
+
+### S-4 面板
+
+```
+趋势面板（新，默认右上角，原需求 §2）            诊断面板（原面板，默认左上角）
+  H4 趋势    ▲ 多头 / ▼ 空头 / 过渡 · 偏多待确认 /    COMPACT  POI n | SESSION hh:mm / no session（| LIQ WAITING）
+             区间震荡（绿 / 红 / 黄 / 灰）                       周期行
+  趋势强度   强 · 76/100 ↑ / 新趋势 / 暂不评级 / ...             ADR / ATR
+  趋势质量   良好 · 82/100（5 次事件）/ 局部表现 ... /     FULL     版本行；H4 CONTEXT + BOS 计数 + 结构诊断；强度分项；质量分项；
+             暂不评级 / ...                                       H4 POI；SESSION；LIQ HISTORY；CYCLE；ADR / ATR
+  当前阶段   延续推进 ...
+  主要原因   同向推进明显，回撤较浅
+  数据截至   2026.10.28 16:00 H4 收盘（服务器时间）
+```
+
+- 等待（序列未同步）：方向、阶段写「等待数据」，强度 / 质量写「等待数据（上次有效结果 强 · 69/100）」（上次是有效分时），时间行
+  「上次有效结果 <时间> H4 收盘（服务器时间）」；未构建：全部「等待数据」。
+- 两个面板都有背景框（默认图表背景色，细边框），按实测文字宽度排版；每次重画先删后建，背景先建，保证压在之后画出的线上。
+- 诊断面板的长行（CYCLE、H4 POI、LIQ HISTORY 等）超过 63 字符时折到下一行（缩进），不再截断：先在「|」处断，其次两个空格，再次任一空格，
+  断点至少保留一半宽度（`stage_sim.wrap` = `StgWrap`）。
+- 新输入（只是样式，不进参数摘要）：InpTrendCorner（默认右上）、InpTrendX / Y、InpTrendFontSize（9）、InpTrendLabelColor、
+  InpPanelCtxTransColor（金色）、InpPanelBgColor（clrNONE = 图表背景）、InpPanelBorderColor。
+
+### S-5 日志
+
+```
+HMI-STG,<sym>,live=,bar=,ctx=,stage=,reasons=<R1+R2|->,def=STG1-NEAR25-DEEP2.3-EFF35-POS65.70-ARR3.5,dir=,pend=UP|DOWN|-,
+        chk=BREAK|FALLBACK|TIMEOUT|INIT|-,prot=1|0|NA,anchor_bar=,prev_ext=,bar_ext=,ext=,close=,dist_pts=,tr_sum=,refresh=,near=,
+        arrow=UP|DOWN|FLAT|NEW|NA,ref_bar=,ref_score=,score=,inst=,run=,init=
+        —— 与 HMI-STR / HMI-QLT 同一组 H4（构建：M5 窗口内收盘的；实时：每根）；段号不写（A-59）
+HMI-STG-HIST,<sym>,live=0,def=,from=,to=,bars=,nodata=,noatr=,trans=,range=,build=,deep=,push=,consol=,pullback=,
+        rs=<15 个原因计数，按 S-2 顺序>,up=,down=,flat=,new=,...   —— 每次构建一行，HMI-QLT-HIST 之后
+```
+
+可核对：每行的阶段与原因只由本行与同一根的 HMI-STR / HMI-QLT 决定（复算见 S-8）；chk 对照本构建 CHOCH 当根的 HMI-PROT BREAK / FALLBACK
+行、RANGE 对照 HMI-CTX TIMEOUT 行；箭头的 ref_score 对照 ref 那根的 HMI-STR，同段与否对照 HMI-CTX 开段突破（str=1）；prev_ext 对照前一根
+同锚点的 ext。
+
+### S-6 原文没有写到的取法（实现时定下；可改）
+
+```
+G-1  回撤比例 r 与极值都取质量记录（leg_anchor 起算，BRI-14 Q-3 / 规则决策补充 §4.2），不读 protected_level；
+     「缺少合法保护点」= protected_level 无效（P-6a），BRI-12 中它与 leg_anchor 由同一候选同时设定，二者有效性总相同
+G-2  「刷新此前本段趋势极值」：严格越过 a+1 .. h−1 的极值（等于不算）；锚点后第一根没有「此前」→ 不算刷新
+G-3  0.25 ATR 用强度的 ATR14（T / 14，同一 SeriesComputeATR 口径），收盘到「本段极值（含本根）」的距离；整数式 56·dist ≤ T
+G-4  趋势中回撤项不可用（LEG / SCALE，leg ≤ 0 或超范围）同样归「结构待完善」（§7 第 4 级），原因写「波段长度无效」
+G-5  TRANSITION 的原因按它是怎样打开的：P-4（越过保护点）或 P-6b（无保护点时越过最近摆动点）；整个过渡期保持。
+     RANGE 只有超时进入时给原因；历史开头尚无趋势的 RANGE 不给
+G-6  「窗口内存在已完成观察的失败 BOS」的窗口 = 质量的事件窗口（BRI-14：当前段、60 根、最近 5 个成熟事件）
+G-7  path = 0（12 根收盘全部相同）时 S_eff = 0 但不叫「价格往返明显」
+G-8  「按高分分项说明」：强度分项达到「强」的分界 65、质量分项达到「良好」的分界 70 才算高分，不另设参数；顺序固定
+     MOVE、RET、BRK、EFF、MOM、OVL（原文示例「同向推进明显，回撤较浅」在前）。部分守住必然有失败事件 → 已是风险原因，
+     所以强项里的突破只有「突破全部守住」
+G-9  趋势中没有任何原因 → 「无突出分项」（由状态生成，不是赞美文案）；非趋势、样本不足 → 「—」
+G-10 箭头按两个显示分（整数）之差，和面板上的两个数字一致；等级仍按未取整分数。同段 = 同一 g_leg_seq
+G-11 TRANSITION / RANGE 时强度、质量行只写「暂不评级」，原因在阶段行（不再三行重复「反转待确认」）
+G-12 等待时时间行写「上次有效结果 <时间>」；强度 / 质量的上次有效分只在上次是 OK 时给出（同 v2.56 / v2.57）
+G-13 趋势面板默认右上角（原文 §2），诊断面板保留左上角，两者都可改角落；COMPACT 与 FULL 共用同一个趋势面板
+G-14 短色条（§2「可配」）与其他图案美化不做（验收方：影响收尾则后续）
+```
+
+### S-7 实现（v2.58 开发版，未编译）
+
+```
+HMI_StageEngine.mqh（新）   StgOnH4Bar(h) 在 H4ProcessBar 最后、QltOnH4Bar 之后（构建与实时同一点，Rule 51）；只读强度 / 质量记录、
+                            g_ctx / g_ctx_pending / g_ctx_time / g_prot.valid、g_h4[]；自己保留两项：上一根结束时 g_prot.valid
+                            （判断 CHOCH 是 P-4 还是 P-6b）与本次过渡的打开方式。运算全为整数；HMI-STG / HIST；面板六行、诊断分项行、折行
+HMI_ObjectManager.mqh       面板改为两个背景框（OM_DrawBox：测宽、两列对齐、四个角落均可）；OM_DrawTrendPanel；诊断面板逐行折行
+HMI_Style.mqh               新样式输入（S-4）；HMI_Defs.mqh / H4M5_Identification.mq5：版本 2.58，调用点，ResetEngine，StgLogHist
+不变                        全部现有日志行（含 HMI-STR / HMI-QLT）、交易参数与摘要 461F006E；没有改任何引擎
+```
+
+### S-8 核对
+
+```
+tools/stage_sim.py                86/86：§7 每一级与优先级、§8 每条原因与上限两条、各阈值精确边界（2/3、56·dist = T、S_eff 35、65 / 70）、
+                                  等于极值不算刷新、箭头 ±5 / ±4 / 跨段 / 无参考、§2 三个示例逐字、等待 / 未构建 / 样本不足、行宽、折行；多空镜像
+  --replay EURUSD_H1.csv          4/4：前缀一致（无前视）、镜像逐根一致、面板各行 ≤ 63 字符、除 NOATR 外各阶段都出现
+tools/stage_mql_mirror.py         PASS：MQL 逐行转写，场景序列 + EURUSD 1292 根及镜像：HMI-STG 3172 行、面板文字 12688 条、随机长行折行
+                                  4000 条，与模型 0 差异。看不到 MQL 语法，不代替编译
+ReloadTest.ps1                    STG 类别：同窗口重载、实时 vs 重建（def 不同 → NOT COMPARABLE）；逐行用同一根的 HMI-STR / HMI-QLT 复算
+                                  （抄录字段、极值与 refresh / near、阶段、原因、箭头）；对照本构建结构行（过渡打开方式、RANGE 来源、箭头
+                                  参考分与同段、前一根极值）；STR / QLT / STG 同一组 H4；直方图（与 STR-HIST 互相对账）；-Versus v2.57 → v2.58
+                                  加法模式（HMI-STR / HMI-QLT 也须逐行相同）；-Stg 分布记录
+tools/logtests                    228/228（新增 g01–g28）；live_coverage_tests 28/28（--ver 2.58 计 STG）
+```
+
+EURUSD H4 回放（1292 根，只作记录）：趋势 959 根中 正常回撤 69.1%、结构待完善 12.8%、深度回撤 8.8%、延续推进 7.3%、高 / 低位整理 1.8%；
+原因出现次数 近期突破失败 540、近期逆向运行 348、价格往返明显 348、回撤较浅 118、同向推进明显 113；无突出分项 2；箭头 ↑ 328 ↓ 406 → 151 新趋势 72。
+「近期突破失败」多，是因为质量窗口保留最近 5 个成熟事件、最远 60 根（G-6）；按原文与已确认的质量窗口实现，不在本版另改。
+
+**不在本版：** 短色条与图案美化（G-14）；任何评分、结构与信号规则。之后：编译与布局截图 → 最终统一五个交易日运行验收。

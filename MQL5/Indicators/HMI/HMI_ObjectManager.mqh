@@ -12,6 +12,7 @@
 #include "HMI_LiquidityLevels.mqh"
 #include "HMI_StrengthEngine.mqh"     // v2.56: strength line (display only)
 #include "HMI_QualityEngine.mqh"      // v2.57: quality line (display only)
+#include "HMI_StageEngine.mqh"        // v2.58: stage, reasons, the trend panel's rows (display only)
 
 #define TT_MARK  "MK"
 #define TT_CTX   "CX"
@@ -27,6 +28,7 @@
 #define TT_KZ    "KZ"
 #define TT_PL    "PL"     // BRI-09 PD / PW / PM level lines + labels
 #define TT_LQE   "LE"     // BRI-09 SWEEP / BROKEN labels
+#define TT_TPN   "TP"     // v2.58 trend panel: background + label column + value column
 
 string OM_Prefix() { return(HMI_PREFIX + "_" + g_inst + "_"); }
 
@@ -217,6 +219,7 @@ bool OM_Protected(const string name)
    // trimming either one would break multi-instance safety or flicker
    return(StringFind(name, "_" + TT_MARK + "_") >= 0 ||
           StringFind(name, "_" + TT_CTX  + "_") >= 0 ||
+          StringFind(name, "_" + TT_TPN  + "_") >= 0 ||
           StringFind(name, "_" + TT_KZ   + "_") >= 0 ||
           StringFind(name, "_" + TT_LIQ  + "_") >= 0 ||
           StringFind(name, "_" + TT_PL   + "_") >= 0 ||
@@ -295,25 +298,116 @@ void OM_Level(const string name, const datetime t1, const datetime t2,
    ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
   }
 
-void OM_PanelRow(const int row, const string text, const int ypix, const color clr)
+//--- v2.58 panel boxes -----------------------------------------------
+// A box is a background rectangle with one or two columns of labels, laid
+// out from the measured text widths, so no text sits on the candles or the
+// level lines behind it. Every draw deletes and recreates the box's objects,
+// background first: MT5 paints chart objects in creation order, so a box
+// made once would end up under every line drawn after it.
+#define MAX_PANEL_ROWS 16
+
+color OM_PanelBg()
   {
-   string name = OM_Name(TT_CTX, 0, row);
-   if(!ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0)) { }
-   else OM_Register(name);
-   bool right = (InpPanelCorner == CORNER_RIGHT_UPPER || InpPanelCorner == CORNER_RIGHT_LOWER);
-   ObjectSetInteger(0, name, OBJPROP_CORNER, InpPanelCorner);
-   ObjectSetInteger(0, name, OBJPROP_ANCHOR, right ? ANCHOR_RIGHT_UPPER : ANCHOR_LEFT_UPPER);
-   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, InpPanelX);
-   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, ypix);
+   if(InpPanelBgColor != clrNONE) return(InpPanelBgColor);
+   return((color)ChartGetInteger(0, CHART_COLOR_BACKGROUND));
+  }
+
+void OM_BoxLabel(const string name, const string text, const ENUM_BASE_CORNER corner, const int x, const int y,
+                 const int fsize, const color clr)
+  {
+   if(ObjectCreate(0, name, OBJ_LABEL, 0, 0, 0)) OM_Register(name);
+   ObjectSetInteger(0, name, OBJPROP_CORNER, corner);
+   ObjectSetInteger(0, name, OBJPROP_ANCHOR, ANCHOR_LEFT_UPPER);
+   ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
+   ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
    ObjectSetString(0, name, OBJPROP_TEXT, text);
    ObjectSetString(0, name, OBJPROP_FONT, InpFontName);
-   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, TS_PANEL.size);
+   ObjectSetInteger(0, name, OBJPROP_FONTSIZE, fsize);
    ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
+   ObjectSetInteger(0, name, OBJPROP_BACK, false);
    ObjectSetInteger(0, name, OBJPROP_SELECTABLE, false);
    ObjectSetInteger(0, name, OBJPROP_HIDDEN, true);
   }
 
-#define MAX_PANEL_ROWS 12
+void OM_BoxClear(const string tt, const int maxrows)
+  {
+   for(int i = 0; i <= 2 * maxrows; i++) OM_DeleteName(OM_Name(tt, 0, i));
+  }
+
+// Sub 0 = the background, 1 .. maxrows = the left column, maxrows + 1 .. = the
+// right one; an empty left column (all "") gives a one-column box. For a
+// right / lower corner the distances are measured to the box's left / top
+// side, so every text is anchored at its upper left and both columns stay
+// aligned whichever corner is chosen.
+void OM_DrawBox(const string tt, const ENUM_BASE_CORNER corner, const int bx, const int by, const int fsize,
+                const string &lab[], const color &lc[], const string &val[], const color &vc[], const int n,
+                const int maxrows)
+  {
+   OM_BoxClear(tt, maxrows);
+   int rows = MathMin(n, maxrows);
+   if(rows <= 0) return;
+   TextSetFont(InpFontName, -fsize * 10);          // the size an OBJ_LABEL of fsize points is drawn at
+   int lw = 0, vw = 0, th = 0;
+   for(int i = 0; i < rows; i++)
+     {
+      uint w = 0, h = 0;
+      if(lab[i] != "" && TextGetSize(lab[i], w, h)) { lw = MathMax(lw, (int)w);  th = MathMax(th, (int)h); }
+      if(val[i] != "" && TextGetSize(val[i], w, h)) { vw = MathMax(vw, (int)w);  th = MathMax(th, (int)h); }
+     }
+   if(th <= 0) th = fsize + 6;
+   int pad  = 5;
+   int gap  = (lw > 0 ? 12 : 0);
+   int step = th + 2;
+   int W = pad + lw + gap + vw + pad + 2;
+   int H = pad + rows * step - 2 + pad;
+   bool right = (corner == CORNER_RIGHT_UPPER || corner == CORNER_RIGHT_LOWER);
+   bool lower = (corner == CORNER_LEFT_LOWER  || corner == CORNER_RIGHT_LOWER);
+   int left = (right ? bx + W : bx);
+   int top  = (lower ? by + H : by);
+   string bg = OM_Name(tt, 0, 0);
+   if(ObjectCreate(0, bg, OBJ_RECTANGLE_LABEL, 0, 0, 0)) OM_Register(bg);
+   ObjectSetInteger(0, bg, OBJPROP_CORNER, corner);
+   ObjectSetInteger(0, bg, OBJPROP_XDISTANCE, left);
+   ObjectSetInteger(0, bg, OBJPROP_YDISTANCE, top);
+   ObjectSetInteger(0, bg, OBJPROP_XSIZE, W);
+   ObjectSetInteger(0, bg, OBJPROP_YSIZE, H);
+   ObjectSetInteger(0, bg, OBJPROP_BGCOLOR, OM_PanelBg());
+   ObjectSetInteger(0, bg, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+   ObjectSetInteger(0, bg, OBJPROP_COLOR, InpPanelBorderColor);
+   ObjectSetInteger(0, bg, OBJPROP_WIDTH, 1);
+   ObjectSetInteger(0, bg, OBJPROP_BACK, false);
+   ObjectSetInteger(0, bg, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, bg, OBJPROP_HIDDEN, true);
+   int xl = (right ? left - pad : left + pad);
+   int xv = (right ? left - pad - lw - gap : left + pad + lw + gap);
+   for(int i = 0; i < rows; i++)
+     {
+      int y = (lower ? top - pad - i * step : top + pad + i * step);
+      if(lab[i] != "") OM_BoxLabel(OM_Name(tt, 0, 1 + i), lab[i], corner, xl, y, fsize, lc[i]);
+      if(val[i] != "") OM_BoxLabel(OM_Name(tt, 0, 1 + maxrows + i), val[i], corner, xv, y, fsize, vc[i]);
+     }
+  }
+
+//--- the trend panel (requirement §2): H4 direction, strength, quality, stage, reasons, data time ---
+color OM_TrendColor(const int ck)
+  {
+   if(!InpPanelColorByContext || ck == PC_BASE) return(InpPanelColor);
+   if(ck == PC_BULL)  return(InpPanelCtxBullColor);
+   if(ck == PC_BEAR)  return(InpPanelCtxBearColor);
+   if(ck == PC_TRANS) return(InpPanelCtxTransColor);
+   return(InpPanelCtxRangeColor);
+  }
+
+void OM_DrawTrendPanel()
+  {
+   if(InpPanelMode == PANEL_OFF) { OM_BoxClear(TT_TPN, 6);  return; }
+   string lab[], val[];
+   int    ck[];
+   StgPanelRows(lab, val, ck);
+   color lc[6], vc[6];
+   for(int i = 0; i < 6; i++) { lc[i] = InpTrendLabelColor;  vc[i] = OM_TrendColor(ck[i]); }
+   OM_DrawBox(TT_TPN, InpTrendCorner, InpTrendX, InpTrendY, InpTrendFontSize, lab, lc, val, vc, 6, 6);
+  }
 
 //================== kill zone bookkeeping ==========================
 #define MAX_KZ_DRAWN MAX_KZ_INST     // one bookkeeping slot per window KZCollect can return
@@ -442,12 +536,26 @@ string OM_PanelCycleLine()
    return(s);
   }
 
+// a diagnostic row: longer than an OBJ_LABEL shows (63 characters) -> wrapped
+// onto indented rows (StgWrap = stage_sim.wrap), never cut off
+void OM_PanelAdd(string &L[], color &C[], int &n, const string text, const color clr)
+  {
+   string parts[];
+   int k = StgWrap(text, parts);
+   for(int i = 0; i < k && n < MAX_PANEL_ROWS; i++) { L[n] = parts[i];  C[n] = clr;  n++; }
+  }
+
+// v2.58: the trend (direction, strength, quality, stage, reasons, data time)
+// is the trend panel's; this one keeps the diagnostics. COMPACT: POI /
+// session and the cycle; FULL adds the structure counters, the score items,
+// the gap rejections and the liquidity history state.
 void OM_DrawPanel()
   {
-   if(InpPanelMode == PANEL_OFF) return;
+   OM_DrawTrendPanel();
+   if(InpPanelMode == PANEL_OFF) { OM_BoxClear(TT_CTX, MAX_PANEL_ROWS);  return; }
 
-   string L[MAX_PANEL_ROWS];
-   color  C[MAX_PANEL_ROWS];
+   string L[MAX_PANEL_ROWS], E[MAX_PANEL_ROWS];
+   color  C[MAX_PANEL_ROWS], EC[MAX_PANEL_ROWS];
    int n = 0;
    color base = TS_PANEL.clr;
 
@@ -458,87 +566,47 @@ void OM_DrawPanel()
    if(g_ctx == CTX_TRANSITION)
       ctx += " (pending " + (g_ctx_pending == DIR_BULL ? "UP" : "DOWN") + ")";
 
-   // v2.56: the BOS count (g_ctx_strength) and CLEAN / MESSY are structure
-   // diagnostics, not the trend strength / quality (requirement §1.4); the
-   // score line is the strength. No build yet / a rebuild waiting for data:
-   // only the header and "waiting" - never the state of an older build.
+   // No build yet / a rebuild waiting for data: the header only - never the
+   // state of an older build (the trend panel says 等待数据)
    if(!g_ready)
-     {
-      C[n] = base;
-      L[n++] = "HMI v" + HMI_VERSION + "  MARK ONLY - NO ENTRY DECISION";
-      C[n] = base;
-      L[n++] = StrPanelText();
-      C[n] = base;
-      L[n++] = QltPanelText();
-     }
+      OM_PanelAdd(L, C, n, "HMI v" + HMI_VERSION + "  MARK ONLY - NO ENTRY DECISION", base);
    else if(InpPanelMode == PANEL_FULL)
      {
-      C[n] = base;
-      L[n++] = "HMI v" + HMI_VERSION + "  MARK ONLY - NO ENTRY DECISION";
-      C[n] = CtxPanelColor(base);
-      L[n++] = "H4 CONTEXT: " + ctx +
-               "   BOS " + HMI_U(ZH_COUNT) + " " + IntegerToString(g_ctx_strength) +
-               "   " + HMI_U(ZH_STRUCT) + (g_ctx_messy ? " MESSY" : " CLEAN");
-      C[n] = base;
-      L[n++] = StrPanelText();
-      C[n] = base;
-      L[n++] = QltPanelText();                // v2.57
-      C[n] = base;
-      L[n++] = "H4 POI: " + IntegerToString(poi_active) + " ACTIVE / " +
-               IntegerToString(g_diag_poi_rejected_gap) + " REJECTED-BY-GAP" +
-               "   |   M5 BLOCK GAP-REJECTED: " + IntegerToString(g_diag_blk_rejected_gap);
-      C[n] = base;
-      L[n++] = "SESSION: " + (g_sess.active ? "ACTIVE since " +
-               TimeToString(g_sess.start_time, TIME_DATE|TIME_MINUTES) : "none");
+      OM_PanelAdd(L, C, n, "HMI v" + HMI_VERSION + "  MARK ONLY - NO ENTRY DECISION", base);
+      // the BOS count (g_ctx_strength) and CLEAN / MESSY are structure
+      // diagnostics, not the trend strength / quality (requirement §1.4)
+      OM_PanelAdd(L, C, n, "H4 CONTEXT: " + ctx +
+                  "   BOS " + HMI_U(ZH_COUNT) + " " + IntegerToString(g_ctx_strength) +
+                  "   " + HMI_U(ZH_STRUCT) + (g_ctx_messy ? " MESSY" : " CLEAN"), CtxPanelColor(base));
+      string si = StgStrItemsText();
+      if(si != "") OM_PanelAdd(L, C, n, si, base);
+      string qi = StgQltItemsText();
+      if(qi != "") OM_PanelAdd(L, C, n, qi, base);
+      OM_PanelAdd(L, C, n, "H4 POI: " + IntegerToString(poi_active) + " ACTIVE / " +
+                  IntegerToString(g_diag_poi_rejected_gap) + " REJECTED-BY-GAP" +
+                  "   |   M5 BLOCK GAP-REJECTED: " + IntegerToString(g_diag_blk_rejected_gap), base);
+      OM_PanelAdd(L, C, n, "SESSION: " + (g_sess.active ? "ACTIVE since " +
+                  TimeToString(g_sess.start_time, TIME_DATE|TIME_MINUTES) : "none"), base);
       if(g_lh_state == LH_WAITING)
-        {
-         C[n] = base;
-         L[n++] = "LIQ HISTORY: WAITING - " + IntegerToString(g_lh_pend_n) +
-                  " level(s) from " + TimeToString(g_lh_need, TIME_DATE|TIME_MINUTES) +
-                  " (attempt " + IntegerToString(g_lh_attempts) +
-                  (g_lh_attempts >= HMI_LH_FAST_TRIES ? ", slow retry" : "") + ") - liquidity lines provisional";
-        }
-      C[n] = base;
-      L[n++] = "CYCLE " + OM_PanelCycleLine();
+         OM_PanelAdd(L, C, n, "LIQ HISTORY: WAITING - " + IntegerToString(g_lh_pend_n) +
+                     " level(s) from " + TimeToString(g_lh_need, TIME_DATE|TIME_MINUTES) +
+                     " (attempt " + IntegerToString(g_lh_attempts) +
+                     (g_lh_attempts >= HMI_LH_FAST_TRIES ? ", slow retry" : "") + ")   |   liquidity lines provisional", base);
+      OM_PanelAdd(L, C, n, "CYCLE " + OM_PanelCycleLine(), base);
      }
    else   // PANEL_COMPACT
      {
-      C[n] = CtxPanelColor(base);
-      L[n++] = ctx +
-               "   BOS " + IntegerToString(g_ctx_strength) +
-               (g_ctx_messy ? " MESSY" : " CLEAN") +
-               "   |   POI " + IntegerToString(poi_active) +
-               "   |   " + (g_sess.active ? "SESSION " +
-               TimeToString(g_sess.start_time, TIME_MINUTES) : "no session") +
-               (g_lh_state == LH_WAITING ? "   |   LIQ WAITING" : "");
-      // v2.56r4: the score and the H4 close it belongs to on a row of their own -
-      // an OBJ_LABEL shows 63 characters, and on the first row the score pushed
-      // the session off its end (MT5 run 2026-10-26)
-      string asof = StrPanelAsOf();
-      C[n] = base;
-      L[n++] = StrPanelShort() + (asof != "" ? "   " + asof : "");
-      C[n] = base;
-      L[n++] = QltPanelShort();               // v2.57: the same H4 as the row above
-      C[n] = base;
-      L[n++] = OM_PanelCycleLine();
+      OM_PanelAdd(L, C, n, "POI " + IntegerToString(poi_active) +
+                  "   |   " + (g_sess.active ? "SESSION " + TimeToString(g_sess.start_time, TIME_MINUTES) : "no session") +
+                  (g_lh_state == LH_WAITING ? "   |   LIQ WAITING" : ""), base);
+      OM_PanelAdd(L, C, n, OM_PanelCycleLine(), base);
      }
 
-   if(g_ready && InpShowATR && n < MAX_PANEL_ROWS) { C[n] = base;                 L[n++] = RangesATRText(); }
-   if(g_ready && InpShowADR && n < MAX_PANEL_ROWS) { C[n] = RangesADRColor(base); L[n++] = RangesADRText(); }
+   if(g_ready && InpShowATR) OM_PanelAdd(L, C, n, RangesATRText(), base);
+   if(g_ready && InpShowADR) OM_PanelAdd(L, C, n, RangesADRText(), RangesADRColor(base));
 
-   //--- draw; bottom corners stack upward so reading order is kept ---
-   int  step  = TS_PANEL.size + 6;
-   bool lower = (InpPanelCorner == CORNER_LEFT_LOWER || InpPanelCorner == CORNER_RIGHT_LOWER);
-   for(int i = 0; i < n; i++)
-      OM_PanelRow(i, L[i], InpPanelY + (lower ? (n - 1 - i) : i) * step, C[i]);
-
-   //--- drop rows left over from a longer panel ---------------------
-   for(int i = n; i < MAX_PANEL_ROWS; i++)
-     {
-      string nm = OM_Name(TT_CTX, 0, i);
-      ObjectDelete(0, nm);
-      OM_Unregister(nm);
-     }
+   for(int i = 0; i < n; i++) { E[i] = "";  EC[i] = base; }
+   OM_DrawBox(TT_CTX, InpPanelCorner, InpPanelX, InpPanelY, TS_PANEL.size, E, EC, L, C, n, MAX_PANEL_ROWS);
   }
 
 //====================== full sync ===================================

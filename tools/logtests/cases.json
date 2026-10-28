@@ -2795,5 +2795,417 @@
   "forbid": [
    "IDENTICAL inside"
   ]
+ },
+ "g01_reload_stg_identical": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "STG    IDENTICAL over 150 / 150 row(s) (stage / reasons / arrow)",
+   "every row recomputes from its bar's HMI-STR / HMI-QLT",
+   "QLT    IDENTICAL over",
+   "IDENTICAL inside the comparable region"
+  ],
+  "forbid": [
+   "FAILED",
+   "MISMATCH"
+  ]
+ },
+ "g02_reload_stg_row_missing": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "STG    MISMATCH (1)",
+   "STR / STG H4 bars differ: 1 bar(s) with HMI-STR but no HMI-STG (2026.01.31 20:00)"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g03_reload_stg_stage_tampered": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "B: 2026.01.31 20:00: stage=PUSH, recomputed PULLBACK",
+   "stage rows FAILED their check"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g04_reload_stg_reasons_tampered": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "2026.01.31 20:00: reasons="
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g05_reload_stg_arrow_tampered": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "2026.01.31 20:00: arrow=FLAT, scores"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g06_reload_stg_near_tampered": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "2026.01.31 20:00: near=1, recomputed 0"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g07_reload_stg_prev_ext_wrong": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "2026.01.31 12:00: prev_ext=",
+   "but the bar before"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g08_reload_stg_trans_kind_wrong": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "2026.01.30 20:00: chk=FALLBACK but the CHOCH at",
+   "has HMI-PROT BREAK"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g09_reload_stg_range_kind_wrong": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "2026.01.31 00:00: chk=INIT but the build's HMI-CTX rows give TIMEOUT"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g10_reload_stg_arrow_new_same_leg": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "2026.02.03 16:00: arrow NEW but no leg opened after"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g11_reload_stg_ref_score_wrong": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "2026.02.03 16:00: ref_score=",
+   "but HMI-STR of"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g12_reload_stg_hist_wrong": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "STG-HIST stages sum to"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g13_reload_stg_hist_missing": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "0 HMI-STG-HIST row(s) in build 2 (one expected)"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g14_reload_stg_def_changed": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "STG    NOT COMPARABLE - stage definition differs"
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the stage rows",
+   "STG    MISMATCH"
+  ]
+ },
+ "g15_reload_stg_prot_flag": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "2026.01.31 20:00: prot=0 but HMI-QLT reason="
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g16_reload_stg_dist_tampered": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "2026.01.31 20:00: dist_pts="
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g17_reload_stg_tr_sum_copy": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "ROW CHECK(S) FAILED",
+   "2026.01.31 20:00: tr_sum="
+  ],
+  "forbid": [
+   "IDENTICAL inside",
+   "AGREE BOTH WAYS",
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g18_live_stg_ok": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "stage rows compared: 30 (STG)",
+   "AGREE BOTH WAYS on every covered bar"
+  ],
+  "forbid": [
+   "MISMATCH(ES)",
+   "FAILED"
+  ]
+ },
+ "g19_live_stg_tampered": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "live stage row(s) FAILED the recomputation",
+   "MISMATCH(ES) on covered bars"
+  ],
+  "forbid": [
+   "AGREE BOTH WAYS on every covered bar"
+  ]
+ },
+ "g20_live_stg_build_missing": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "MISMATCH(ES) on covered bars",
+   "live only  [1->2] STG"
+  ],
+  "forbid": [
+   "AGREE BOTH WAYS"
+  ]
+ },
+ "g21_live_stg_build_hist_corrupt": {
+  "args": [
+   "-LiveVsBuild"
+  ],
+  "expect": [
+   "build score check(s) FAILED",
+   "build 1 STG: STG-HIST stages sum to"
+  ],
+  "forbid": [
+   "AGREE BOTH WAYS"
+  ]
+ },
+ "g22_versus258_additive_ok": {
+  "args": [
+   "-Source",
+   "USDJPY#0D57,M5",
+   "-Versus",
+   "USDJPY#0E58,M5"
+  ],
+  "expect": [
+   "the stage, reasons and strength arrow are added (BRI-15, display only)",
+   "IDENTICAL apart from the stage rows"
+  ],
+  "forbid": [
+   "UNEXPLAINED",
+   "FAILED",
+   "NOT JUDGED"
+  ]
+ },
+ "g23_versus258_qlt_changed": {
+  "args": [
+   "-Source",
+   "USDJPY#0D57,M5",
+   "-Versus",
+   "USDJPY#0E58,M5"
+  ],
+  "expect": [
+   "line(s) differ outside the stage rows - UNEXPLAINED",
+   "HMI-QLT,USDJPY"
+  ],
+  "forbid": [
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g24_versus258_stg_bad": {
+  "args": [
+   "-Source",
+   "USDJPY#0D57,M5",
+   "-Versus",
+   "USDJPY#0E58,M5"
+  ],
+  "expect": [
+   "stage rows FAILED their check",
+   "stage=PUSH, recomputed PULLBACK"
+  ],
+  "forbid": [
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g25_versus258_no_stg": {
+  "args": [
+   "-Source",
+   "USDJPY#0D57,M5",
+   "-Versus",
+   "USDJPY#0E58,M5"
+  ],
+  "expect": [
+   "stage rows FAILED their check (2)",
+   "STR / STG H4 bars differ: 150 bar(s) with HMI-STR but no HMI-STG",
+   "0 HMI-STG-HIST row(s) in build 1 (one expected)"
+  ],
+  "forbid": [
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g26_versus258_old_has_stg": {
+  "args": [
+   "-Source",
+   "USDJPY#0D57,M5",
+   "-Versus",
+   "USDJPY#0E58,M5"
+  ],
+  "expect": [
+   "v2.57 build carries 1 stage row(s)"
+  ],
+  "forbid": [
+   "IDENTICAL apart from the stage rows"
+  ]
+ },
+ "g27_stg_dist": {
+  "args": [
+   "-Stg"
+  ],
+  "expect": [
+   "merged  params ABCD1234 STG1-NEAR25-DEEP2.3-EFF35-POS65.70-ARR3.5",
+   "trend stages",
+   "reasons       PROT_BROKEN"
+  ],
+  "forbid": [
+   "CHECK FAILED"
+  ]
+ },
+ "g28_reload_stg_rows_missing_both": {
+  "args": [
+   "-Source",
+   "USDJPY,M5"
+  ],
+  "expect": [
+   "STR / STG H4 bars differ: 150 bar(s) with HMI-STR but no HMI-STG",
+   "stage rows FAILED their check"
+  ],
+  "forbid": [
+   "IDENTICAL inside"
+  ]
  }
 }

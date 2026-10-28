@@ -1,0 +1,195 @@
+# v2.58 development build - checks before a compile (2026-10-28; MQL not compiled yet)
+# baseline v2.57 (MQL 833c7a3, tools r2 8f4a641); BRI-15 in docs/02
+
+## MQL files changed / added (SHA-256)
+658430790c06f7a6b3c7563d91adf5af6470a7e4cb5747a534083e69bc8ec20e  HMI_StageEngine.mqh
+f3f160c535a03e0f189b95941cc9097947b5e442fc69b0237881e7946cc1b666  HMI_ObjectManager.mqh
+9dc13def1364bc099d0c2eb93066365f1e4e6886b1010e5da8f3515aa81732d3  HMI_Style.mqh
+c6a57ca9ceb9215c2441d76d09006a43ebc532c44de0f097b7e8ed3b27bb5693  HMI_Defs.mqh
+39e284f5b6a62b323500d6983bc44dffede3faeabd9131bd6223ef209b7e16e7  H4M5_Identification.mq5
+unchanged against v2.57: the other 21 files, HMI_StrengthEngine.mqh and HMI_QualityEngine.mqh included
+python3 tools/params_digest.py MQL5/Indicators/HMI -> params=461F006E   (the new inputs are display styles, not in the digest)
+
+## python3 tools/stage_sim.py
+PASS  S01 strength NODATA / HISTORY before everything (TRANSITION too) [bull]  NODATA - NA  refresh None near None
+PASS  S01 strength NODATA / HISTORY before everything (TRANSITION too) [bear]  NODATA - NA  refresh None near None
+PASS  S02 strength NODATA / ATR [bull]  NOATR - NA  refresh None near None
+PASS  S02 strength NODATA / ATR [bear]  NOATR - NA  refresh None near None
+PASS  S03 TRANSITION opened by the protected level: 多头保护低点已破 [bull]  TRANS PROT_BROKEN NA  refresh None near None
+PASS  S03 TRANSITION opened by the protected level: 多头保护低点已破 [bear]  TRANS PROT_BROKEN NA  refresh None near None
+PASS  S04 TRANSITION opened by the P-6b fallback [bull]  TRANS SWING_BROKEN NA  refresh None near None
+PASS  S04 TRANSITION opened by the P-6b fallback [bear]  TRANS SWING_BROKEN NA  refresh None near None
+PASS  S05 RANGE after a TRANSITION timed out [bull]  RANGE TIMEOUT NA  refresh None near None
+PASS  S05 RANGE after a TRANSITION timed out [bear]  RANGE TIMEOUT NA  refresh None near None
+PASS  S06 RANGE at the start of history: no reason [bull]  RANGE - NA  refresh None near None
+PASS  S06 RANGE at the start of history: no reason [bear]  RANGE - NA  refresh None near None
+PASS  S07 trend without a protected level: 结构待完善 / 缺少保护点 (+ the first risk) [bull]  BUILD NO_PROT+COUNTER UP  refresh None near None
+PASS  S07 trend without a protected level: 结构待完善 / 缺少保护点 (+ the first risk) [bear]  BUILD NO_PROT+COUNTER UP  refresh None near None
+PASS  S08 trend, protected level, retrace unavailable (LEG): 结构待完善 / 波段长度无效 [bull]  BUILD LEG UP  refresh None near None
+PASS  S08 trend, protected level, retrace unavailable (LEG): 结构待完善 / 波段长度无效 [bear]  BUILD LEG UP  refresh None near None
+PASS  S09 r > 2/3 (3x = 2L + 1): 深度回撤 even on a new extreme [bull]  DEEP DEEP UP  refresh 1 near 0
+PASS  S09 r > 2/3 (3x = 2L + 1): 深度回撤 even on a new extreme [bear]  DEEP DEEP UP  refresh 1 near 0
+PASS  S10 r = 2/3 exactly is not deep; a new high 200 above the close is not near: 正常回撤 (Q_retrace 40: no RET) [bull]  PULLBACK MOVE+BRK UP  refresh 1 near 0
+PASS  S10 r = 2/3 exactly is not deep; a new high 200 above the close is not near: 正常回撤 (Q_retrace 40: no RET) [bear]  PULLBACK MOVE+BRK UP  refresh 1 near 0
+PASS  S11 new extreme, close 25 below it (56 x 25 = 1400 = T): 延续推进 [bull]  PUSH MOVE+RET UP  refresh 1 near 1
+PASS  S11 new extreme, close 25 below it (56 x 25 = 1400 = T): 延续推进 [bear]  PUSH MOVE+RET UP  refresh 1 near 1
+PASS  S12 new extreme, close 26 below (56 x 26 > T): 正常回撤 - a wick high is not a push [bull]  PULLBACK MOVE+RET UP  refresh 1 near 0
+PASS  S12 new extreme, close 26 below (56 x 26 > T): 正常回撤 - a wick high is not a push [bear]  PULLBACK MOVE+RET UP  refresh 1 near 0
+PASS  S13 high equal to the earlier extreme is no refresh: near -> 高位整理 [bull]  CONSOL MOVE+RET UP  refresh 0 near 1
+PASS  S13 high equal to the earlier extreme is no refresh: near -> 高位整理 [bear]  CONSOL MOVE+RET UP  refresh 0 near 1
+PASS  S14 first bar after the anchor: no earlier extreme, no refresh -> 高位整理 [bull]  CONSOL MOVE+RET UP  refresh 0 near 1
+PASS  S14 first bar after the anchor: no earlier extreme, no refresh -> 高位整理 [bear]  CONSOL MOVE+RET UP  refresh 0 near 1
+PASS  S15 below the extreme, not near: 正常回撤 [bull]  PULLBACK MOVE+RET UP  refresh 0 near 0
+PASS  S15 below the extreme, not near: 正常回撤 [bear]  PULLBACK MOVE+RET UP  refresh 0 near 0
+PASS  R01 risks in order, at most two: 回撤偏深 + 近期突破失败 (逆向 / 往返 dropped) [bull]  DEEP DEEP+BRK_FAIL UP  refresh 1 near 0
+PASS  R01 risks in order, at most two: 回撤偏深 + 近期突破失败 (逆向 / 往返 dropped) [bear]  DEEP DEEP+BRK_FAIL UP  refresh 1 near 0
+PASS  R02 a failed mature event: 近期突破失败 even with n < 3 (FEW) [bull]  PULLBACK BRK_FAIL UP  refresh 0 near 0
+PASS  R02 a failed mature event: 近期突破失败 even with n < 3 (FEW) [bear]  PULLBACK BRK_FAIL UP  refresh 0 near 0
+PASS  R03 S_mom = 0 with recent = 0 is not 逆向; recent = -1 is [bull]  PULLBACK COUNTER UP  refresh 0 near 0
+PASS  R03 S_mom = 0 with recent = 0 is not 逆向; recent = -1 is [bear]  PULLBACK COUNTER UP  refresh 0 near 0
+PASS  R04 recent = 0: S_mom 0 but no counter-move -> no risk; strengths shown [bull]  PULLBACK MOVE+RET UP  refresh 0 near 0
+PASS  R04 recent = 0: S_mom 0 but no counter-move -> no risk; strengths shown [bear]  PULLBACK MOVE+RET UP  refresh 0 near 0
+PASS  R05 S_eff exactly 35 (100 e = 35 path) is not 往返; 34.9 is [bull]  PULLBACK MOVE+RET UP  refresh 0 near 0
+PASS  R05 S_eff exactly 35 (100 e = 35 path) is not 往返; 34.9 is [bear]  PULLBACK MOVE+RET UP  refresh 0 near 0
+PASS  R06 S_eff 34.75 (e 139 / path 400): 价格往返明显 [bull]  PULLBACK CHOP UP  refresh 0 near 0
+PASS  R06 S_eff 34.75 (e 139 / path 400): 价格往返明显 [bear]  PULLBACK CHOP UP  refresh 0 near 0
+PASS  R07 path 0: S_eff 0 is not called 往返 (no movement at all) [bull]  PULLBACK RET+BRK UP  refresh 0 near 0
+PASS  R07 path 0: S_eff 0 is not called 往返 (no movement at all) [bear]  PULLBACK RET+BRK UP  refresh 0 near 0
+PASS  R08 S_move exactly 65 (100 m = 195 T): 同向推进明显 [bull]  PULLBACK MOVE+RET UP  refresh 0 near 0
+PASS  R08 S_move exactly 65 (100 m = 195 T): 同向推进明显 [bear]  PULLBACK MOVE+RET UP  refresh 0 near 0
+PASS  R09 S_move just under 65: no MOVE; next strengths in order [bull]  PULLBACK RET+BRK UP  refresh 0 near 0
+PASS  R09 S_move just under 65: no MOVE; next strengths in order [bear]  PULLBACK RET+BRK UP  refresh 0 near 0
+PASS  R10 Q_retrace exactly 70 (r = 1/2): 回撤较浅 [bull]  PULLBACK RET+BRK UP  refresh 0 near 0
+PASS  R10 Q_retrace exactly 70 (r = 1/2): 回撤较浅 [bear]  PULLBACK RET+BRK UP  refresh 0 near 0
+PASS  R11 Q_retrace 69.4 (x 151): no RET [bull]  PULLBACK BRK UP  refresh 0 near 0
+PASS  R11 Q_retrace 69.4 (x 151): no RET [bear]  PULLBACK BRK UP  refresh 0 near 0
+PASS  R12 3 of 4 held (Q_break 75): the failure is a risk, so no strength is listed [bull]  PULLBACK BRK_FAIL UP  refresh 0 near 0
+PASS  R12 3 of 4 held (Q_break 75): the failure is a risk, so no strength is listed [bear]  PULLBACK BRK_FAIL UP  refresh 0 near 0
+PASS  R13 n = 3, all held: 突破全部守住; n = 2 all held (FEW) is not listed (R14) [bull]  PULLBACK BRK UP  refresh 0 near 0
+PASS  R13 n = 3, all held: 突破全部守住; n = 2 all held (FEW) is not listed (R14) [bear]  PULLBACK BRK UP  refresh 0 near 0
+PASS  R14 S_eff, S_mom and Q_overlap at their boundaries (65 / 65 / 70) [bull]  PULLBACK EFF+MOM UP  refresh 0 near 0
+PASS  R14 S_eff, S_mom and Q_overlap at their boundaries (65 / 65 / 70) [bear]  PULLBACK EFF+MOM UP  refresh 0 near 0
+PASS  R15 only Q_overlap high: K 线重叠少 [bull]  PULLBACK OVL UP  refresh 0 near 0
+PASS  R15 only Q_overlap high: K 线重叠少 [bear]  PULLBACK OVL UP  refresh 0 near 0
+PASS  R16 Q_overlap 69.99: nothing high -> 无突出分项 (empty list) [bull]  PULLBACK - UP  refresh 0 near 0
+PASS  R16 Q_overlap 69.99: nothing high -> 无突出分项 (empty list) [bear]  PULLBACK - UP  refresh 0 near 0
+PASS  R17 a state reason blocks the strengths: BUILD with nothing else [bull]  BUILD NO_PROT UP  refresh None near None
+PASS  R17 a state reason blocks the strengths: BUILD with nothing else [bear]  BUILD NO_PROT UP  refresh None near None
+PASS  A01 +5: ↑ [bull]  PULLBACK MOVE+RET UP  refresh 0 near 0
+PASS  A01 +5: ↑ [bear]  PULLBACK MOVE+RET UP  refresh 0 near 0
+PASS  A02 +4: → [bull]  PULLBACK MOVE+RET FLAT  refresh 0 near 0
+PASS  A02 +4: → [bear]  PULLBACK MOVE+RET FLAT  refresh 0 near 0
+PASS  A03 -5: ↓ [bull]  PULLBACK MOVE+RET DOWN  refresh 0 near 0
+PASS  A03 -5: ↓ [bear]  PULLBACK MOVE+RET DOWN  refresh 0 near 0
+PASS  A04 -4: → [bull]  PULLBACK MOVE+RET FLAT  refresh 0 near 0
+PASS  A04 -4: → [bear]  PULLBACK MOVE+RET FLAT  refresh 0 near 0
+PASS  A05 another leg 3 bars ago: 新趋势 [bull]  PULLBACK MOVE+RET NEW  refresh 0 near 0
+PASS  A05 another leg 3 bars ago: 新趋势 [bear]  PULLBACK MOVE+RET NEW  refresh 0 near 0
+PASS  A06 no OK score 3 bars ago: 新趋势 [bull]  PULLBACK MOVE+RET NEW  refresh 0 near 0
+PASS  A06 no OK score 3 bars ago: 新趋势 [bear]  PULLBACK MOVE+RET NEW  refresh 0 near 0
+PASS  P01 the requirement's normal example (§2): six rows
+PASS  P02 bear mirror: ▼ 空头 red, 低位整理
+PASS  P03 the requirement's transition example (§2)
+PASS  P04 RANGE: 区间震荡 grey, 暂不评级 both, the timeout as reason
+PASS  P05 waiting: no current value, the last valid result named as such with its time
+PASS  P06 before the first build: 等待数据 everywhere, no time
+PASS  P07 partial quality as in v2.57 (局部表现), 新趋势 arrow
+PASS  P08 history too short: 样本不足 on strength, quality and stage; reason —
+PASS  P09 every trend panel row fits an OBJ_LABEL (63; longest 47: 趋势质量  样本不足（成熟突破 2/3，待确认 1）  局部表现 回撤 100 · 重叠 49)
+        CYCLE #1582 BEAR    CISD OK  MSS OK  BPR OK  PA ENGULFING OK /     PA REJECTION OK  PA BREAK-RETEST OK   [ANCHOR INVALIDATED] /     [CTX CHANGED]
+        H4 POI: 0 ACTIVE / 13 REJECTED-BY-GAP /     M5 BLOCK GAP-REJECTED: 125
+        TRANSITION (pending UP)   BOS 0 CLEAN   |   POI 0 /     no session   |   LIQ WAITING
+PASS  P10 wrap: every piece within 63 characters and at least half of it, nothing but a | lost, split between words
+
+86/86 PASS
+
+## python3 tools/stage_sim.py --replay EURUSD_H1.csv
+replay /tmp/claude-0/-home-user-yuuuu/b9098c87-6172-53af-aa1b-554c3ebd29c5/scratchpad/data/EURUSD_H1.csv: 1292 H4 bars 2017.04.19 08:00 .. 2018.02.07 12:00
+PASS  R1 prefix: the stage record of h from bars[:h+1] equals the full run (every 37th bar from 40)
+PASS  R2 mirror: mirrored bars give the same stage, reasons and arrow on every bar (0 differ)
+PASS  R3 every panel row of the replay fits an OBJ_LABEL (longest 47: 趋势质量  样本不足（成熟突破 2/3，待确认 1）  局部表现 回撤 100 · 重叠 61)
+
+record only - nothing below changes the definition
+stages: NODATA 14  NOATR 0  TRANS 288  RANGE 33  BUILD 123  DEEP 84  PUSH 70  CONSOL 17  PULLBACK 663
+trend bars 959: BUILD 123 (12.8%)  DEEP 84 (8.8%)  PUSH 70 (7.3%)  CONSOL 17 (1.8%)  PULLBACK 663 (69.1%)
+reasons: PROT_BROKEN 212  SWING_BROKEN 76  TIMEOUT 33  NO_PROT 123  LEG 0  DEEP 84  BRK_FAIL 540  COUNTER 348  CHOP 348  MOVE 113  RET 118  BRK 5  EFF 0  MOM 1  OVL 0
+trend bars with no reason (无突出分项): 2
+arrows: UP 328  DOWN 406  FLAT 151  NEW 72
+PASS  R4 every stage but NOATR occurs on real data (8 of 9)
+
+4/4 PASS
+
+## python3 tools/stage_mql_mirror.py EURUSD_H1.csv
+staircase: 74 bars, 0 rows differ
+           panel strings: 296 compared, 0 differ
+staircase mirror: 74 bars, 0 rows differ
+                  panel strings: 296 compared, 0 differ
+CHOCH then TRANS_OK: 38 bars, 0 rows differ
+                     panel strings: 152 compared, 0 differ
+CHOCH then TRANS_OK mirror: 38 bars, 0 rows differ
+                            panel strings: 152 compared, 0 differ
+CHOCH then TRANS_FAIL: 33 bars, 0 rows differ
+                       panel strings: 132 compared, 0 differ
+CHOCH then TRANS_FAIL mirror: 33 bars, 0 rows differ
+                              panel strings: 132 compared, 0 differ
+TRANSITION timing out into RANGE: 71 bars, 0 rows differ
+                                  panel strings: 284 compared, 0 differ
+TRANSITION timing out into RANGE mirror: 71 bars, 0 rows differ
+                                         panel strings: 284 compared, 0 differ
+INVALID anchor: 37 bars, 0 rows differ
+                panel strings: 148 compared, 0 differ
+INVALID anchor mirror: 37 bars, 0 rows differ
+                       panel strings: 148 compared, 0 differ
+failing breaks: 41 bars, 0 rows differ
+                panel strings: 164 compared, 0 differ
+failing breaks mirror: 41 bars, 0 rows differ
+                       panel strings: 164 compared, 0 differ
+EURUSD_H1.csv: 1292 bars, 0 rows differ
+               panel strings: 5168 compared, 0 differ
+EURUSD_H1.csv mirror: 1292 bars, 0 rows differ
+                      panel strings: 5168 compared, 0 differ
+HMI-STG rows: 3172 compared, 0 differ;  panel strings: 12688 compared, 0 differ;  wrapped rows: 4000 random texts, 0 differ
+stages met: NODATA, TRANS, RANGE, BUILD, DEEP, PUSH, CONSOL, PULLBACK
+PASS
+
+## regression of the earlier offline suites (unchanged)
+python3 tools/quality_sim.py        -> 127/127 PASS
+python3 tools/strength_sim.py       -> 81/81 PASS
+python3 tools/quality_mql_mirror.py -> HMI-QLT rows: 3030 compared, 0 differ;  panel strings: 12120 compared, 0 differ PASS 
+
+## pwsh -File tools/logtests/Run-LogTests.ps1 (ReloadTest.ps1 with the STG category), the new cases
+PASS  g01_reload_stg_identical
+PASS  g02_reload_stg_row_missing
+PASS  g03_reload_stg_stage_tampered
+PASS  g04_reload_stg_reasons_tampered
+PASS  g05_reload_stg_arrow_tampered
+PASS  g06_reload_stg_near_tampered
+PASS  g07_reload_stg_prev_ext_wrong
+PASS  g08_reload_stg_trans_kind_wrong
+PASS  g09_reload_stg_range_kind_wrong
+PASS  g10_reload_stg_arrow_new_same_leg
+PASS  g11_reload_stg_ref_score_wrong
+PASS  g12_reload_stg_hist_wrong
+PASS  g13_reload_stg_hist_missing
+PASS  g14_reload_stg_def_changed
+PASS  g15_reload_stg_prot_flag
+PASS  g16_reload_stg_dist_tampered
+PASS  g17_reload_stg_tr_sum_copy
+PASS  g18_live_stg_ok
+PASS  g19_live_stg_tampered
+PASS  g20_live_stg_build_missing
+PASS  g21_live_stg_build_hist_corrupt
+PASS  g22_versus258_additive_ok
+PASS  g23_versus258_qlt_changed
+PASS  g24_versus258_stg_bad
+PASS  g25_versus258_no_stg
+PASS  g26_versus258_old_has_stg
+PASS  g27_stg_dist
+PASS  g28_reload_stg_rows_missing_both
+228/228 cases as expected
+
+## python3 tools/live_coverage_tests.py
+  ok   v2.58 unaltered (STG-HIST rows not compared) exit 0 (want 0)  RESULT: inputs complete, 0 differences (categories without a sample ar
+  ok   v2.58 live HMI-STG arrow changed         exit 1 (want 1)  RESULT: NOT PASSED - 2 difference(s) on compared rows
+  ok   v2.58 live HMI-STG missing from the later build exit 1 (want 1)  RESULT: NOT PASSED - 1 difference(s) on compared rows
+28/28

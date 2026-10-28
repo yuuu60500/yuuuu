@@ -1027,5 +1027,148 @@ case("q35_live_str_build_hist_corrupt", [start("2.57")] + qlb(1, _X2, 1, tweak=_
 _nostr = lambda rr: [l for l in rr if not ("HMI-STR," in l and (",bar=" + _qt(_h34) + ",") in l)]
 case("q36_reload_str_row_missing_both", [start("2.57")] + qbuild(1, tweak=_nostr) + [start("2.57", init=2)] + qbuild(2, init=2, tweak=_nostr), R,
      [f"0 bar(s) with HMI-STR but no HMI-QLT, 1 with HMI-QLT but no HMI-STR ({_qt(_h34)})"], ["IDENTICAL inside"])
+
+# ---- v2.58 (BRI-15): stage rows. One model run (tools/stage_sim.py on synthetic bars, seed 20: TRANSITION opened by
+# the protected level and by the P-6b fallback, a RANGE after a timeout, BUILD / DEEP / PUSH / CONSOL / PULLBACK, every
+# arrow) written as the MQL writes it: the build's structure rows, HMI-STR, HMI-QLT and HMI-STG on the bars inside the
+# M5 window, the three histograms. ReloadTest recomputes every STG row from its bar's STR / QLT rows, checks it against
+# the build's own structure rows and judges STG as a category; the counterexamples are single-field tampering and rows
+# that recompute but stand on the wrong inputs (how a TRANSITION opened, a RANGE's start, the arrow's leg, the reference
+# score, the extreme before the bar).
+import stage_sim as GS
+_GB = PA.synth_bars(300, 20)
+_GR, _GSR, _GQR, _GC, _GE = GS.run(_GB)
+def _gt(h): return HB.tstr(_GB[h][0] + 4 * 3600)
+def _gstruct(upto, inst, init, live=False):
+    out = []
+    for l in PA.emit_lines(_GB, _GE, "2.58", inst, init):
+        b = HB.dt.datetime.strptime(l.split(",bar=")[1].split(",")[0], "%Y.%m.%d %H:%M")
+        bt = int(b.replace(tzinfo=HB.dt.timezone.utc).timestamp())
+        if bt <= _GB[upto - 1][0] + 4 * 3600:
+            out.append(l.replace(",live=0,", ",live=1,") if live else l)
+    return out
+def grows(lo, hi, live=0, inst="0001", init=1, stg=True):
+    out = []
+    for h in range(lo, hi):
+        out.append(L(SRC, SS.str_row(_GB, h, _GC[h], live=live, inst=inst, init=init, rec=_GSR[h])))
+        out.append(L(SRC, QS.qlt_row(_GB, h, _GC[h], _GQR[h], live=live, inst=inst, init=init)))
+        if stg: out.append(L(SRC, GS.stg_row(_GB, h, _GC[h], _GR[h], live=live, inst=inst, init=init)))
+    return out
+def ghists(upto, inst="0001", init=1, stg=True):
+    out = [L(SRC, SS.hist_row(_GB, _GSR[:upto], inst=inst, init=init)), L(SRC, QS.qhist_row(_GB, _GQR[:upto], inst=inst, init=init))]
+    if stg: out.append(L(SRC, GS.stg_hist_row(_GB, _GR[:upto], inst=inst, init=init)))
+    return out
+def gbuild(b, upto=300, ver="2.58", inst="0001", init=1, stg=True, tweak=None):
+    rows = _gstruct(upto, inst, init) + grows(_QW, upto, inst=inst, init=init, stg=stg) + ghists(upto, inst, init, stg)
+    if tweak: rows = tweak(rows)
+    to = HB.tstr(_GB[upto - 1][0] + 5 * 3600)
+    return blk(b, ver=ver, inst=inst, init=init, marks=[], liqs=[], chain=False, frm=HB.tstr(_GB[_QW][0]), to=to,
+               warm=HB.tstr(_GB[_QW][0]), extra_rows=rows)
+_grow = lambda h: (lambda l: "HMI-STG," in l and (",bar=" + _gt(h) + ",") in l)
+def _gfirst(pred, lo=_QW + 4): return next(h for h in range(lo, 300) if pred(_GR[h]))
+_gpb = _gfirst(lambda r: r["stage"] == "PULLBACK" and len(r["reasons"]) == 2)
+_gtr = _gfirst(lambda r: r["stage"] == "TRANS" and r["chk"] == "BREAK")
+_grg = _gfirst(lambda r: r["stage"] == "RANGE" and r["chk"] == "TIMEOUT")
+_gfl = _gfirst(lambda r: r["arrow"] == "FLAT")
+_gup = _gfirst(lambda r: r["arrow"] in ("UP", "DOWN"))
+_gnr = _gfirst(lambda r: r["near"] == 0 and r["stage"] == "PULLBACK")
+_gpe = next(h for h in range(_QW + 4, 300) if _GR[h]["prev_ext"] is not None and _GR[h - 1]["ext"] is not None and
+            _GR[h - 1].get("anchor") == _GR[h].get("anchor") and _GR[h]["refresh"] == 1)
+NOG = ["IDENTICAL inside", "AGREE BOTH WAYS", "IDENTICAL apart from the stage rows"]
+GB1, GB2 = gbuild(1), gbuild(2, init=2)
+case("g01_reload_stg_identical", [start("2.58")] + GB1 + [start("2.58", init=2)] + GB2, R,
+     ["STG    IDENTICAL over 150 / 150 row(s) (stage / reasons / arrow)", "every row recomputes from its bar's HMI-STR / HMI-QLT",
+      "QLT    IDENTICAL over", "IDENTICAL inside the comparable region"], ["FAILED", "MISMATCH"])
+case("g02_reload_stg_row_missing", [start("2.58")] + GB1 + [start("2.58", init=2)] + gbuild(2, init=2, tweak=lambda rr: tamper(rr, _grow(_gpb), lambda l: None)), R,
+     ["STG    MISMATCH (1)", f"STR / STG H4 bars differ: 1 bar(s) with HMI-STR but no HMI-STG ({_gt(_gpb)})"], NOG)
+case("g03_reload_stg_stage_tampered", [start("2.58")] + GB1 + [start("2.58", init=2)] + gbuild(2, init=2, tweak=lambda rr: tamper(rr, _grow(_gpb), lambda l: setf(l, "stage", "PUSH"))), R,
+     ["ROW CHECK(S) FAILED", f"B: {_gt(_gpb)}: stage=PUSH, recomputed PULLBACK", "stage rows FAILED their check"], NOG)
+case("g04_reload_stg_reasons_tampered", [start("2.58")] + GB1 + [start("2.58", init=2)] + gbuild(2, init=2, tweak=lambda rr: tamper(rr, _grow(_gpb), lambda l: setf(l, "reasons", "+".join(reversed(fld(l, "reasons").split("+")))))), R,
+     ["ROW CHECK(S) FAILED", f"{_gt(_gpb)}: reasons="], NOG)
+case("g05_reload_stg_arrow_tampered", [start("2.58")] + GB1 + [start("2.58", init=2)] + gbuild(2, init=2, tweak=lambda rr: tamper(rr, _grow(_gup), lambda l: setf(l, "arrow", "FLAT"))), R,
+     ["ROW CHECK(S) FAILED", f"{_gt(_gup)}: arrow=FLAT, scores"], NOG)
+case("g06_reload_stg_near_tampered", [start("2.58")] + GB1 + [start("2.58", init=2)] + gbuild(2, init=2, tweak=lambda rr: tamper(rr, _grow(_gnr), lambda l: setf(l, "near", "1"))), R,
+     ["ROW CHECK(S) FAILED", f"{_gt(_gnr)}: near=1, recomputed 0"], NOG)
+def _prev_lower(l):
+    """the extreme before the bar moved 1 point back (the bar still refreshes it: the row recomputes) - only the previous bar's
+    stage row, same anchor, shows it"""
+    return setf(l, "prev_ext", f"{float(fld(l, 'prev_ext')) - int(fld(l, 'dir')) * 0.00001:.5f}")
+case("g07_reload_stg_prev_ext_wrong", [start("2.58")] + GB1 + [start("2.58", init=2)] + gbuild(2, init=2, tweak=lambda rr: tamper(rr, _grow(_gpe), _prev_lower)), R,
+     ["ROW CHECK(S) FAILED", f"{_gt(_gpe)}: prev_ext=", "but the bar before"], NOG)
+def _as_fallback(l):
+    return setf(setf(l, "chk", "FALLBACK"), "reasons", "SWING_BROKEN")
+case("g08_reload_stg_trans_kind_wrong", [start("2.58")] + GB1 + [start("2.58", init=2)] + gbuild(2, init=2, tweak=lambda rr: tamper(rr, _grow(_gtr), _as_fallback)), R,
+     ["ROW CHECK(S) FAILED", f"{_gt(_gtr)}: chk=FALLBACK but the CHOCH at", "has HMI-PROT BREAK"], NOG)
+def _as_init(l):
+    return setf(setf(l, "chk", "INIT"), "reasons", "-")
+case("g09_reload_stg_range_kind_wrong", [start("2.58")] + GB1 + [start("2.58", init=2)] + gbuild(2, init=2, tweak=lambda rr: tamper(rr, _grow(_grg), _as_init)), R,
+     ["ROW CHECK(S) FAILED", f"{_gt(_grg)}: chk=INIT but the build's HMI-CTX rows give TIMEOUT"], NOG)
+case("g10_reload_stg_arrow_new_same_leg", [start("2.58")] + GB1 + [start("2.58", init=2)] + gbuild(2, init=2, tweak=lambda rr: tamper(rr, _grow(_gfl), lambda l: setf(l, "arrow", "NEW"))), R,
+     ["ROW CHECK(S) FAILED", f"{_gt(_gfl)}: arrow NEW but no leg opened after"], NOG)
+def _ref_moved(l):
+    """the reference score moved by one and the arrow kept consistent with it: the row recomputes, the build's own HMI-STR
+    row of the reference bar does not agree"""
+    rs = int(fld(l, "ref_score")) + 1; dl = int(fld(l, "score")) - rs
+    return setf(setf(l, "ref_score", str(rs)), "arrow", "UP" if dl >= 5 else "DOWN" if dl <= -5 else "FLAT")
+case("g11_reload_stg_ref_score_wrong", [start("2.58")] + GB1 + [start("2.58", init=2)] + gbuild(2, init=2, tweak=lambda rr: tamper(rr, _grow(_gfl), _ref_moved)), R,
+     ["ROW CHECK(S) FAILED", f"{_gt(_gfl)}: ref_score=", "but HMI-STR of"], NOG)
+_gh = lambda l: "HMI-STG-HIST," in l
+case("g12_reload_stg_hist_wrong", [start("2.58")] + GB1 + [start("2.58", init=2)] + gbuild(2, init=2, tweak=lambda rr: tamper(rr, _gh, lambda l: setf(l, "pullback", str(int(fld(l, "pullback")) + 1)))), R,
+     ["ROW CHECK(S) FAILED", "STG-HIST stages sum to"], NOG)
+case("g13_reload_stg_hist_missing", [start("2.58")] + GB1 + [start("2.58", init=2)] + gbuild(2, init=2, tweak=lambda rr: tamper(rr, _gh, lambda l: None)), R,
+     ["ROW CHECK(S) FAILED", "0 HMI-STG-HIST row(s) in build 2 (one expected)"], NOG)
+case("g14_reload_stg_def_changed", [start("2.58")] + GB1 + [start("2.58", init=2)] + gbuild(2, init=2, tweak=lambda rr: [l.replace("STG1-NEAR25-", "STG1-NEAR30-") for l in rr]), R,
+     ["STG    NOT COMPARABLE - stage definition differs"], NOG + ["STG    MISMATCH"])
+case("g15_reload_stg_prot_flag", [start("2.58")] + GB1 + [start("2.58", init=2)] + gbuild(2, init=2, tweak=lambda rr: tamper(rr, _grow(_gpb), lambda l: setf(setf(setf(l, "prot", "0"), "stage", "BUILD"), "reasons", "NO_PROT"))), R,
+     ["ROW CHECK(S) FAILED", f"{_gt(_gpb)}: prot=0 but HMI-QLT reason="], NOG)
+case("g16_reload_stg_dist_tampered", [start("2.58")] + GB1 + [start("2.58", init=2)] + gbuild(2, init=2, tweak=lambda rr: tamper(rr, _grow(_gnr), lambda l: setf(l, "dist_pts", str(int(fld(l, "dist_pts")) + 1)))), R,
+     ["ROW CHECK(S) FAILED", f"{_gt(_gnr)}: dist_pts="], NOG)
+case("g17_reload_stg_tr_sum_copy", [start("2.58")] + GB1 + [start("2.58", init=2)] + gbuild(2, init=2, tweak=lambda rr: tamper(rr, _grow(_gpb), lambda l: setf(l, "tr_sum", str(int(fld(l, "tr_sum")) + 1)))), R,
+     ["ROW CHECK(S) FAILED", f"{_gt(_gpb)}: tr_sum="], NOG)
+# live vs build
+def _glive(lo, hi, tweak=None):
+    rows = _bars_between_g(_gstruct(hi, "0001", 1, live=True), lo - 1, hi - 1) + grows(lo, hi, live=1)
+    return tweak(rows) if tweak else rows
+def _bars_between_g(lines, lo, hi):
+    a, b = _GB[lo][0] + 4 * 3600, _GB[hi][0] + 4 * 3600
+    out = []
+    for l in lines:
+        t = int(HB.dt.datetime.strptime(l.split(",bar=")[1].split(",")[0], "%Y.%m.%d %H:%M").replace(tzinfo=HB.dt.timezone.utc).timestamp())
+        if a < t <= b: out.append(l)
+    return out
+def glb(b, upto, init, tweak=None): return gbuild(b, upto=upto, init=init, tweak=tweak)
+case("g18_live_stg_ok", [start("2.58")] + glb(1, _X2, 1) + _glive(_X2, _Y2) + [start("2.58", init=2)] + glb(2, _Y2, 2), ["-LiveVsBuild"],
+     [f"stage rows compared: {_Y2 - _X2} (STG)", "AGREE BOTH WAYS on every covered bar"], ["MISMATCH(ES)", "FAILED"])
+_gL = lambda l: "HMI-STG," in l and ",stage=PULLBACK," in l
+case("g19_live_stg_tampered", [start("2.58")] + glb(1, _X2, 1) + _glive(_X2, _Y2, lambda rr: tamper(rr, _gL, lambda l: setf(l, "stage", "DEEP"))) + [start("2.58", init=2)] + glb(2, _Y2, 2),
+     ["-LiveVsBuild"], ["live stage row(s) FAILED the recomputation", "MISMATCH(ES) on covered bars"], ["AGREE BOTH WAYS on every covered bar"])
+case("g20_live_stg_build_missing", [start("2.58")] + glb(1, _X2, 1) + _glive(_X2, _Y2) + [start("2.58", init=2)] + glb(2, _Y2, 2, tweak=lambda rr: tamper(rr, _grow(_X2 + 5), lambda l: None)),
+     ["-LiveVsBuild"], ["MISMATCH(ES) on covered bars", "live only  [1->2] STG"], ["AGREE BOTH WAYS"])
+_stgbars = lambda rr: [setf(l, "bars", "999") if "HMI-STG-HIST," in l else l for l in rr]
+case("g21_live_stg_build_hist_corrupt", [start("2.58")] + glb(1, _X2, 1, tweak=_stgbars) + _glive(_X2, _Y2) + [start("2.58", init=2)] + glb(2, _Y2, 2, tweak=_stgbars),
+     ["-LiveVsBuild"], ["build score check(s) FAILED", "build 1 STG: STG-HIST stages sum to"], ["AGREE BOTH WAYS"])
+# v2.57 -> v2.58: the stage rows are added and nothing else may change (HMI-STR and HMI-QLT included)
+def v57v58(old_tweak=None, new_tweak=None, new_stg=True):
+    a = gbuild(1, ver="2.57", inst="0D57", init=1, stg=False, tweak=old_tweak)
+    nb = gbuild(1, ver="2.58", inst="0E58", init=2, stg=new_stg, tweak=new_tweak)
+    return [start("2.57", inst="0D57")] + a + [start("2.58", inst="0E58", init=2)] + nb
+VG = ["-Source", "USDJPY#0D57,M5", "-Versus", "USDJPY#0E58,M5"]
+case("g22_versus258_additive_ok", v57v58(), VG,
+     ["the stage, reasons and strength arrow are added (BRI-15, display only)", "IDENTICAL apart from the stage rows"], ["UNEXPLAINED", "FAILED", "NOT JUDGED"])
+_qok = lambda l: "HMI-QLT," in l and ",state=OK," in l
+case("g23_versus258_qlt_changed", v57v58(new_tweak=lambda rr: tamper(rr, _qok, lambda l: setf(l, "score", str(int(fld(l, "score")) + 1)))), VG,
+     ["line(s) differ outside the stage rows - UNEXPLAINED", "HMI-QLT,USDJPY"], ["IDENTICAL apart from the stage rows"])
+case("g24_versus258_stg_bad", v57v58(new_tweak=lambda rr: tamper(rr, _grow(_gpb), lambda l: setf(l, "stage", "PUSH"))), VG,
+     ["stage rows FAILED their check", "stage=PUSH, recomputed PULLBACK"], ["IDENTICAL apart from the stage rows"])
+case("g25_versus258_no_stg", v57v58(new_stg=False), VG,
+     ["stage rows FAILED their check (2)", "STR / STG H4 bars differ: 150 bar(s) with HMI-STR but no HMI-STG",
+      "0 HMI-STG-HIST row(s) in build 1 (one expected)"], ["IDENTICAL apart from the stage rows"])
+case("g26_versus258_old_has_stg", v57v58(old_tweak=lambda rr: rr + [L(SRC, GS.stg_row(_GB, _gpb, _GC[_gpb], _GR[_gpb], inst="0D57", init=1))]), VG,
+     ["v2.57 build carries 1 stage row(s)"], ["IDENTICAL apart from the stage rows"])
+case("g27_stg_dist", [start("2.58")] + GB1, ["-Stg"],
+     ["merged  params ABCD1234 " + GS.DEF_ID, "trend stages", "reasons       PROT_BROKEN"], ["CHECK FAILED"])
+_nostg = lambda rr: [l for l in rr if "HMI-STG," not in l]
+case("g28_reload_stg_rows_missing_both", [start("2.58")] + gbuild(1, tweak=_nostg) + [start("2.58", init=2)] + gbuild(2, init=2, tweak=_nostg), R,
+     ["STR / STG H4 bars differ: 150 bar(s) with HMI-STR but no HMI-STG", "stage rows FAILED their check"], ["IDENTICAL inside"])
 json.dump(C, open("cases.json", "w"), indent=1)
 print(len(C), "cases")

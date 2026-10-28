@@ -26,6 +26,8 @@
 #                                            not a calibration
 #     .\ReloadTest.ps1 -Qlt                  (v2.57) quality score distribution (HMI-QLT-HIST):
 #                                            states, tiers, mature-event counts; a record
+#     .\ReloadTest.ps1 -Stg                  (v2.58) stage / reason / arrow counts
+#                                            (HMI-STG-HIST); a record
 #     .\ReloadTest.ps1 -Quiet                why a chart has had no mark lately:
 #                                            its context timeline since the last
 #                                            mark, and the POIs Rule 6 refused
@@ -94,7 +96,7 @@
 #  hence the grouping below.
 # ============================================================
 param([string]$Source = "", [switch]$LiveVsBuild, [switch]$Rejects, [switch]$Live,
-      [switch]$Ctx, [switch]$Str, [switch]$Qlt, [switch]$Quiet, [switch]$Chain, [int]$Days = 1, [string]$LogDir = "", [int]$Warmup = 100,
+      [switch]$Ctx, [switch]$Str, [switch]$Qlt, [switch]$Stg, [switch]$Quiet, [switch]$Chain, [int]$Days = 1, [string]$LogDir = "", [int]$Warmup = 100,
       [int]$SettleHours = 24, [string]$Versus = "", [switch]$NoArmedBarPA, [int]$H4SwingRight = 2)
 
 # Row layout after the tag is stripped:
@@ -691,6 +693,284 @@ function QltStructCheck($s) {
     }
     return $out
 }
+# v2.58 (BRI-15): HMI-STG, one stage row per H4 bar (the bars HMI-STR / HMI-QLT cover),
+# and HMI-STG-HIST, one per build. The key is every field but live= and the identity.
+function StgParse([string]$msg) {
+    $c = $msg -split ','
+    if ($c.Count -lt 4) { return $null }
+    $f = @{}; foreach ($p in $c[2..($c.Count-1)]) { $kv = $p -split '=', 2; if ($kv.Count -eq 2) { $f[$kv[0]] = $kv[1] } }
+    $skip = @('live', 'inst', 'run', 'init')
+    $body = (@($f.Keys | Where-Object { $skip -notcontains $_ } | Sort-Object) | ForEach-Object { "$_=$($f[$_])" }) -join '|'
+    [pscustomobject]@{ Bar = (PT16 $f['bar']); BarS = $f['bar']; Def = [string]$f['def']; F = $f; Key = "STG|$body" }
+}
+# STG1-NEAR<percent of ATR14>-DEEP<num>.<den>-EFF<low>-POS<strength item>.<quality item>-ARR<bars>.<points>
+function StgDef([string]$s) {
+    if ($s -match '^STG1-NEAR(\d+)-DEEP(\d+)\.(\d+)-EFF(\d+)-POS(\d+)\.(\d+)-ARR(\d+)\.(\d+)$') {
+        return @{ Near = [decimal][int]$Matches[1]; DN = [decimal][int]$Matches[2]; DD = [decimal][int]$Matches[3]; Eff = [decimal][int]$Matches[4]
+                  PS = [decimal][int]$Matches[5]; PQ = [decimal][int]$Matches[6]; AB = [int]$Matches[7]; AD = [int]$Matches[8] }
+    }
+    return $null
+}
+$StgStageNames  = @('NODATA', 'NOATR', 'TRANS', 'RANGE', 'BUILD', 'DEEP', 'PUSH', 'CONSOL', 'PULLBACK')
+$StgReasonNames = @('PROT_BROKEN', 'SWING_BROKEN', 'TIMEOUT', 'NO_PROT', 'LEG', 'DEEP', 'BRK_FAIL', 'COUNTER', 'CHOP', 'MOVE', 'RET', 'BRK', 'EFF', 'MOM', 'OVL')
+# BRI-15 once more from the stage row and the strength / quality rows of the same bar
+# (the same build, or the same live stretch): the copied fields, the extreme before the
+# bar, refresh and near, the stage in its priority order, the reasons in theirs, the
+# arrow from the two displayed scores. Integers throughout; decimals only for prices.
+# '' when the row holds together, otherwise why not. Constants from the rows' def=.
+function StgVerify($x, $sr, $qr) {
+    $f = $x.F; $sd = StgDef $f['def']
+    if (-not $sd) { return "def=$($f['def']) is not a definition this tool can recompute" }
+    if ($x.Bar -eq [datetime]::MinValue) { return "bar=$($f['bar']) unreadable" }
+    if (-not $sr) { return 'no HMI-STR row for this bar' }
+    if (-not $qr) { return 'no HMI-QLT row for this bar' }
+    $g = $sr.F; $q = $qr.F
+    $stD = StrDef $g['def']; $qd = QltDef $q['def']
+    if (-not $stD -or -not $qd) { return "the strength / quality rows of the bar carry a definition this tool cannot read" }
+    $ctx = [string]$f['ctx']
+    if (@('BULLISH', 'BEARISH', 'RANGE', 'TRANSITION') -notcontains $ctx) { return "ctx=$ctx" }
+    if ($g['ctx'] -ne $ctx -or $q['ctx'] -ne $ctx) { return "ctx=$ctx but HMI-STR ctx=$($g['ctx']), HMI-QLT ctx=$($q['ctx'])" }
+    if ($f['close'] -ne $q['close']) { return "close=$($f['close']) but HMI-QLT close=$($q['close'])" }
+    $sg = $(if ($ctx -eq 'BULLISH') { 1 } elseif ($ctx -eq 'BEARISH') { -1 } else { 0 })
+    if ($f['dir'] -ne "$sg") { return "dir=$($f['dir']) under ctx=$ctx" }
+    $sst = [string]$g['state']
+    $wantT = $(if ($g['reason'] -eq 'HISTORY') { 'NA' } else { [string]$g['tr_sum'] })
+    if ([string]$f['tr_sum'] -ne $wantT) { return "tr_sum=$($f['tr_sum']) but HMI-STR tr_sum=$($g['tr_sum'])" }
+    $wantSc = $(if ($sst -eq 'OK') { [string]$g['score'] } else { 'NA' })
+    if ([string]$f['score'] -ne $wantSc) { return "score=$($f['score']) but HMI-STR score=$($g['score'])" }
+    $chk = [string]$f['chk']
+    if ($ctx -eq 'TRANSITION') {
+        if (@('UP', 'DOWN') -notcontains $f['pend']) { return "TRANSITION with pend=$($f['pend'])" }
+        if (@('BREAK', 'FALLBACK') -notcontains $chk) { return "TRANSITION with chk=$chk" }
+    } elseif ($ctx -eq 'RANGE') {
+        if ($f['pend'] -ne '-') { return "RANGE with pend=$($f['pend'])" }
+        if (@('TIMEOUT', 'INIT') -notcontains $chk) { return "RANGE with chk=$chk" }
+    } elseif ($f['pend'] -ne '-' -or $chk -ne '-') { return "$ctx with pend=$($f['pend']) chk=$chk" }
+    $prot = [string]$f['prot']
+    if ($sg -eq 0) { if ($prot -ne 'NA') { return "$ctx with prot=$prot" } }
+    elseif (@('0', '1') -notcontains $prot) { return "prot=$prot in a trend" }
+    $qst = [string]$q['state']; $qrs = @(([string]$q['reason']) -split '\+')
+    # the protected level and leg_anchor come and go together (BRI-12: one candidate sets both)
+    if ($sg -ne 0 -and ($qst -eq 'OK' -or $qst -eq 'PARTIAL') -and (($prot -eq '0') -ne ($qrs -contains 'ANCHOR'))) {
+        return "prot=$prot but HMI-QLT reason=$($q['reason'])"
+    }
+    $T = StrInt $g['tr_sum']
+    $hasX = ($sg -ne 0 -and [string]$q['retr_pts'] -match '^\d+$')
+    $near = 'NA'; $refresh = 'NA'; $xx = $null; $lg = $null
+    if ($hasX) {
+        if ($f['anchor_bar'] -ne $q['anchor_bar']) { return "anchor_bar=$($f['anchor_bar']) but HMI-QLT anchor_bar=$($q['anchor_bar'])" }
+        if ($f['ext'] -ne $q['ext']) { return "ext=$($f['ext']) but HMI-QLT ext=$($q['ext'])" }
+        $ext = QPx $f['ext']; $be = QPx $f['bar_ext']; $close = QPx $f['close']
+        if ($null -eq $ext -or $null -eq $be -or $null -eq $close) { return 'ext / bar_ext / close unreadable' }
+        $dg = 0; if ([string]$f['close'] -match '\.(\d+)$') { $dg = $Matches[1].Length }
+        $pt = [decimal]1; for ($i = 0; $i -lt $dg; $i++) { $pt = $pt / 10 }
+        if ($sg * ($be - $close) -lt 0) { return "bar_ext=$($f['bar_ext']) on the wrong side of the close" }
+        if ($f['prev_ext'] -eq 'NA') {
+            if ($ext -ne $be) { return "no bar between the anchor and this one, but ext=$($f['ext']) is not bar_ext=$($f['bar_ext'])" }
+            $refresh = '0'
+        } else {
+            $pe = QPx $f['prev_ext']
+            if ($null -eq $pe) { return "prev_ext=$($f['prev_ext'])" }
+            $up = ($sg * ($be - $pe) -gt 0)
+            if ($ext -ne $(if ($up) { $be } else { $pe })) { return "ext=$($f['ext']) is not the extreme of prev_ext=$($f['prev_ext']) and bar_ext=$($f['bar_ext'])" }
+            $refresh = $(if ($up) { '1' } else { '0' })
+        }
+        $dist = [long][Math]::Round($sg * ($ext - $close) / $pt)
+        if ([string]$f['dist_pts'] -ne "$dist") { return "dist_pts=$($f['dist_pts']), recomputed $dist" }
+        if ($null -ne $T -and $T -gt 0) { $near = $(if (1400 * [decimal]$dist -le $sd.Near * $T) { '1' } else { '0' }) }
+        $xx = StrInt $q['retr_pts']; $lg = StrInt $q['leg_pts']          # decimals: exact for these sizes
+        if ($null -eq $xx -or $null -eq $lg -or $lg -le 0) { return "HMI-QLT retr_pts=$($q['retr_pts']) / leg_pts=$($q['leg_pts'])" }
+    } else {
+        foreach ($k in 'prev_ext', 'bar_ext', 'ext', 'dist_pts') { if ($f[$k] -ne 'NA') { return "no retrace items but $k=$($f[$k])" } }
+        if ($f['anchor_bar'] -ne '-') { return "no retrace items but anchor_bar=$($f['anchor_bar'])" }
+    }
+    if ([string]$f['refresh'] -ne $refresh) { return "refresh=$($f['refresh']), recomputed $refresh" }
+    if ([string]$f['near'] -ne $near) { return "near=$($f['near']), recomputed $near" }
+    # the arrow: the displayed scores of this bar and of the bar AB back (same leg: StgStructCheck)
+    $arr = [string]$f['arrow']
+    if ($sst -eq 'OK') {
+        if (@('UP', 'DOWN', 'FLAT', 'NEW') -notcontains $arr) { return "strength OK with arrow=$arr" }
+        $rb = PT16 $f['ref_bar']
+        if ($rb -eq [datetime]::MinValue -or $rb -ge $x.Bar) { return "ref_bar=$($f['ref_bar'])" }
+        $rsc = [string]$f['ref_score']
+        if ($rsc -eq 'NA') { if ($arr -ne 'NEW') { return "arrow=$arr without a reference score" } }
+        elseif ($rsc -notmatch '^\d{1,3}$') { return "ref_score=$rsc" }
+        elseif ($arr -ne 'NEW') {
+            $dl = [int]$g['score'] - [int]$rsc
+            $wa = $(if ($dl -ge $sd.AD) { 'UP' } elseif ($dl -le -$sd.AD) { 'DOWN' } else { 'FLAT' })
+            if ($arr -ne $wa) { return "arrow=$arr, scores $($g['score']) and $rsc give $wa" }
+        }
+    } elseif ($arr -ne 'NA' -or $f['ref_bar'] -ne '-' -or $f['ref_score'] -ne 'NA') {
+        return "strength $sst with arrow=$arr ref_bar=$($f['ref_bar']) ref_score=$($f['ref_score'])"
+    }
+    # the stage (§7) and the reasons (§8)
+    $st = [string]$f['stage']
+    $rsn = @(); if ($f['reasons'] -ne '-') { $rsn = @(([string]$f['reasons']) -split '\+') }
+    $wr = @()
+    if ($sst -eq 'NODATA') { $want = $(if ($g['reason'] -eq 'HISTORY') { 'NODATA' } else { 'NOATR' }) }
+    elseif ($ctx -eq 'TRANSITION') { $want = 'TRANS'; $wr = @($(if ($chk -eq 'BREAK') { 'PROT_BROKEN' } else { 'SWING_BROKEN' })) }
+    elseif ($ctx -eq 'RANGE') { $want = 'RANGE'; if ($chk -eq 'TIMEOUT') { $wr = @('TIMEOUT') } }
+    else {
+        if ($sst -ne 'OK' -or ($qst -ne 'OK' -and $qst -ne 'PARTIAL')) { return "$ctx with strength $sst / quality $qst" }
+        $net = StrInt $g['net']; $rec = StrInt $g['recent']; $path = StrInt $g['path']
+        if ($null -eq $T -or $null -eq $net -or $null -eq $rec -or $null -eq $path) { return 'strength items unreadable' }
+        $z = [decimal]0
+        $m  = [Math]::Min([Math]::Max(14 * $net, $z), $stD.Move * $T)
+        $e  = [Math]::Min([Math]::Max($net, $z), $path)
+        $qm = [Math]::Min([Math]::Max(14 * $rec, $z), $stD.Mom * $T)
+        $deep = ($hasX -and $sd.DD * $xx -gt $sd.DN * $lg)
+        if ($prot -ne '1') { $want = 'BUILD'; $wr += 'NO_PROT' }
+        elseif (-not $hasX) { $want = 'BUILD'; $wr += 'LEG' }
+        elseif ($deep) { $want = 'DEEP' }
+        elseif ($refresh -eq '1' -and $near -eq '1') { $want = 'PUSH' }
+        elseif ($near -eq '1') { $want = 'CONSOL' }
+        else { $want = 'PULLBACK' }
+        $bn = [int]$q['b_n']; $bok = [int]$q['b_ok']; $bf = [int]$q['b_fail']
+        if ($deep) { $wr += 'DEEP' }
+        if ($bf -gt 0) { $wr += 'BRK_FAIL' }
+        if ($qm -eq 0 -and $rec -lt 0) { $wr += 'COUNTER' }
+        if ($path -gt 0 -and 100 * $e -lt $sd.Eff * $path) { $wr += 'CHOP' }
+        if ($wr.Count -eq 0) {
+            $so = StrInt $q['ov_sum']; $pf = [decimal]$qd.FP * $qd.Pairs
+            if ($null -eq $so) { return "HMI-QLT ov_sum=$($q['ov_sum'])" }
+            if (100 * $m -ge $sd.PS * $stD.Move * $T) { $wr += 'MOVE' }
+            if ($hasX) {
+                $nr = $(if ($xx * 3 -le $lg) { $lg * 100 } elseif ($xx * 3 -le $lg * 2) { $lg * 160 - $xx * 180 } else { ($lg - $xx) * 120 })
+                if ($nr -ge $sd.PQ * $lg) { $wr += 'RET' }
+            }
+            if ($bn -ge $qd.Min -and $bok -eq $bn) { $wr += 'BRK' }
+            if ($path -gt 0 -and 100 * $e -ge $sd.PS * $path) { $wr += 'EFF' }
+            if (100 * $qm -ge $sd.PS * $stD.Mom * $T) { $wr += 'MOM' }
+            if (($pf - $so) * 100 -ge $sd.PQ * $pf) { $wr += 'OVL' }
+        }
+    }
+    $wr = @($wr | Select-Object -First 2)
+    if ($st -ne $want) { return "stage=$st, recomputed $want" }
+    $ws = $(if ($wr.Count) { $wr -join '+' } else { '-' })
+    if ([string]$f['reasons'] -ne $ws) { return "reasons=$($f['reasons']), recomputed $ws" }
+    return ''
+}
+# A build's stage rows: each recomputed with the build's strength / quality rows of the
+# same bar; inside the processed window; no bar twice; STR / QLT / STG on the same bars;
+# consistent with the build's OWN structure rows (how a TRANSITION opened, whether a RANGE
+# came from a timeout, the arrow's leg, the extreme before the bar); and its one
+# HMI-STG-HIST consistent with itself, with the rows and with HMI-STR-HIST.
+function StgAudit($bk) {
+    $s = Get-Struct $bk; $out = @()
+    $sb = @{}; foreach ($r in $s.Str) { $sb[$r.BarS] = $r }
+    $qb = @{}; foreach ($r in $s.Qlt) { $qb[$r.BarS] = $r }
+    foreach ($x in $s.Stg) { $w = StgVerify $x $sb[$x.BarS] $qb[$x.BarS]; if ($w) { $out += "$($x.BarS): $w" } }
+    foreach ($x in $s.Stg) {
+        if ($x.Bar -ne [datetime]::MinValue -and ($x.Bar -le $bk.From -or $x.Bar -gt $bk.To)) {
+            $out += "HMI-STG bar=$($x.BarS) outside the build's processed M5 window ($($bk.FromS) .. $($bk.ToS)]"
+        }
+    }
+    foreach ($g in @($s.Stg | Group-Object BarS | Where-Object { $_.Count -gt 1 })) { $out += "bar $($g.Name) has $($g.Count) HMI-STG rows" }
+    if ((VerNum $bk.Ver) -lt [decimal]2.58 -and $s.Stg.Count -eq 0 -and $s.SHist.Count -eq 0) { return $out }
+    $gb = @{}; foreach ($r in $s.Stg) { $gb[$r.BarS] = $true }
+    $miss = @($sb.Keys | Where-Object { -not $gb.ContainsKey($_) } | Sort-Object)
+    $xtra = @($gb.Keys | Where-Object { -not $sb.ContainsKey($_) } | Sort-Object)
+    if ($miss.Count -or $xtra.Count) {
+        $out += ("STR / STG H4 bars differ: {0} bar(s) with HMI-STR but no HMI-STG{1}, {2} with HMI-STG but no HMI-STR{3}" -f `
+                 $miss.Count, $(if ($miss.Count) { ' (' + (@($miss | Select-Object -First 3) -join ', ') + $(if ($miss.Count -gt 3) { ', ...' }) + ')' }),
+                 $xtra.Count, $(if ($xtra.Count) { ' (' + (@($xtra | Select-Object -First 3) -join ', ') + $(if ($xtra.Count -gt 3) { ', ...' }) + ')' }))
+    }
+    $out += @(StgStructCheck $s)
+    if ($s.SHist.Count -ne 1) { return ($out + "$($s.SHist.Count) HMI-STG-HIST row(s) in build $($bk.Build) (one expected)") }
+    $hs = $s.SHist[0]; $f = $hs.F; $n = @{}
+    if ($hs.To -eq [datetime]::MinValue -or $hs.To -gt $bk.To) { $out += "STG-HIST to=$($f['to']) after the build's last M5 bar $($bk.ToS)" }
+    foreach ($k in @('bars', 'up', 'down', 'flat', 'new') + @($StgStageNames | ForEach-Object { $_.ToLower() })) {
+        if ([string]$f[$k] -notmatch '^\d{1,9}$') { return ($out + "STG-HIST $k=$($f[$k])") }
+        $n[$k] = [int]$f[$k]
+    }
+    $rc = @(([string]$f['rs']) -split ';')
+    if ($rc.Count -ne $StgReasonNames.Count -or @($rc | Where-Object { $_ -notmatch '^\d{1,9}$' }).Count) { return ($out + "STG-HIST rs= is not $($StgReasonNames.Count) counts") }
+    $r = @{}; for ($i = 0; $i -lt $rc.Count; $i++) { $r[$StgReasonNames[$i]] = [int]$rc[$i] }
+    $ssum = 0; foreach ($k in $StgStageNames) { $ssum += $n[$k.ToLower()] }
+    if ($ssum -ne $n['bars']) { $out += "STG-HIST stages sum to $ssum, bars=$($n['bars'])" }
+    $trend = $n['build'] + $n['deep'] + $n['push'] + $n['consol'] + $n['pullback']
+    if ($n['up'] + $n['down'] + $n['flat'] + $n['new'] -ne $trend) { $out += "STG-HIST arrows $($n['up'] + $n['down'] + $n['flat'] + $n['new']), trend stages $trend (an arrow on every scored bar)" }
+    if ($r['PROT_BROKEN'] + $r['SWING_BROKEN'] -ne $n['trans']) { $out += "STG-HIST PROT_BROKEN + SWING_BROKEN = $($r['PROT_BROKEN'] + $r['SWING_BROKEN']), trans=$($n['trans'])" }
+    if ($r['TIMEOUT'] -gt $n['range']) { $out += "STG-HIST TIMEOUT=$($r['TIMEOUT']) > range=$($n['range'])" }
+    if ($r['NO_PROT'] + $r['LEG'] -ne $n['build']) { $out += "STG-HIST NO_PROT + LEG = $($r['NO_PROT'] + $r['LEG']), build=$($n['build'])" }
+    if ($r['DEEP'] -ne $n['deep']) { $out += "STG-HIST reason DEEP=$($r['DEEP']), stage deep=$($n['deep'])" }
+    # against the strength histogram of the same window: stage NODATA / NOATR <-> strength NODATA, TRANS / RANGE <-> NODIR
+    if ($s.Hist.Count -eq 1) {
+        $h2 = $s.Hist[0].F
+        if ([string]$h2['bars'] -ne [string]$n['bars']) { $out += "STG-HIST bars=$($n['bars']) but STR-HIST bars=$($h2['bars'])" }
+        elseif ($n['nodata'] + $n['noatr'] -ne [int]$h2['nodata'] -or $n['trans'] + $n['range'] -ne [int]$h2['nodir'] -or $trend -ne [int]$h2['ok']) {
+            $out += "STG-HIST nodata+noatr / trans+range / trend stages = $($n['nodata'] + $n['noatr']) / $($n['trans'] + $n['range']) / $trend, STR-HIST nodata / nodir / ok = $($h2['nodata']) / $($h2['nodir']) / $($h2['ok'])"
+        }
+    }
+    foreach ($x in $s.Stg) { if ($x.Def -ne $hs.Def) { $out += "HMI-STG def=$($x.Def) but STG-HIST def=$($hs.Def)"; break } }
+    foreach ($k in $StgStageNames) {
+        $c = @($s.Stg | Where-Object { $_.F['stage'] -eq $k }).Count
+        if ($c -gt $n[$k.ToLower()]) { $out += "$c $k row(s) but STG-HIST $($k.ToLower())=$($n[$k.ToLower()])" }
+    }
+    foreach ($k in 'UP', 'DOWN', 'FLAT', 'NEW') {
+        $c = @($s.Stg | Where-Object { $_.F['arrow'] -eq $k }).Count
+        if ($c -gt $n[$k.ToLower()]) { $out += "$c arrow $k row(s) but STG-HIST $($k.ToLower())=$($n[$k.ToLower()])" }
+    }
+    foreach ($k in $StgReasonNames) {
+        $c = @($s.Stg | Where-Object { @(([string]$_.F['reasons']) -split '\+') -contains $k }).Count
+        if ($c -gt $r[$k]) { $out += "$c row(s) with reason $k but STG-HIST counts $($r[$k])" }
+    }
+    if ($s.Stg.Count) {
+        $last = ($s.Stg | Sort-Object Bar | Select-Object -Last 1).Bar
+        if ($last -ne $hs.To) { $out += "last HMI-STG bar $($last.ToString('yyyy.MM.dd HH:mm')) but STG-HIST to=$($f['to']) (the window it counts)" }
+    }
+    return $out
+}
+function StgStructCheck($s) {
+    $out = @()
+    $rows = @($s.Stg | Where-Object { $_.Bar -ne [datetime]::MinValue } | Sort-Object Bar)
+    if ($rows.Count -eq 0) { return $out }
+    $ctxRows = @($s.Ctx | Sort-Object Bar)
+    $opens = @($s.Ctx | Where-Object { @('BOS', 'TRANS_OK', 'TRANS_FAIL') -contains $_.Kind -and $_.Str -eq '1' } | Sort-Object Bar)
+    $prot = @($s.Prot | Where-Object { $_.Tag -eq 'HMI-PROT' -and @('BREAK', 'FALLBACK') -contains $_.Ev })
+    $sb = @{}; foreach ($r in $s.Str) { $sb[$r.BarS] = $r }
+    $prev = $null
+    foreach ($x in $rows) {
+        $f = $x.F
+        # how the TRANSITION opened: the HMI-PROT row of its CHOCH bar
+        if ($f['ctx'] -eq 'TRANSITION') {
+            $ch = @($ctxRows | Where-Object { $_.Bar -le $x.Bar -and $_.Kind -eq 'CHOCH' } | Select-Object -Last 1)
+            if (-not $ch.Count) { $out += "$($x.BarS): TRANSITION with no CHOCH in the build's HMI-CTX rows" }
+            else {
+                $p = @($prot | Where-Object { $_.Bar -eq $ch[0].Bar } | Select-Object -First 1)
+                if (-not $p.Count) { $out += "$($x.BarS): no HMI-PROT BREAK / FALLBACK row on the CHOCH bar $($ch[0].BarS)" }
+                elseif ($p[0].Ev -ne $f['chk']) { $out += "$($x.BarS): chk=$($f['chk']) but the CHOCH at $($ch[0].BarS) has HMI-PROT $($p[0].Ev)" }
+            }
+        }
+        # how the RANGE began: a TIMEOUT row, or nothing at all yet (the build's history start)
+        if ($f['ctx'] -eq 'RANGE') {
+            $lc = @($ctxRows | Where-Object { $_.Bar -le $x.Bar } | Select-Object -Last 1)
+            $wc = $(if (-not $lc.Count) { 'INIT' } elseif ($lc[0].Kind -eq 'TIMEOUT') { 'TIMEOUT' } else { "after $($lc[0].Kind)" })
+            if ($wc -ne $f['chk']) { $out += "$($x.BarS): chk=$($f['chk']) but the build's HMI-CTX rows give $wc" }
+        }
+        # the arrow: the reference bar's score as this build logged it, and the leg in between
+        if ($f['arrow'] -ne 'NA' -and $f['ref_bar'] -ne '-') {
+            $rb = PT16 $f['ref_bar']
+            if ($sb.ContainsKey($f['ref_bar'])) {
+                $rr = $sb[$f['ref_bar']].F
+                $want = $(if ($rr['state'] -eq 'OK') { [string]$rr['score'] } else { 'NA' })
+                if ([string]$f['ref_score'] -ne $want) { $out += "$($x.BarS): ref_score=$($f['ref_score']) but HMI-STR of $($f['ref_bar']) gives $want" }
+            }
+            if ($f['ref_score'] -ne 'NA') {
+                $newLeg = @($opens | Where-Object { $_.Bar -gt $rb -and $_.Bar -le $x.Bar }).Count -gt 0
+                if ($newLeg -and $f['arrow'] -ne 'NEW') { $out += "$($x.BarS): arrow=$($f['arrow']) but a new leg opened after $($f['ref_bar'])" }
+                if (-not $newLeg -and $f['arrow'] -eq 'NEW') { $out += "$($x.BarS): arrow NEW but no leg opened after $($f['ref_bar']) in the build's HMI-CTX rows" }
+            }
+        }
+        # the extreme before this bar = the previous bar's extreme while the anchor stands
+        if ($prev -and $prev.F['anchor_bar'] -ne '-' -and $prev.F['anchor_bar'] -eq $f['anchor_bar'] -and $prev.F['ctx'] -eq $f['ctx'] -and
+            $prev.Bar -lt $x.Bar -and $f['prev_ext'] -ne 'NA' -and (QPx $f['prev_ext']) -ne (QPx $prev.F['ext'])) {
+            $out += "$($x.BarS): prev_ext=$($f['prev_ext']) but the bar before ($($prev.BarS)), same anchor, has ext=$($prev.F['ext'])"
+        }
+        $prev = $x
+    }
+    return $out
+}
 function RowKind([string]$r) { $c = $r -split ','; if ($c.Count -gt 1) { return $c[1] } return '?' }
 function KV([string]$s) { $m = @{}; foreach ($p in ($s -split ',')) { $kv = $p -split '=', 2; if ($kv.Count -eq 2) { $m[$kv[0].Trim()] = $kv[1].Trim() } }; return $m }
 
@@ -741,7 +1021,7 @@ function Close-Block($bk) {
     $bk.Status = $(if ($bk.Why.Count -eq 0) { 'COMPLETE' } else { 'INCOMPLETE' })
 }
 
-$blocks = @(); $open = @{}; $verNow = @{}; $liveAll = @(); $liveCtx = @(); $liveProt = @(); $liveB8 = @(); $liveStr = @(); $liveQlt = @(); $orphanRows = 0; $orphanEnds = 0
+$blocks = @(); $open = @{}; $verNow = @{}; $liveAll = @(); $liveCtx = @(); $liveProt = @(); $liveB8 = @(); $liveStr = @(); $liveQlt = @(); $liveStg = @(); $orphanRows = 0; $orphanEnds = 0
 for ($i = 0; $i -lt $all.Count; $i++) {
     $l = $all[$i]
     if ($l -notmatch 'HMI') { continue }
@@ -815,6 +1095,10 @@ for ($i = 0; $i -lt $all.Count; $i++) {
     elseif ($msg -match '^HMI-QLT,') {                                # v2.57: quality rows outside a build = live
         $qr = QltParse $msg
         if ($qr) { $liveQlt += [pscustomobject]@{ Src = $src; Idx = $i; Id = $id; S = $qr } }
+    }
+    elseif ($msg -match '^HMI-STG,') {                                # v2.58: stage rows outside a build = live
+        $gr = StgParse $msg
+        if ($gr) { $liveStg += [pscustomobject]@{ Src = $src; Idx = $i; Id = $id; S = $gr } }
     }
     if ($l -match 'HMI-BUILD,(.*)$') {
         if (-not $open.ContainsKey($src)) { $orphanRows++; continue }
@@ -1491,12 +1775,15 @@ function Get-Struct($bk) {
     $prot = New-Object System.Collections.ArrayList; $b8 = New-Object System.Collections.ArrayList
     $str = New-Object System.Collections.ArrayList; $hist = New-Object System.Collections.ArrayList
     $qlt = New-Object System.Collections.ArrayList; $qhist = New-Object System.Collections.ArrayList
+    $stg = New-Object System.Collections.ArrayList; $shist = New-Object System.Collections.ArrayList
     foreach ($m in $bk.Lines) {
         if ($m -match '^HMI-(REF|BRK),') { $br = B8Parse $m; if ($br) { [void]$b8.Add($br) }; continue }
         if ($m -match '^HMI-STR,') { $sr = StrParse $m; if ($sr) { [void]$str.Add($sr) }; continue }
         if ($m -match '^HMI-STR-HIST,') { [void]$hist.Add((HistParse $m)); continue }
         if ($m -match '^HMI-QLT,') { $qr = QltParse $m; if ($qr) { [void]$qlt.Add($qr) }; continue }       # v2.57
         if ($m -match '^HMI-QLT-HIST,') { [void]$qhist.Add((HistParse $m)); continue }
+        if ($m -match '^HMI-STG,') { $gr = StgParse $m; if ($gr) { [void]$stg.Add($gr) }; continue }       # v2.58
+        if ($m -match '^HMI-STG-HIST,') { [void]$shist.Add((HistParse $m)); continue }
         if ($m -match '^HMI-(PROT|ANCHOR|CTX-INTERNAL),') {
             $pr = ProtParse $m
             if ($pr) {
@@ -1565,7 +1852,7 @@ function Get-Struct($bk) {
     $blkBy = @{}; foreach ($x in $blk) { if (-not $blkBy.ContainsKey($x.B)) { $blkBy[$x.B] = $x } }
     $armOf = @{}; foreach ($x in @($arm | Sort-Object Time)) { if (-not $armOf.ContainsKey($x.BlockId)) { $armOf[$x.BlockId] = New-Object System.Collections.ArrayList }; [void]$armOf[$x.BlockId].Add($x) }
     $poiNew = @{}; foreach ($x in $poi) { if ($x.Kind -eq 'NEW' -and -not $poiNew.ContainsKey($x.P)) { $poiNew[$x.P] = $x } }
-    $s = [pscustomobject]@{ Ctx = $ctx; Proc = $proc; ProcSrc = $procSrc; DedupN = $dedupN; TDedup = $tDedup; Prot = $prot; B8 = $b8; Str = $str; Hist = $hist; Qlt = $qlt; QHist = $qhist
+    $s = [pscustomobject]@{ Ctx = $ctx; Proc = $proc; ProcSrc = $procSrc; DedupN = $dedupN; TDedup = $tDedup; Prot = $prot; B8 = $b8; Str = $str; Hist = $hist; Qlt = $qlt; QHist = $qhist; Stg = $stg; SHist = $shist
                             Poi = $poi; Sess = $sess; Blk = $blk; Arm = $arm; Models = $models
                             SessStart = $sessStart; SessEnd = $sessEnd; Starts = @($sess | Where-Object { $_.Kind -eq 'START' } | Sort-Object Time)
                             BlkBy = $blkBy; ArmOf = $armOf; ArmSorted = @($arm | Sort-Object Time); PoiNew = $poiNew }
@@ -2415,7 +2702,7 @@ function Show-LiveVsBuild([string]$src) {
     $lv  = @($liveAll | Where-Object { $_.Src -eq $src })
     if ($sel.Count -lt 2) { Write-Host "  fewer than two builds - nothing brackets a live stretch yet." -ForegroundColor Yellow; return }
     $pairs = 0; $cmp = 0; $pend = 0; $liveN = 0; $liveCtxN = 0; $strPend = 0; $bad = @(); $okRows = @(); $pendWhy = @(); $liqPend = 0
-    $liveProtN = 0; $legPend = 0; $liveB8N = 0; $liveStrN = 0; $strBadL = @(); $liveQltN = 0; $qltBadL = @()
+    $liveProtN = 0; $legPend = 0; $liveB8N = 0; $liveStrN = 0; $strBadL = @(); $liveQltN = 0; $qltBadL = @(); $liveStgN = 0; $stgBadL = @()
     $scoreBadB = @(); $auditDone = @{}
     for ($k = 1; $k -lt $sel.Count; $k++) {
         $A = $sel[$k - 1]; $B = $sel[$k]
@@ -2438,7 +2725,10 @@ function Show-LiveVsBuild([string]$src) {
         # v2.57: quality rows, the same bars
         $lq  = @($liveQlt | Where-Object { $_.Src -eq $src -and $_.Idx -gt $A.EndIdx -and $_.Idx -lt $B.BeginIdx })
         $bq  = @((Get-Struct $B).Qlt | Where-Object { $_.Bar -gt $A.To -and $_.Bar -le $B.To })
-        if ($rows.Count -eq 0 -and $bIn.Count -eq 0 -and $lc.Count -eq 0 -and $bc.Count -eq 0 -and $lp.Count -eq 0 -and $bp.Count -eq 0 -and $lb.Count -eq 0 -and $bb.Count -eq 0 -and $ls.Count -eq 0 -and $bs.Count -eq 0 -and $lq.Count -eq 0 -and $bq.Count -eq 0) { continue }
+        # v2.58: stage rows, the same bars
+        $lt  = @($liveStg | Where-Object { $_.Src -eq $src -and $_.Idx -gt $A.EndIdx -and $_.Idx -lt $B.BeginIdx })
+        $bt  = @((Get-Struct $B).Stg | Where-Object { $_.Bar -gt $A.To -and $_.Bar -le $B.To })
+        if ($rows.Count -eq 0 -and $bIn.Count -eq 0 -and $lc.Count -eq 0 -and $bc.Count -eq 0 -and $lp.Count -eq 0 -and $bp.Count -eq 0 -and $lb.Count -eq 0 -and $bb.Count -eq 0 -and $ls.Count -eq 0 -and $bs.Count -eq 0 -and $lq.Count -eq 0 -and $bq.Count -eq 0 -and $lt.Count -eq 0 -and $bt.Count -eq 0) { continue }
         $pairs++
         $why = ''
         if ($A.Status -ne 'COMPLETE' -or $B.Status -ne 'COMPLETE') { $why = 'INCOMPLETE build: ' + ((@($A.Why) + @($B.Why)) -join '; ') }
@@ -2456,8 +2746,8 @@ function Show-LiveVsBuild([string]$src) {
         # lifetime that produced them), makes the pair PENDING - not a row
         # quietly set aside while the rest still passes.
         if ($A.Strict) {
-            $noId  = @(@($rows) + @($lc) + @($lp) + @($lb) + @($ls) + @($lq) | Where-Object { -not $_.Id }).Count
-            $alien = @(@($rows) + @($lc) + @($lp) + @($lb) + @($ls) + @($lq) | Where-Object { $_.Id -and $_.Id -ne $A.Id }).Count
+            $noId  = @(@($rows) + @($lc) + @($lp) + @($lb) + @($ls) + @($lq) + @($lt) | Where-Object { -not $_.Id }).Count
+            $alien = @(@($rows) + @($lc) + @($lp) + @($lb) + @($ls) + @($lq) + @($lt) | Where-Object { $_.Id -and $_.Id -ne $A.Id }).Count
             if ($noId -or $alien) {
                 $pend++
                 $pendWhy += "build $($A.Build)->$($B.Build): live rows without run/init $noId, from another run/init than build $($A.Build) $alien"
@@ -2494,7 +2784,14 @@ function Show-LiveVsBuild([string]$src) {
             $pendWhy += "build $($A.Build)->$($B.Build): quality definition differs ($($qDefs -join ' / ')) - quality rows not compared"
             $lqIn = @(); $bq = @()
         }
-        if (($lIn.Count + $bIn.Count + $lcIn.Count + $bc.Count + $lpIn.Count + $bp.Count + $lbIn.Count + $bb.Count + $lsIn.Count + $bs.Count + $lqIn.Count + $bq.Count) -eq 0) {
+        $ltIn = @($lt | Where-Object { $_.S.Bar -gt $A.To -and $_.S.Bar -le $B.To } | ForEach-Object { $_.S })
+        if ($lt.Count -gt $ltIn.Count) { $pendWhy += "build $($A.Build)->$($B.Build): $($lt.Count - $ltIn.Count) stage row(s) outside the bars B consumed, not provably covered" }
+        $tDefs = @(@($ltIn) + @($bt) + @((Get-Struct $A).SHist) + @((Get-Struct $B).SHist) | ForEach-Object { $_.Def } | Sort-Object -Unique)
+        if ($tDefs.Count -gt 1) {
+            $pendWhy += "build $($A.Build)->$($B.Build): stage definition differs ($($tDefs -join ' / ')) - stage rows not compared"
+            $ltIn = @(); $bt = @()
+        }
+        if (($lIn.Count + $bIn.Count + $lcIn.Count + $bc.Count + $lpIn.Count + $bp.Count + $lbIn.Count + $bb.Count + $lsIn.Count + $bs.Count + $lqIn.Count + $bq.Count + $ltIn.Count + $bt.Count) -eq 0) {
             $pend++
             $pendWhy += "build $($A.Build)->$($B.Build): no judged event (LIQ pending or edge rows only) - not comparable"
             continue
@@ -2507,6 +2804,7 @@ function Show-LiveVsBuild([string]$src) {
             $auditDone[$sbk.BeginIdx] = $true
             if ((VerNum $sbk.Ver) -ge [decimal]2.56) { foreach ($w in @(StrAudit $sbk)) { $scoreBadB += "build $($sbk.Build) STR: $w" } }
             if ((VerNum $sbk.Ver) -ge [decimal]2.57) { foreach ($w in @(QltAudit $sbk)) { $scoreBadB += "build $($sbk.Build) QLT: $w" } }
+            if ((VerNum $sbk.Ver) -ge [decimal]2.58) { foreach ($w in @(StgAudit $sbk)) { $scoreBadB += "build $($sbk.Build) STG: $w" } }
         }
         $cmp++
         $liveN += $lIn.Count
@@ -2547,6 +2845,14 @@ function Show-LiveVsBuild([string]$src) {
         foreach ($x in $dqx.A) { $bad += [pscustomobject]@{ Side = 'live only';  Row = "QLT $($x.Key)"; Pair = "$($A.Build)->$($B.Build)" } }
         foreach ($x in $dqx.B) { $bad += [pscustomobject]@{ Side = 'build only'; Row = "QLT $($x.Key)"; Pair = "$($A.Build)->$($B.Build)" } }
         foreach ($x in $lqIn) { $w = QltVerify $x; if ($w) { $qltBadL += "live $($x.BarS): $w" } }
+        # v2.58: stage rows both ways; a live row is also recomputed with the live strength / quality rows of its bar
+        $liveStgN += $ltIn.Count
+        $dtx = DiffKeys $ltIn $bt 'Key'
+        foreach ($x in $dtx.A) { $bad += [pscustomobject]@{ Side = 'live only';  Row = "STG $($x.Key)"; Pair = "$($A.Build)->$($B.Build)" } }
+        foreach ($x in $dtx.B) { $bad += [pscustomobject]@{ Side = 'build only'; Row = "STG $($x.Key)"; Pair = "$($A.Build)->$($B.Build)" } }
+        $lsBy = @{}; foreach ($y in @($ls | ForEach-Object { $_.S })) { $lsBy[$y.BarS] = $y }
+        $lqBy = @{}; foreach ($y in @($lq | ForEach-Object { $_.S })) { $lqBy[$y.BarS] = $y }
+        foreach ($x in $ltIn) { $w = StgVerify $x $lsBy[$x.BarS] $lqBy[$x.BarS]; if ($w) { $stgBadL += "live $($x.BarS): $w" } }
     }
     Write-Host ("  build pairs with a live stretch: {0}   comparable: {1}   pending review: {2}   liquidity pending: {3}" -f $pairs, $cmp, $pend, $liqPend)
     foreach ($w in $pendWhy) { Write-Host "    pending: $w" -ForegroundColor Yellow }
@@ -2556,6 +2862,7 @@ function Show-LiveVsBuild([string]$src) {
     if ($liveB8N -gt 0)   { Write-Host ("  BRI-08 rows compared: {0} (REF / BRK)" -f $liveB8N) }
     if ($liveStrN -gt 0)  { Write-Host ("  strength rows compared: {0} (STR)" -f $liveStrN) }
     if ($liveQltN -gt 0)  { Write-Host ("  quality rows compared: {0} (QLT)" -f $liveQltN) }
+    if ($liveStgN -gt 0)  { Write-Host ("  stage rows compared: {0} (STG)" -f $liveStgN) }
     if ($strBadL.Count) {
         Write-Host "  $($strBadL.Count) live strength row(s) FAILED the recomputation:" -ForegroundColor Red
         $strBadL | Select-Object -First 10 | ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
@@ -2563,6 +2870,10 @@ function Show-LiveVsBuild([string]$src) {
     if ($qltBadL.Count) {
         Write-Host "  $($qltBadL.Count) live quality row(s) FAILED the recomputation:" -ForegroundColor Red
         $qltBadL | Select-Object -First 10 | ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
+    }
+    if ($stgBadL.Count) {
+        Write-Host "  $($stgBadL.Count) live stage row(s) FAILED the recomputation:" -ForegroundColor Red
+        $stgBadL | Select-Object -First 10 | ForEach-Object { Write-Host "    $_" -ForegroundColor Red }
     }
     if ($scoreBadB.Count) {
         Write-Host "  $($scoreBadB.Count) build score check(s) FAILED (rows, structure, histogram of the builds compared):" -ForegroundColor Red
@@ -2572,14 +2883,14 @@ function Show-LiveVsBuild([string]$src) {
         $bm = $okRows | Group-Object { RowLabel $_ } | Sort-Object Name | ForEach-Object { "$($_.Name) $($_.Count)" }
         Write-Host ("  by model: " + ($bm -join '  |  '))
     }
-    if ($bad.Count -eq 0 -and $strBadL.Count -eq 0 -and $qltBadL.Count -eq 0 -and $scoreBadB.Count -eq 0) {
+    if ($bad.Count -eq 0 -and $strBadL.Count -eq 0 -and $qltBadL.Count -eq 0 -and $stgBadL.Count -eq 0 -and $scoreBadB.Count -eq 0) {
         $what = $(if ($liqPend -eq 0) { 'MODEL + LIQ' } else { "MODEL only; LIQ pending in $liqPend pair(s)" })
         Write-Host "  AGREE BOTH WAYS on every covered bar ($what)." -ForegroundColor $(if ($liqPend -eq 0 -and $strPend -eq 0 -and $legPend -eq 0) { 'Green' } else { 'Yellow' })
         if ($strPend -gt 0) { Write-Host "  $strPend H4 event(s) agree on swing and state but not on the strength number - PENDING REVIEW for those" -ForegroundColor Yellow }
         if ($legPend -gt 0) { Write-Host "  $legPend protected-level row(s) agree but for the leg number - PENDING REVIEW for those" -ForegroundColor Yellow }
         if ($pend -gt 0) { Write-Host "  (the pending pairs above are NOT included in this result)" -ForegroundColor Yellow }
     } elseif ($bad.Count -eq 0) {
-        Write-Host "  no mismatch, but $(if ($strBadL.Count) { 'strength' } elseif ($qltBadL.Count) { 'quality' } else { 'the builds'' score' }) rows FAILED their check - not a pass." -ForegroundColor Red
+        Write-Host "  no mismatch, but $(if ($strBadL.Count) { 'strength' } elseif ($qltBadL.Count) { 'quality' } elseif ($stgBadL.Count) { 'stage' } else { 'the builds'' score' }) rows FAILED their check - not a pass." -ForegroundColor Red
     } else {
         Write-Host "  $($bad.Count) MISMATCH(ES) on covered bars:" -ForegroundColor Red
         $bad | Select-Object -First 20 | ForEach-Object { Write-Host ("    {0,-10} [{1}] {2}" -f $_.Side, $_.Pair, $_.Row) }
@@ -2624,9 +2935,14 @@ function Show-Versus([string]$sa, [string]$sb) {
 function Show-StrAdditive($old, $new, [string]$mode = 'STR') {
     # v2.57: the same check for v2.56 -> v2.57, where the quality score is the addition
     # and the strength rows are now compared lines like any other
+    # v2.58: and for v2.57 -> v2.58, where the stage / reasons / arrow rows are the addition (the panel
+    # is not in the log) and the strength and quality rows are compared lines like any other
     $T = $(if ($mode -eq 'QLT') {
             @{ Intro = 'the quality score is added (BRI-14, display only) - every other line must be identical, HMI-STR included'
                Rx = '^HMI-QLT(-HIST)?,'; Tag = 'HMI-QLT'; Word = 'quality'; Chk = 'QLT-CHECK'; Rows = 'Qlt'; Hist = 'QHist' }
+          } elseif ($mode -eq 'STG') {
+            @{ Intro = 'the stage, reasons and strength arrow are added (BRI-15, display only) - every other line must be identical, HMI-STR and HMI-QLT included'
+               Rx = '^HMI-STG(-HIST)?,'; Tag = 'HMI-STG'; Word = 'stage'; Chk = 'STG-CHECK'; Rows = 'Stg'; Hist = 'SHist' }
           } else {
             @{ Intro = 'the strength score is added (BRI-13, display only) - every other line must be identical'
                Rx = '^HMI-STR(-HIST)?,'; Tag = 'HMI-STR'; Word = 'strength'; Chk = 'STR-CHECK'; Rows = 'Str'; Hist = 'Hist' } })
@@ -2666,7 +2982,7 @@ function Show-StrAdditive($old, $new, [string]$mode = 'STR') {
     $oldStr = @($old.Lines | Where-Object { & $isStr $_ }).Count
     $sn = Get-Struct $new
     $nRows = $sn.($T.Rows).Count; $nHist = $sn.($T.Hist).Count
-    $bad = @($(if ($mode -eq 'QLT') { QltAudit $new } else { StrAudit $new }))
+    $bad = @($(if ($mode -eq 'QLT') { QltAudit $new } elseif ($mode -eq 'STG') { StgAudit $new } else { StrAudit $new }))
     Write-Host ("  lines compared: {0} / {1} (all tags but {2}); v{3} {4} rows: {5} {2} + {6} {2}-HIST" -f `
                 $nOld, @($new.Lines | Where-Object { -not (& $isStr $_) }).Count, $T.Tag, $new.Ver, $T.Word, $nRows, $nHist)
     if ($attemptOnly.Count) {
@@ -2769,6 +3085,45 @@ function Show-QltDist {
     Write-Host "  a record of the distribution, not a calibration (BRI-14 C-10): weights 40 / 35 / 25 and tiers 40 / 70 stay." -ForegroundColor DarkGray
 }
 
+# -Stg (v2.58): the stage / reason / arrow counts each chart's latest complete build made over
+# its whole H4 window (HMI-STG-HIST). A record, not a calibration (BRI-15): the 0.25 ATR, 2/3,
+# 35 and the 65 / 70 item boundaries stay.
+function Show-StgDist {
+    Write-Host "`n--- stage / reason distribution (HMI-STG-HIST, latest complete build per chart) ---" -ForegroundColor Cyan
+    $groups = @{}
+    foreach ($src in @($blocks | ForEach-Object { $_.Src } | Sort-Object -Unique)) {
+        $bk = @($blocks | Where-Object { $_.Src -eq $src -and $_.Status -eq 'COMPLETE' -and (Get-Struct $_).SHist.Count -eq 1 }) | Select-Object -Last 1
+        if (-not $bk) { continue }
+        $hs = (Get-Struct $bk).SHist[0]; $f = $hs.F
+        $bad = @(StgAudit $bk)
+        $sv = @($StgStageNames | ForEach-Object { [int]$f[$_.ToLower()] })
+        $rv = @(([string]$f['rs']) -split ';' | ForEach-Object { [int]$_ })
+        Write-Host ("  {0,-22} build {1,-4} {2} .. {3}  bars {4}  " -f $src, $bk.Build, $f['from'], $f['to'], $f['bars']) -NoNewline -ForegroundColor $(if ($bad.Count) { 'Red' } else { 'Gray' })
+        Write-Host (((0..($StgStageNames.Count - 1)) | ForEach-Object { "$($StgStageNames[$_].ToLower()) $($sv[$_])" }) -join '  ') -NoNewline -ForegroundColor $(if ($bad.Count) { 'Red' } else { 'Gray' })
+        Write-Host ("  arrows up {0} / down {1} / flat {2} / new {3}{4}" -f $f['up'], $f['down'], $f['flat'], $f['new'], $(if ($bad.Count) { "   CHECK FAILED ($($bad.Count))" } else { '' })) -ForegroundColor $(if ($bad.Count) { 'Red' } else { 'Gray' })
+        $g = "$($bk.Params) $($hs.Def)"
+        if (-not $groups.ContainsKey($g)) { $groups[$g] = [pscustomobject]@{ S = (New-Object 'int[]' $StgStageNames.Count); R = (New-Object 'int[]' $StgReasonNames.Count); A = (New-Object 'int[]' 4); Charts = 0 } }
+        $x = $groups[$g]
+        for ($i = 0; $i -lt $StgStageNames.Count; $i++) { $x.S[$i] += $sv[$i] }
+        for ($i = 0; $i -lt [Math]::Min($rv.Count, $StgReasonNames.Count); $i++) { $x.R[$i] += $rv[$i] }
+        $k = 0; foreach ($a in 'up', 'down', 'flat', 'new') { $x.A[$k] += [int]$f[$a]; $k++ }
+        $x.Charts++
+    }
+    if ($groups.Count -eq 0) { Write-Host "  no complete build with an HMI-STG-HIST row (v2.58+, InpLogSignals = true)" -ForegroundColor Yellow; return }
+    foreach ($g in $groups.Keys) {
+        $x = $groups[$g]
+        $tr = $x.S[4] + $x.S[5] + $x.S[6] + $x.S[7] + $x.S[8]
+        Write-Host ("  merged  params {0}  ({1} chart(s), {2} trend H4 bars)" -f $g, $x.Charts, $tr)
+        if ($tr) {
+            Write-Host ("    trend stages  " + ((4..8) | ForEach-Object { "{0} {1} ({2:P0})" -f $StgStageNames[$_].ToLower(), $x.S[$_], ($x.S[$_] / $tr) }) -join '  ')
+        }
+        Write-Host ("    other         " + ((0..3) | ForEach-Object { "{0} {1}" -f $StgStageNames[$_].ToLower(), $x.S[$_] }) -join '  ')
+        Write-Host ("    reasons       " + ((0..($StgReasonNames.Count - 1)) | ForEach-Object { "{0} {1}" -f $StgReasonNames[$_], $x.R[$_] }) -join '  ')
+        Write-Host ("    arrows        up {0}  down {1}  flat {2}  new {3}" -f $x.A[0], $x.A[1], $x.A[2], $x.A[3])
+    }
+    Write-Host "  a record of the distribution, not a calibration (BRI-15): 0.25 ATR, 2/3, 35 and the 65 / 70 item boundaries stay." -ForegroundColor DarkGray
+}
+
 function Compare-Builds($A, $B) {
     Write-Host "  A  $(BlockLabel $A)" -ForegroundColor $(if ($A.Status -eq 'COMPLETE') { 'Gray' } else { 'Red' })
     Write-Host "  B  $(BlockLabel $B)" -ForegroundColor $(if ($B.Status -eq 'COMPLETE') { 'Gray' } else { 'Red' })
@@ -2826,6 +3181,11 @@ function Compare-Builds($A, $B) {
         # v2.57: v2.56 -> v2.57 only adds the quality score (BRI-14, display only)
         if ((VerNum $old.Ver) -ge [decimal]2.56 -and (VerNum $old.Ver) -lt [decimal]2.57 -and (VerNum $new.Ver) -ge [decimal]2.57 -and (VerNum $new.Ver) -lt [decimal]2.58) {
             Show-StrAdditive $old $new 'QLT'
+            return
+        }
+        # v2.58: v2.57 -> v2.58 only adds the stage / reasons / arrow rows (BRI-15, display only)
+        if ((VerNum $old.Ver) -ge [decimal]2.57 -and (VerNum $old.Ver) -lt [decimal]2.58 -and (VerNum $new.Ver) -ge [decimal]2.58 -and (VerNum $new.Ver) -lt [decimal]2.59) {
+            Show-StrAdditive $old $new 'STG'
             return
         }
         if ($mA.Count -eq 0 -and $mB.Count -eq 0) {
@@ -2980,6 +3340,22 @@ function Compare-Builds($A, $B) {
         foreach ($x in $dQ.A) { $cls += [pscustomobject]@{ Class = 'MISMATCH'; Side = 'A only'; Time = $x.Bar; Row = "QLT $($x.Key)" } }
         foreach ($x in $dQ.B) { $cls += [pscustomobject]@{ Class = 'MISMATCH'; Side = 'B only'; Time = $x.Bar; Row = "QLT $($x.Key)" } }
     }
+    # v2.58 (BRI-15): stage rows, judged the same way; each row also recomputed with its build's
+    # strength / quality rows of the bar and checked against the build's structure rows
+    $tA = @((Get-Struct $A).Stg | Where-Object { $_.Bar -ge $rs -and $_.Bar -le $re })
+    $tB = @((Get-Struct $B).Stg | Where-Object { $_.Bar -ge $rs -and $_.Bar -le $re })
+    $nT = $tA.Count + $tB.Count
+    $showT = ($nT -gt 0 -or (VerNum $A.Ver) -ge [decimal]2.58 -or (VerNum $B.Ver) -ge [decimal]2.58)
+    $stgBad = @(@(StgAudit $A | ForEach-Object { "A: $_" }) + @(StgAudit $B | ForEach-Object { "B: $_" }))
+    $tdefs = @(@((Get-Struct $A).Stg) + @((Get-Struct $B).Stg) + @((Get-Struct $A).SHist) + @((Get-Struct $B).SHist) | ForEach-Object { $_.Def } | Sort-Object -Unique)
+    $stgNC = ($tdefs.Count -gt 1)
+    $mmT = 0
+    if (-not $stgNC) {
+        $dT = DiffKeys $tA $tB 'Key'
+        $mmT = $dT.A.Count + $dT.B.Count
+        foreach ($x in $dT.A) { $cls += [pscustomobject]@{ Class = 'MISMATCH'; Side = 'A only'; Time = $x.Bar; Row = "STG $($x.Key)" } }
+        foreach ($x in $dT.B) { $cls += [pscustomobject]@{ Class = 'MISMATCH'; Side = 'B only'; Time = $x.Bar; Row = "STG $($x.Key)" } }
+    }
     $mm = @($cls | Where-Object Class -eq 'MISMATCH')
     $vC = $(if ($mmC) { "MISMATCH ($mmC)" } elseif ($nC -eq 0) { 'no event on either side (nothing judged)' }
             elseif ($strC) { "same events, strength numbered differently on $strC - PENDING REVIEW" }
@@ -3028,20 +3404,35 @@ function Compare-Builds($A, $B) {
             if ($nAllQ) { Write-Host "    QLT    every row recomputes and agrees with its build's HMI-CTX / HMI-ANCHOR rows ($nAllQ row(s)); both histograms add up" -ForegroundColor Gray }
         }
     }
+    if ($showT) {
+        $vT = $(if ($stgNC) { "NOT COMPARABLE - stage definition differs ($($tdefs -join ' / ')): not a repaint test" }
+                elseif ($mmT) { "MISMATCH ($mmT)" } elseif ($nT -eq 0) { 'no row on either side (nothing judged)' }
+                else { "IDENTICAL over $($tA.Count) / $($tB.Count) row(s) (stage / reasons / arrow)" })
+        Write-Host "    STG    $vT" -ForegroundColor $(if ($mmT) { 'Red' } elseif ($nT -eq 0 -or $stgNC) { 'Yellow' } else { 'Gray' })
+        if ($stgBad.Count) {
+            Write-Host "    STG    $($stgBad.Count) ROW CHECK(S) FAILED - a row that does not recompute with its bar's HMI-STR / HMI-QLT, disagrees with its build's structure rows, or a histogram that does not add up:" -ForegroundColor Red
+            $stgBad | Select-Object -First 10 | ForEach-Object { Write-Host "      $_" -ForegroundColor Red }
+        } else {
+            $nAllT = (Get-Struct $A).Stg.Count + (Get-Struct $B).Stg.Count
+            if ($nAllT) { Write-Host "    STG    every row recomputes from its bar's HMI-STR / HMI-QLT and agrees with its build's HMI-CTX / HMI-PROT rows ($nAllT row(s)); both histograms add up" -ForegroundColor Gray }
+        }
+    }
 
-    if ($mm.Count -gt 0 -or $strBad.Count -gt 0 -or $qltBad.Count -gt 0) {
+    if ($mm.Count -gt 0 -or $strBad.Count -gt 0 -or $qltBad.Count -gt 0 -or $stgBad.Count -gt 0) {
         if ($mm.Count) {
             Write-Host "  $($mm.Count) event(s) differ INSIDE the comparable region - repaint or non-determinism:" -ForegroundColor Red
             $mm | Select-Object -First 20 | ForEach-Object { Write-Host ("    {0}  {1}" -f $_.Side, $_.Row) }
         }
         if ($strBad.Count) { Write-Host "  strength rows FAILED their check ($($strBad.Count)) - not a pass." -ForegroundColor Red }
         if ($qltBad.Count) { Write-Host "  quality rows FAILED their check ($($qltBad.Count)) - not a pass." -ForegroundColor Red }
-    } elseif (($nM + $nL + $nC + $nP + $nB + $nS + $nQ) -eq 0) {
+        if ($stgBad.Count) { Write-Host "  stage rows FAILED their check ($($stgBad.Count)) - not a pass." -ForegroundColor Red }
+    } elseif (($nM + $nL + $nC + $nP + $nB + $nS + $nQ + $nT) -eq 0) {
         Write-Host "  INSUFFICIENT SAMPLE - no judged event inside the comparable region; nothing was compared." -ForegroundColor Yellow
-    } elseif ($pend.Count -gt 0 -or -not $known -or $A.WarmEst -or $B.WarmEst -or $strC -or $legP -or $strNC -or $qltNC) {
+    } elseif ($pend.Count -gt 0 -or -not $known -or $A.WarmEst -or $B.WarmEst -or $strC -or $legP -or $strNC -or $qltNC -or $stgNC) {
         Write-Host "  no difference inside the comparable region - PENDING REVIEW, not a pass:" -ForegroundColor Yellow
         if ($strNC)                 { Write-Host "    strength rows not compared: the scoring definition differs between the builds" -ForegroundColor Yellow }
         if ($qltNC)                 { Write-Host "    quality rows not compared: the quality definition differs between the builds" -ForegroundColor Yellow }
+        if ($stgNC)                 { Write-Host "    stage rows not compared: the stage definition differs between the builds" -ForegroundColor Yellow }
         if ($strC)                  { Write-Host "    $strC H4 event(s) with the same swing and state but another strength number (H4 history start)" -ForegroundColor Yellow }
         if ($legP)                  { Write-Host "    $legP protected-level row(s) the same but for the leg number (H4 history start)" -ForegroundColor Yellow }
         if ($pend.Count)            { Write-Host "    $($pend.Count) difference(s) before the region need a look (see file)" -ForegroundColor Yellow }
@@ -3062,6 +3453,7 @@ function Compare-Builds($A, $B) {
 
 if ($Str) { Show-StrDist; exit }
 if ($Qlt) { Show-QltDist; exit }
+if ($Stg) { Show-StgDist; exit }
 
 if (-not $LiveVsBuild -and -not $Rejects -and $Source -eq "") {
     Write-Host "`nnothing asked for. Add one of:" -ForegroundColor Yellow
@@ -3071,6 +3463,7 @@ if (-not $LiveVsBuild -and -not $Rejects -and $Source -eq "") {
     Write-Host "  -Ctx           context events + BOS-count distribution" -ForegroundColor Yellow
     Write-Host "  -Str           (v2.56+) strength score distribution, from each chart's HMI-STR-HIST" -ForegroundColor Yellow
     Write-Host "  -Qlt           (v2.57+) quality score distribution, from each chart's HMI-QLT-HIST" -ForegroundColor Yellow
+    Write-Host "  -Stg           (v2.58+) stage / reason / arrow distribution, from each chart's HMI-STG-HIST" -ForegroundColor Yellow
     Write-Host "  -Source `"<name>`"   repaint test on that one chart" -ForegroundColor Yellow
     Write-Host "  -Source `"<a>`" -Versus `"<b>`"   fixed-window version regression (two sources)" -ForegroundColor Yellow
     exit

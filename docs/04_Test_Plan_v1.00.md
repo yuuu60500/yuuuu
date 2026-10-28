@@ -1116,3 +1116,26 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           及模型面板文字逐字一致，最长的质量行完整显示；USDJPY FULL「趋势质量  暂不评级（反转待确认）」。第 8 项完成；
           周期行 63 字符截断等为旧行为，留 v2.58。v2.57 第 0–8 项全部有记录
    验收结论（2026-10-28，Audit Round 49）：**按已覆盖范围通过**，冻结为开发与回退基线（docs/baselines/v2.57.md）；进入 v2.58 最终面板
+
+### v2.58 验收清单（BRI-15：最终面板 —— 阶段、原因、强度箭头、排版；只显示；基线 v2.57）
+
+```
+0  编译 0 errors / 0 warnings（新文件 HMI_StageEngine.mqh；代码部分 ASCII，中文只在注释与 \uXXXX 中）
+1  版本 2.58；BEGIN ver=2.58；params=461F006E 不变；HMI-STR / HMI-QLT 的 def 不变；HMI-STG def=STG1-NEAR25-DEEP2.3-EFF35-POS65.70-ARR3.5
+2  新日志行（BRI-15 S-5）：HMI-STG（与 HMI-STR / HMI-QLT 同一组 H4）；HMI-STG-HIST（每次构建一行，QLT-HIST 之后）
+3  离线：python3 tools/stage_sim.py → 86/86；--replay EURUSD_H1.csv → 4/4（前缀、镜像、行宽、各阶段出现）
+          python3 tools/stage_mql_mirror.py EURUSD_H1.csv → PASS（MQL 逐行转写：HMI-STG、面板文字、折行与模型 0 差异）
+          ReloadTest 日志用例 228/228（g01–g28：STG 重载一致 / 缺行 / 阶段、原因、箭头、near、dist、抄录字段篡改 / 自洽但输入错误：
+          过渡打开方式、RANGE 来源、箭头同段、参考分、前一根极值、保护点标志 / 直方图、def 改变 / 实时一致、篡改、缺行、构建直方图损坏 /
+          v2.57 → v2.58 加法一致、QLT 改变、阶段行失败、无阶段行、旧版带阶段行 / -Stg / 两次构建都缺阶段行）
+          python3 tools/live_coverage_tests.py → 28/28（+3：v2.58 STG 一致、箭头改变、缺行）
+4  同窗口重载：MODEL / LIQ / CTX / PROT / B8 / STR / QLT / STG 八类 IDENTICAL，STG 逐行复算与结构对照全部通过
+5  实时 vs 重建：STG 逐行全字段相同（ReloadTest -LiveVsBuild；live_coverage.py --ver 2.58）；0 行写「无样本」
+6  跨版本 v2.57 vs v2.58（同品种同参数、同一根 M5 内各建一次）：除 HMI-STG / HMI-STG-HIST 外逐行相同（含 HMI-STR、HMI-QLT）
+7  分布记录：ReloadTest -Stg（各图最新构建：阶段、原因、箭头计数）—— 记录，不据此改阈值
+8  面板截图：趋势面板六行（右上角；按实际出现的状态：多 / 空、过渡、区间、等待；阶段与原因与该根 HMI-STG 一致）；诊断面板 COMPACT / FULL
+          （长行折行、无截断；FULL 的强度 / 质量分项行）；背景框不被线条压住；改角落后的排版
+9  之后：最终统一五个交易日运行验收（验收方收尾要求）
+```
+   状态（2026-10-28）：开发版 —— MQL 已实现，未编译；第 3 项离线与工具部分完成（docs/evidence/v2.58_dev_checks.txt）；
+          第 0–2、4–8 项待用户编译与 MT5 运行。原文未写明的取法 G-1 至 G-14 见 docs/02 BRI-15 S-6

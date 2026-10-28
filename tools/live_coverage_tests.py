@@ -143,6 +143,28 @@ def days257():
     return d1, d2
 
 
+# v2.58: one HMI-STG row for the same H4 bar, live and in build 2, and an HMI-STG-HIST per build - not a row to compare
+STG = 'HMI-STG,AUDUSD,live={},bar=2026.10.19 12:00,ctx=BULLISH,stage=PUSH,reasons=MOVE+RET,def=STG1-NEAR25-DEEP2.3-EFF35-POS65.70-ARR3.5,' \
+      'dir=1,pend=-,chk=-,prot=1,anchor_bar=2026.10.18 16:00,prev_ext=0.71000,bar_ext=0.71050,ext=0.71050,close=0.71000,' \
+      'dist_pts=50,tr_sum=7000,refresh=1,near=1,arrow={},ref_bar=2026.10.19 00:00,ref_score=80,score=91'
+SHIST = 'HMI-STG-HIST,AUDUSD,live=0,def=STG1-NEAR25-DEEP2.3-EFF35-POS65.70-ARR3.5,from=2026.07.10 04:00,to={},bars=500,' \
+        'nodata=14,noatr=0,trans=150,range=36,build=30,deep=30,push=40,consol=20,pullback=180,rs=' + ';'.join(['5'] * 15) + \
+        ',up=100,down=100,flat=50,new=50'
+
+
+def days258():
+    d1, d2 = days257()
+    v = lambda x: x.replace('ver=2.57', 'ver=2.58')
+    d1, d2 = [v(x) for x in d1], [v(x) for x in d2]
+    i1 = next(k for k, x in enumerate(d1) if 'HMI-BUILD-END' in x and 'build=1,' in x)
+    d1 = d1[:i1] + [line('10:00:00.007', SHIST.format('2026.10.19 08:00') + ',' + ID)] + d1[i1:]
+    i = next(k for k, x in enumerate(d1) if 'HMI-STR-WAIT' in x)
+    d1 = d1[:i] + [line('10:05:00.002', STG.format(1, 'UP') + ',' + ID)] + d1[i:]
+    j = next(k for k, x in enumerate(d1) if 'HMI-BUILD-END' in x and 'build=2,' in x)
+    d1 = d1[:j] + [line('10:31:00.008', STG.format(0, 'UP') + ',' + ID), line('10:31:00.009', SHIST.format('2026.10.19 12:00') + ',' + ID)] + d1[j:]
+    return d1, d2
+
+
 def restart(drop_row=None):
     """the terminal restarted between build 1 and build 2: build 2 onwards carries run=101"""
     def f(d):
@@ -215,6 +237,11 @@ CASES = [
     ('v2.57 live HMI-QLT score changed', lambda d: [[x.replace(',score=95,', ',score=94,') if 'HMI-QLT,AUDUSD,live=1,' in x else x
                                                     for x in d[0]], d[1]], 1, '2.57'),
     ('v2.57 live HMI-QLT missing from the later build', drop('HMI-QLT,AUDUSD,live=0,'), 1, '2.57'),
+    # v2.58 (--ver 2.58): HMI-STG is a category of its own (STG), judged like STR on the H4 bar
+    ('v2.58 unaltered (STG-HIST rows not compared)', lambda d: d, 0, '2.58'),
+    ('v2.58 live HMI-STG arrow changed', lambda d: [[x.replace(',arrow=UP,', ',arrow=FLAT,') if 'HMI-STG,AUDUSD,live=1,' in x else x
+                                                    for x in d[0]], d[1]], 1, '2.58'),
+    ('v2.58 live HMI-STG missing from the later build', drop('HMI-STG,AUDUSD,live=0,'), 1, '2.58'),
 ]
 
 
@@ -227,7 +254,7 @@ def main():
         os.makedirs(tmp, exist_ok=True)
         for name, alter, want, *ver in CASES:
             ver = ver[0] if ver else '2.54'
-            d1, d2 = alter(days257() if ver == '2.57' else days256() if ver == '2.56' else days255() if ver == '2.55' else days())
+            d1, d2 = alter(days258() if ver == '2.58' else days257() if ver == '2.57' else days256() if ver == '2.56' else days255() if ver == '2.55' else days())
             paths = []
             for n, d in (('20261019.log', d1), ('20261020.log', d2)):
                 p = os.path.join(tmp, n)
@@ -255,6 +282,9 @@ def main():
             if name.startswith('v2.56 unaltered'):
                 good = good and 'AUDUSD#T1      20261019       1      1    0    0    0    2    1     0        0' in r.stdout \
                     and 'intraday: MODEL, B8, STR' in r.stdout
+            if name.startswith('v2.58 unaltered'):
+                good = good and 'AUDUSD#T1      20261019       1      1    0    0    0    2    1    1    1     0        0' in r.stdout \
+                    and 'intraday: MODEL, B8, STR, QLT, STG' in r.stdout
             if name.startswith('v2.57 unaltered'):
                 good = good and 'AUDUSD#T1      20261019       1      1    0    0    0    2    1    1     0        0' in r.stdout \
                     and 'intraday: MODEL, B8, STR, QLT' in r.stdout
