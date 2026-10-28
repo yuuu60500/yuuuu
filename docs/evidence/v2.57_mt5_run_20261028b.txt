@@ -106,4 +106,5 @@ unchanged from earlier versions, not v2.57 (kept for v2.58, long-line truncation
   (EURUSD / USDJPY "... PA REJE", FULL "... PA ENGULFING OK  P"), USDJPY COMPACT row 1 ends "no sess", the FULL POI row ends "GAP-REJECTE".
 cycle number: COMPACT #1589 / FULL #1582 (EURUSD), #3010 / #3003 (GBPUSD), #1607 / #1599 (USDJPY). Switching the panel mode re-initialises the indicator, and the
   new build starts its window later; cycle_id = block_id is counted from the window start, so a rebuild renumbers (A-20: the comparisons
-  key on the event, not the id). The switch rebuilds are in the terminal log after 14:09 and can be checked there.
+  key on the event, not the id). Correction (reviewer, 2026-10-28): the switch rebuilds were made after the packaged 20261028.log
+  ends (14:09:04), so the renumbering in these screenshots is not checked in this evidence - it follows from A-20, not from a log row.
