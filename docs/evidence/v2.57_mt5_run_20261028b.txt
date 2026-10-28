@@ -98,11 +98,12 @@ GBPUSD   COMPACT row 2  强度 强 88/100  数据截至 2026.10.28 16:00 H4 收�
                         趋势质量  样本不足（成熟突破 2/3，待确认 1）  局部表现 回撤 100 · 重叠 49   (the longest quality line, shown whole)
 USDJPY   COMPACT row 2  强度 暂不评级  数据截至 2026.10.28 16:00 H4 收盘
                  row 3  质量 暂不评级
-         FULL           (to follow)
+         FULL           趋势强度  暂不评级（反转待确认）
+                        趋势质量  暂不评级（反转待确认）          (H4 CONTEXT: TRANSITION (pending UP))
 = the live HMI-STR (EURUSD 69 STRONG, GBPUSD 88 STRONG, USDJPY NODIR) and HMI-QLT rows of bar 2026.10.28 16:00 above, and the
   model's panel text for them, character for character.
 unchanged from earlier versions, not v2.57 (kept for v2.58, long-line truncation): the cycle row is cut at 63 characters
   (EURUSD / USDJPY "... PA REJE", FULL "... PA ENGULFING OK  P"), USDJPY COMPACT row 1 ends "no sess", the FULL POI row ends "GAP-REJECTE".
-cycle number: COMPACT #1589 / FULL #1582 (EURUSD), #3010 / #3003 (GBPUSD). Switching the panel mode re-initialises the indicator, and the
+cycle number: COMPACT #1589 / FULL #1582 (EURUSD), #3010 / #3003 (GBPUSD), #1607 / #1599 (USDJPY). Switching the panel mode re-initialises the indicator, and the
   new build starts its window later; cycle_id = block_id is counted from the window start, so a rebuild renumbers (A-20: the comparisons
   key on the event, not the id). The switch rebuilds are in the terminal log after 14:09 and can be checked there.

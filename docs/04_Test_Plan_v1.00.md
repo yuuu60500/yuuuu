@@ -1113,4 +1113,5 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           第 4 项十张同窗口重载七类 IDENTICAL、QLT 全部通过；第 6 项十对「IDENTICAL apart from the quality rows」；第 7 项 -Qlt 记录。
           日志复制时 v2.56 EURUSD#198B 第 42 次构建未写完（无 END），工具跳过该块；live_coverage 去掉这 460 行后 inputs complete。
           第 8 项截图（同日）：EURUSD 低样本、GBPUSD 样本不足 + 局部的 COMPACT / FULL，USDJPY 暂不评级的 COMPACT，与该根实时 STR / QLT
-          及模型面板文字逐字一致，最长的质量行完整显示；USDJPY FULL 待补。周期行 63 字符截断等为旧行为，留 v2.58
+          及模型面板文字逐字一致，最长的质量行完整显示；USDJPY FULL「趋势质量  暂不评级（反转待确认）」。第 8 项完成；
+          周期行 63 字符截断等为旧行为，留 v2.58。v2.57 第 0–8 项全部有记录
