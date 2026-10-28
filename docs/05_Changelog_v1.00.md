@@ -2203,3 +2203,14 @@ tools     stage_sim.py（新，86/86，--replay 4/4）；stage_mql_mirror.py（�
 docs      02 BRI-15；01 §2.4；03；04 v2.58 清单；06 Audit Round 50；evidence/v2.58_dev_checks.txt
 ```
 
+## v2.58r2 —— 面板字体与右侧留白（显示；日志、评分、参数不变；未编译）
+
+```
+Date:     2026-10-28
+来源:     v2.58 开发版首批截图（docs/evidence/v2.58_mt5_run_20261028.txt）
+MQL       HMI_Style.mqh：InpPanelFontName（默认 "Microsoft YaHei"）—— 两个面板用含全部中文字形的字体；Arial 没有中文，Windows 逐字替换字体，
+          「强」字出自另一字体、比其他字小（v2.56 起即如此）
+          HMI_ObjectManager.mqh：面板按该字体测宽与绘制；右侧多留 6 像素（「（服务器时间）」的括号曾压在边框上）
+不变      全部日志行、阶段 / 原因 / 箭头、面板文字、参数摘要 461F006E；版本仍 2.58
+```
+

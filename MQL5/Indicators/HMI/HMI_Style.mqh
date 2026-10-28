@@ -32,6 +32,8 @@ input color  InpPanelCtxRangeColor  = clrSilver;  // RANGE (and TRANSITION on th
 input color  InpPanelCtxTransColor  = clrGold;    // v2.58 trend panel: TRANSITION (requirement §2: yellow)
 input color  InpPanelBgColor        = clrNONE;    // v2.58: panel background; clrNONE = the chart's own background
 input color  InpPanelBorderColor    = clrDimGray;
+input string InpPanelFontName       = "Microsoft YaHei";   // v2.58r2: both panels - a font holding every Chinese glyph
+                                                           // (Arial has none: Windows then swaps fonts glyph by glyph, 强 came out smaller)
 
 input group "=== Style: trend panel (v2.58) ==="
 input ENUM_BASE_CORNER InpTrendCorner = CORNER_RIGHT_UPPER;   // requirement §2: top right

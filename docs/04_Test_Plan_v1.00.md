@@ -1140,3 +1140,6 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
    状态（2026-10-28）：开发版 —— MQL 已实现，未编译；第 3 项离线与工具部分完成（docs/evidence/v2.58_dev_checks.txt）；
           第 0–2、4–8 项待用户编译与 MT5 运行。原文未写明的取法 G-1 至 G-14 见 docs/02 BRI-15 S-6
    编译（2026-10-28）：第 0 项 —— 用户 MetaEditor 编译开发版（包 AE84D74A…51B1）0 errors / 0 warnings；第 1–2、4–8 项待挂图运行
+   首批截图（2026-10-28，docs/evidence/v2.58_mt5_run_20261028.txt）：GBPUSD COMPACT / FULL、USDCHF COMPACT —— 趋势面板六行、两列对齐、
+          背景框、颜色、过渡文字、诊断面板折行与分项行均如设计；两处显示修正为 r2：「强」字字号不一（字体替换）→ 面板字体
+          InpPanelFontName（默认 Microsoft YaHei）；右侧留白不足 → 多留 6 像素

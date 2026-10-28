@@ -1,0 +1,29 @@
+# v2.58 dev (compiled 0 / 0 by the user, package AE84D74A...51B1) - first panel screenshots, 2026-10-28 (server ~20:10)
+# three screenshots from the user: GBPUSD COMPACT, GBPUSD FULL, USDCHF COMPACT
+
+## trend panel (top right, as designed: six rows, two aligned columns, background box with border, above the candles)
+GBPUSD  H4 趋势    ▼ 空头                                   (red)
+        趋势强度   弱 · 32/100 ↓
+        趋势质量   一般 · 51/100（低样本 3 次突破）
+        当前阶段   正常回撤
+        主要原因   近期突破失败，近期逆向运行
+        数据截至   2026.10.28 20:00 H4 收盘（服务器时间）
+        consistent with the FULL item rows of the same bar: 强度分项 净推进 49 · 效率 29 · 动量 0 -> 动量 0 (COUNTER) and 效率 < 35
+        (CHOP, third risk, dropped: at most two); 质量分项 突破 33 (one of three held: BRK_FAIL first) · 回撤 69 (r about 1/2: not
+        deep) · 重叠 52; 0.40 x 33.3 + 0.35 x 69 + 0.25 x 52 = 50.5 -> 51
+USDCHF  H4 趋势    过渡 · 偏多待确认                          (gold)
+        趋势强度   暂不评级 / 趋势质量 暂不评级 / 当前阶段 反转待确认 / 主要原因 空头保护高点已破 (pending UP: the bear leg's
+        protected high broke) / 数据截至 2026.10.28 20:00 H4 收盘（服务器时间）
+
+## diagnostic panel (top left)
+COMPACT GBPUSD  POI 0 | no session / #2995 BEAR  BPR OK  CISD N/A  [ANCHOR INVALIDATED] / ADR(20): n/a
+COMPACT USDCHF  POI 0 | no session / #2654 BEAR  BPR OK  PA BREAK-RETEST OK / (wrapped) [ANCHOR INVALIDATED]  [CTX CHANGED] / ADR(20): n/a
+FULL    GBPUSD  version row; H4 CONTEXT ... BOS 计数 3 结构诊断 CLEAN (red); 强度分项; 质量分项; H4 POI: 0 ACTIVE / 9 REJECTED-BY-GAP
+                (wrapped) M5 BLOCK GAP-REJECTED: 16; SESSION: none; CYCLE ...; ADR(20): 73.2 pip | today 48.6 pip (66%) | left 24.6 pip
+the long rows wrap at a | / two-space gap instead of being cut at 63 characters. ADR n/a on the two COMPACT shots, a value on the
+FULL shot taken later: the daily series was not there yet right after the attach (HMI_Ranges, unchanged) - to be watched, not a v2.58 change
+
+## found, fixed in v2.58r2 (display only)
+1  强 drawn smaller than the other characters (趋势强度, 强度分项; the same since v2.56): Arial has no Chinese glyph, Windows swaps
+   fonts glyph by glyph and 强 came from another font -> both panels use InpPanelFontName, default "Microsoft YaHei"
+2  the last bracket of 数据截至 ...（服务器时间） on the box's right border: the measured width a few pixels short -> 6 px more on the right

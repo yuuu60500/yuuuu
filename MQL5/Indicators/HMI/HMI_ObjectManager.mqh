@@ -321,7 +321,7 @@ void OM_BoxLabel(const string name, const string text, const ENUM_BASE_CORNER co
    ObjectSetInteger(0, name, OBJPROP_XDISTANCE, x);
    ObjectSetInteger(0, name, OBJPROP_YDISTANCE, y);
    ObjectSetString(0, name, OBJPROP_TEXT, text);
-   ObjectSetString(0, name, OBJPROP_FONT, InpFontName);
+   ObjectSetString(0, name, OBJPROP_FONT, InpPanelFontName);
    ObjectSetInteger(0, name, OBJPROP_FONTSIZE, fsize);
    ObjectSetInteger(0, name, OBJPROP_COLOR, clr);
    ObjectSetInteger(0, name, OBJPROP_BACK, false);
@@ -346,7 +346,7 @@ void OM_DrawBox(const string tt, const ENUM_BASE_CORNER corner, const int bx, co
    OM_BoxClear(tt, maxrows);
    int rows = MathMin(n, maxrows);
    if(rows <= 0) return;
-   TextSetFont(InpFontName, -fsize * 10);          // the size an OBJ_LABEL of fsize points is drawn at
+   TextSetFont(InpPanelFontName, -fsize * 10);     // the font and size an OBJ_LABEL of fsize points is drawn at
    int lw = 0, vw = 0, th = 0;
    for(int i = 0; i < rows; i++)
      {
@@ -355,10 +355,12 @@ void OM_DrawBox(const string tt, const ENUM_BASE_CORNER corner, const int bx, co
       if(val[i] != "" && TextGetSize(val[i], w, h)) { vw = MathMax(vw, (int)w);  th = MathMax(th, (int)h); }
      }
    if(th <= 0) th = fsize + 6;
-   int pad  = 5;
+   int pad  = 6;
    int gap  = (lw > 0 ? 12 : 0);
    int step = th + 2;
-   int W = pad + lw + gap + vw + pad + 2;
+   // + 6: a measured width can still come out a few pixels short of the drawn
+   // one (font substitution; the MT5 run 2026-10-28 had the last bracket on the border)
+   int W = pad + lw + gap + vw + pad + 6;
    int H = pad + rows * step - 2 + pad;
    bool right = (corner == CORNER_RIGHT_UPPER || corner == CORNER_RIGHT_LOWER);
    bool lower = (corner == CORNER_LEFT_LOWER  || corner == CORNER_RIGHT_LOWER);
