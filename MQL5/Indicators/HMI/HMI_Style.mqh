@@ -20,9 +20,9 @@ input M5LayerVis InpM5Layer = M5LAYER_UPTO_M15;   // M5 blocks / ARMED / CISD / 
 input group "=== Style: font & panel ==="
 input string InpFontName          = "Arial";       // font for every text object
 input PanelMode       InpPanelMode   = PANEL_COMPACT;      // OFF / COMPACT / FULL
-input ENUM_BASE_CORNER InpPanelCorner = CORNER_LEFT_UPPER;
-input int    InpPanelX            = 10;
-input int    InpPanelY            = 18;
+input ENUM_BASE_CORNER InpPanelCorner = CORNER_LEFT_UPPER;   // Diagnostic panel: chart corner
+input int    InpPanelX            = 10;            // Diagnostic panel: X distance from the corner (px)
+input int    InpPanelY            = 18;            // Diagnostic panel: Y distance from the corner (px)
 input color  InpPanelColor        = clrWhite;      // default row colour
 input int    InpPanelFontSize     = 8;
 input bool   InpPanelColorByContext = true;       // colour the context row by direction
@@ -32,15 +32,16 @@ input color  InpPanelCtxRangeColor  = clrSilver;  // RANGE (and TRANSITION on th
 input color  InpPanelCtxTransColor  = clrGold;    // v2.58 trend panel: TRANSITION (requirement §2: yellow)
 input color  InpPanelBgColor        = clrNONE;    // v2.58: panel background; clrNONE = the chart's own background
 input color  InpPanelBorderColor    = clrDimGray;
-input string InpPanelFontName       = "Microsoft YaHei";   // v2.58r2: both panels - a font holding every Chinese glyph
-                                                           // (Arial has none: Windows then swaps fonts glyph by glyph, 强 came out smaller)
+// v2.58r2: both panels use a font that holds every Chinese glyph (Arial has none: Windows then
+// swaps fonts glyph by glyph, and one character came out smaller than the rest)
+input string InpPanelFontName       = "Microsoft YaHei";   // Both panels: font (one with Chinese glyphs)
 
 input group "=== Style: trend panel (v2.58) ==="
-input ENUM_BASE_CORNER InpTrendCorner = CORNER_RIGHT_UPPER;   // requirement §2: top right
-input int    InpTrendX            = 10;
-input int    InpTrendY            = 18;
-input int    InpTrendFontSize     = 9;
-input color  InpTrendLabelColor   = clrSilver;     // the left column (H4 趋势 / 趋势强度 / ...)
+input ENUM_BASE_CORNER InpTrendCorner = CORNER_RIGHT_UPPER;   // Trend panel: chart corner (requirement §2: top right)
+input int    InpTrendX            = 10;            // Trend panel: X distance from the corner (px)
+input int    InpTrendY            = 18;            // Trend panel: Y distance from the corner (px)
+input int    InpTrendFontSize     = 9;             // Trend panel: font size
+input color  InpTrendLabelColor   = clrSilver;     // Trend panel: label column colour
 
 //================== H4 POI =========================================
 input group "=== Style: H4 POI zone ==="

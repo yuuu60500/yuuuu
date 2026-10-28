@@ -2214,3 +2214,12 @@ MQL       HMI_Style.mqh：InpPanelFontName（默认 "Microsoft YaHei"）—— �
 不变      全部日志行、阶段 / 原因 / 箭头、面板文字、参数摘要 461F006E；版本仍 2.58
 ```
 
+## v2.58 输入显示名（只改注释；随下一个包发出）
+
+```
+Date:     2026-10-28
+HMI_Style.mqh   MT5 把输入行尾的注释当参数名显示：趋势面板角落原显示为「requirement §2: top right」—— 改为
+                「Trend panel: chart corner (...)」；同组 X / Y / 字号 / 标签色、诊断面板角落与 X / Y、面板字体同样给出可读的名字
+不变            变量名（.set 文件照常加载）、默认值、参数摘要 461F006E、日志、面板文字
+```
+
