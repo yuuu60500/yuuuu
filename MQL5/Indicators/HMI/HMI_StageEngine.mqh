@@ -372,6 +372,9 @@ void StgLogHist()
 #define PC_BEAR   2
 #define PC_TRANS  3
 #define PC_RANGE  4
+#define PC_HIGH   5              // v2.58r3: strength / quality rows by tier (强 / 良好, 中等 / 一般, 弱 / 较差)
+#define PC_MID    6
+#define PC_LOW    7
 
 string StgStageZh(const StgRec &r)
   {
@@ -485,6 +488,8 @@ void StgPanelRows(string &lab[], string &val[], int &ck[])
    else                          { val[0] = HMI_U(ZH_RANGE);  ck[0] = PC_RANGE; }
    val[1] = StgStrengthValue(s, r.arrow, false);
    val[2] = StgQualityValue(q, false);
+   if(s.state == STR_OK) ck[1] = (s.tier == ST_STRONG ? PC_HIGH : (s.tier == ST_MED ? PC_MID : PC_LOW));
+   if(q.state == QLT_OK) ck[2] = (q.tier == QT_GOOD ? PC_HIGH : (q.tier == QT_FAIR ? PC_MID : PC_LOW));
    val[3] = StgStageZh(r);
    string why = "";
    for(int i = 0; i < r.rn; i++) why += (i > 0 ? HMI_U(ZH_COMMA) : "") + StgReasonZh(r.rs[i], r);

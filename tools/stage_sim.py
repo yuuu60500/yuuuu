@@ -254,7 +254,7 @@ def quality_value(q, wait):
 
 def panel_rows(r, s, q, ctx, when, wait=False, ready=True):
     """the trend panel, six (label, value, colour) rows; colour: BULL / BEAR / TRANS / RANGE for the direction row,
-    else BASE. r, s, q = the stage, strength and quality records of the last processed bar (None before any);
+    HIGH / MID / LOW for a scored strength / quality row by its tier (v2.58r3), else BASE. r, s, q = the stage, strength and quality records of the last processed bar (None before any);
     when = its close time; wait = a series did not deliver (the strength WAIT state)"""
     if not ready or r is None:
         vals = ["等待数据"] * 4 + ["—", "等待数据"]
@@ -277,7 +277,12 @@ def panel_rows(r, s, q, ctx, when, wait=False, ready=True):
         why = "无突出分项" if r["dir"] != 0 else "—"
     vals = [dv, strength_value(s, r["arrow"], False), quality_value(q, False), stage_zh(r), why,
             f"{when} H4 收盘（服务器时间）"]
-    return [(lab, v, dc if i == 0 else "BASE") for i, (lab, v) in enumerate(zip(LABELS, vals))]
+    cks = [dc, "BASE", "BASE", "BASE", "BASE", "BASE"]
+    if s["state"] == "OK":
+        cks[1] = {"STRONG": "HIGH", "MED": "MID", "WEAK": "LOW"}[s["tier"]]
+    if q["state"] == "OK":
+        cks[2] = {"GOOD": "HIGH", "FAIR": "MID", "POOR": "LOW"}[q["tier"]]
+    return list(zip(LABELS, vals, cks))
 
 
 def items_rows(s, q):
@@ -489,7 +494,7 @@ def cases():
     q_ok = qrec(score=82, tier="GOOD", sample="FIVE", n=5, s=5, x=20)
     r = stage_rec(BULL_CTX, 0, "-", True, s_ok, q_ok, (1999, 2000), (71, True))
     rows = panel_rows(r, s_ok, q_ok, BULL_CTX, t1)
-    want = [("H4 趋势", "▲ 多头", "BULL"), ("趋势强度", "强 · 76/100 ↑", "BASE"), ("趋势质量", "良好 · 82/100（5 次事件）", "BASE"),
+    want = [("H4 趋势", "▲ 多头", "BULL"), ("趋势强度", "强 · 76/100 ↑", "HIGH"), ("趋势质量", "良好 · 82/100（5 次事件）", "HIGH"),
             ("当前阶段", "延续推进", "BASE"), ("主要原因", "同向推进明显，回撤较浅", "BASE"),
             ("数据截至", "2026.10.28 16:00 H4 收盘（服务器时间）", "BASE")]
     check("P01 the requirement's normal example (§2): six rows", rows == want, f"{rows}")
@@ -497,6 +502,12 @@ def cases():
     rows = panel_rows(rb, s_ok, flip(q_ok), BEAR_CTX, t1)
     check("P02 bear mirror: ▼ 空头 red, 低位整理", rows[0] == ("H4 趋势", "▼ 空头", "BEAR") and rows[3][1] == "低位整理",
           f"{rows}")
+    sm, sw_ = dict(s_ok, tier="MED", score=50), dict(s_ok, tier="WEAK", score=20)
+    qf, qp_ = dict(q_ok, tier="FAIR", score=55), dict(q_ok, tier="POOR", score=30)
+    ck = [(panel_rows(r, a, b, BULL_CTX, t1)[1][2], panel_rows(r, a, b, BULL_CTX, t1)[2][2]) for a, b in ((sm, qf), (sw_, qp_))]
+    check("P02b tier colours (r3): 中等 / 一般 MID, 弱 / 较差 LOW; waiting rows uncoloured",
+          ck == [("MID", "MID"), ("LOW", "LOW")] and all(c == "BASE" for _, _, c in panel_rows(r, s_ok, q_ok, BULL_CTX, t1, wait=True)),
+          f"{ck}")
     sn = srec(state="NODIR")
     qn = qrec(state="NODIR", x=None)
     rt = stage_rec(TRANS, -1, "BREAK", None, sn, qn, None, None)

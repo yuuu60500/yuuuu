@@ -1558,7 +1558,9 @@ near      dist = D·(ext − C[h])（不限幅，ext 含本根），56·dist ≤
 - 诊断面板的长行（CYCLE、H4 POI、LIQ HISTORY 等）超过 63 字符时折到下一行（缩进），不再截断：先在「|」处断，其次两个空格，再次任一空格，
   断点至少保留一半宽度（`stage_sim.wrap` = `StgWrap`）。
 - 新输入（只是样式，不进参数摘要）：InpTrendCorner（默认右上）、InpTrendX / Y、InpTrendFontSize（9）、InpTrendLabelColor、
-  InpPanelCtxTransColor（金色）、InpPanelBgColor（clrNONE = 图表背景）、InpPanelBorderColor。
+  InpPanelCtxTransColor（金色）、InpPanelBgColor（clrNONE = 图表背景）、InpPanelBorderColor；r2：InpPanelFontName（Microsoft YaHei）；
+  r3（用户要求）：InpTrendValueColor（数值列，白）、InpTrendTierColors（开）与等级色 InpTierHigh / Mid / LowColor（强·良好 天蓝 /
+  中等·一般 白 / 弱·较差 紫）—— 有分数时强度、质量两行按等级着色；默认避开红绿，因为方向行已用红绿表示空 / 多。
 
 ### S-5 日志
 
@@ -1595,7 +1597,7 @@ G-10 箭头按两个显示分（整数）之差，和面板上的两个数字一
 G-11 TRANSITION / RANGE 时强度、质量行只写「暂不评级」，原因在阶段行（不再三行重复「反转待确认」）
 G-12 等待时时间行写「上次有效结果 <时间>」；强度 / 质量的上次有效分只在上次是 OK 时给出（同 v2.56 / v2.57）
 G-13 趋势面板默认右上角（原文 §2），诊断面板保留左上角，两者都可改角落；COMPACT 与 FULL 共用同一个趋势面板
-G-14 短色条（§2「可配」）与其他图案美化不做（验收方：影响收尾则后续）
+G-14 短色条（§2「可配」）与其他图案美化不做（验收方：影响收尾则后续）。r3 应用户要求加了等级文字着色（S-4），可关；仍不画色条
 ```
 
 ### S-7 实现（v2.58 开发版，未编译）

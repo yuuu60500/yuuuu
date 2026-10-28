@@ -393,7 +393,12 @@ void OM_DrawBox(const string tt, const ENUM_BASE_CORNER corner, const int bx, co
 //--- the trend panel (requirement §2): H4 direction, strength, quality, stage, reasons, data time ---
 color OM_TrendColor(const int ck)
   {
-   if(!InpPanelColorByContext || ck == PC_BASE) return(InpPanelColor);
+   if(ck == PC_HIGH || ck == PC_MID || ck == PC_LOW)          // v2.58r3: tier colours, never red / green by default
+     {
+      if(!InpTrendTierColors) return(InpTrendValueColor);
+      return(ck == PC_HIGH ? InpTierHighColor : (ck == PC_MID ? InpTierMidColor : InpTierLowColor));
+     }
+   if(!InpPanelColorByContext || ck == PC_BASE) return(InpTrendValueColor);
    if(ck == PC_BULL)  return(InpPanelCtxBullColor);
    if(ck == PC_BEAR)  return(InpPanelCtxBearColor);
    if(ck == PC_TRANS) return(InpPanelCtxTransColor);

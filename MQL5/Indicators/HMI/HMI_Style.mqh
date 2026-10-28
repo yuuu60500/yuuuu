@@ -42,6 +42,12 @@ input int    InpTrendX            = 10;            // Trend panel: X distance fr
 input int    InpTrendY            = 18;            // Trend panel: Y distance from the corner (px)
 input int    InpTrendFontSize     = 9;             // Trend panel: font size
 input color  InpTrendLabelColor   = clrSilver;     // Trend panel: label column colour
+input color  InpTrendValueColor   = clrWhite;      // Trend panel: value column colour
+input bool   InpTrendTierColors   = true;          // Trend panel: colour strength / quality by tier
+// the tier colours stay off red and green by default: the direction row already uses them for bull / bear
+input color  InpTierHighColor     = clrDeepSkyBlue; // Trend panel: strong / good tier colour
+input color  InpTierMidColor      = clrWhite;       // Trend panel: medium / fair tier colour
+input color  InpTierLowColor      = clrOrchid;      // Trend panel: weak / poor tier colour
 
 //================== H4 POI =========================================
 input group "=== Style: H4 POI zone ==="

@@ -193,3 +193,10 @@ PASS  g28_reload_stg_rows_missing_both
   ok   v2.58 live HMI-STG arrow changed         exit 1 (want 1)  RESULT: NOT PASSED - 2 difference(s) on compared rows
   ok   v2.58 live HMI-STG missing from the later build exit 1 (want 1)  RESULT: NOT PASSED - 1 difference(s) on compared rows
 28/28
+
+## r3 (2026-10-28): tier colours and the trend panel's value colour (display only)
+python3 tools/stage_sim.py                     -> 87/87 PASS (+ P02b: 中等 / 一般 MID, 弱 / 较差 LOW, waiting rows uncoloured)
+python3 tools/stage_sim.py --replay EURUSD     -> 4/4 PASS
+python3 tools/stage_mql_mirror.py EURUSD       -> HMI-STG rows 3172, panel strings 12688 (label, text and colour key), wrapped 4000: 0 differ; PASS
+python3 tools/params_digest.py                 -> params=461F006E
+

@@ -260,6 +260,8 @@ def panel_rows(r, s, q, ctx, when, wait):
     for i, c in enumerate(r["rs"]): why += ("" if i == 0 else U("ZH_COMMA")) + reason_zh(c, r)
     if why == "": why = U("ZH_R_NONE" if r["dir"] != 0 else "ZH_DASH")
     val = [v0, strength_value(s, None, r["arrow"], False), quality_value(q, False), stage_zh(r), why, w]
+    if s["state"] == 0: ck[1] = {"STRONG": "HIGH", "MED": "MID", "WEAK": "LOW"}[s["tier"]]
+    if q["state"] == "OK": ck[2] = {"GOOD": "HIGH", "FAIR": "MID", "POOR": "LOW"}[q["tier"]]
     return list(zip(lab, val, ck))
 
 

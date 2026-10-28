@@ -2223,3 +2223,16 @@ HMI_Style.mqh   MT5 把输入行尾的注释当参数名显示：趋势面板角
 不变            变量名（.set 文件照常加载）、默认值、参数摘要 461F006E、日志、面板文字
 ```
 
+## v2.58r3 —— 趋势面板数值颜色、等级着色、输入显示名（显示；日志、评分、参数不变；未编译）
+
+```
+Date:     2026-10-28
+来源:     用户：字体颜色与大小能否都自由选择 —— 趋势面板数值颜色原与诊断面板共用 InpPanelColor；强度 / 质量不能按等级着色
+MQL       HMI_Style.mqh：InpTrendValueColor（白）；InpTrendTierColors（开）；InpTierHighColor（天蓝）/ InpTierMidColor（白）/
+          InpTierLowColor（紫）—— 默认避开红绿（方向行用红绿表示空 / 多）；输入显示名（上一节）随本包
+          HMI_StageEngine.mqh：有分数时强度、质量两行的颜色键按等级（PC_HIGH / MID / LOW）；等待、暂不评级、样本不足仍用数值色
+          HMI_ObjectManager.mqh：OM_TrendColor 解析等级色；趋势面板的基础色改为 InpTrendValueColor
+tools     stage_sim.py 87/87（+P02b 等级色）；stage_mql_mirror.py 同步颜色键，PASS
+不变      全部日志行、阶段 / 原因 / 箭头、面板文字、参数摘要 461F006E；版本仍 2.58
+```
+
