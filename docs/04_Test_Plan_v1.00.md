@@ -1112,4 +1112,5 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           14:08 刷新后 -LiveVsBuild 20 / 20 AGREE BOTH WAYS（构建侧检查通过），live_coverage --ver 2.57 0 差异；
           第 4 项十张同窗口重载七类 IDENTICAL、QLT 全部通过；第 6 项十对「IDENTICAL apart from the quality rows」；第 7 项 -Qlt 记录。
           日志复制时 v2.56 EURUSD#198B 第 42 次构建未写完（无 END），工具跳过该块；live_coverage 去掉这 460 行后 inputs complete。
-          第 8 项待补：低样本（EURUSD）、样本不足 + 局部（GBPUSD）、暂不评级（NZDUSD / USDCHF / USDJPY）截图 —— 本地 17:05 前面板即为上表状态
+          第 8 项截图（同日）：EURUSD 低样本、GBPUSD 样本不足 + 局部的 COMPACT / FULL，USDJPY 暂不评级的 COMPACT，与该根实时 STR / QLT
+          及模型面板文字逐字一致，最长的质量行完整显示；USDJPY FULL 待补。周期行 63 字符截断等为旧行为，留 v2.58
