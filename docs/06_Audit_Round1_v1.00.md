@@ -2484,3 +2484,19 @@ P2-2 两边都缺质量明细    两份构建删去全部 HMI-QLT（直方图自
                          10-27 的刷新在本地 17:01，早于 17:05，之后终端休眠，10-28 只有 09:10 的构建。v2.56 白天实时 10/10 一致
 下一步:                  本地 13:05 之后（同一天、不休眠、不重启）刷新 v2.57，取得第一批实时 QLT
 ```
+
+
+## Audit Round 48 —— v2.57 运行第三部分（10-28 本地 09:10 .. 14:09）：第一批实时 QLT
+
+```
+实时:                    服务器 16:00 那根 H4 在本地 13:04:59 .. 13:05:05 实时处理，十张 v2.57 各 1 行 HMI-QLT live=1：
+                         XAUUSD 两图 良好 73（5 次）、EURUSD 两图 良好 77（低样本 3 次）、USDCAD 一般 54、AUDUSD 一般 55（5 次）、
+                         GBPUSD PARTIAL FEW（成熟 2、待确认 1）、NZDUSD / USDCHF / USDJPY NODIR（TRANSITION）
+实时 vs 重建（工具 r2）: 14:08 刷新后 -LiveVsBuild 20 / 20 AGREE BOTH WAYS，每张 v2.57 比对 1 行 QLT + 1 行 STR，构建侧复算通过；
+                         live_coverage --ver 2.57 / 2.56 0 差异（XAUUSD MODEL 11 + B8 8、USDJPY LIQ 1 另有覆盖）
+输入:                    日志在 14:09:04 复制，v2.56 EURUSD#198B 第 42 次构建没有 END（自 BEGIN 起 460 行）；ReloadTest 标 INCOMPLETE 并跳过，
+                         live_coverage 报 1 个输入问题，去掉这 460 行后 inputs complete、0 差异。v2.57 的构建全部完整
+同窗口 / 跨版本:         14:08 的最后两次构建十张 v2.57 七类 IDENTICAL（QLT 复算、结构对照、直方图通过）；十对 v2.56 → v2.57
+                         「IDENTICAL apart from the quality rows」（478–1240 行）；-Qlt 与上午一致（默认 8 图 55% 有总分，良好 55%）
+未完成:                  第 8 项截图：低样本、样本不足 + 局部、暂不评级（状态保持到本地 17:05 处理下一根 H4）
+```

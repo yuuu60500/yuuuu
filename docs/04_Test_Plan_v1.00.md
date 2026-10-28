@@ -1107,3 +1107,9 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
    运行第二部分（10-27 全天 + 10-28 09:10；docs/evidence/v2.57_mt5_run_20261028.txt）：10-27 傍晚十张同窗口重载七类 IDENTICAL、QLT 全部通过；
           v2.56 / v2.57 二十对（10-27 17:00、10-28 09:10）「IDENTICAL apart from the quality rows」；-Qlt 记录。第 5 项仍无样本：
           10-27 的刷新（本地 17:01）早于 20:00 那根 H4 的实时处理（本地 17:05），之后休眠
+   运行第三部分（10-28 本地 09:10 .. 14:09，Audit Round 48；docs/evidence/v2.57_mt5_run_20261028b.txt）：第 5 项取得样本 ——
+          服务器 16:00 那根 H4 在本地 13:05 实时处理，十张各 1 行 HMI-QLT（OK 良好 5 次 / 良好低样本 / 一般 5 次、PARTIAL FEW、NODIR），
+          14:08 刷新后 -LiveVsBuild 20 / 20 AGREE BOTH WAYS（构建侧检查通过），live_coverage --ver 2.57 0 差异；
+          第 4 项十张同窗口重载七类 IDENTICAL、QLT 全部通过；第 6 项十对「IDENTICAL apart from the quality rows」；第 7 项 -Qlt 记录。
+          日志复制时 v2.56 EURUSD#198B 第 42 次构建未写完（无 END），工具跳过该块；live_coverage 去掉这 460 行后 inputs complete。
+          第 8 项待补：低样本（EURUSD）、样本不足 + 局部（GBPUSD）、暂不评级（NZDUSD / USDCHF / USDJPY）截图 —— 本地 17:05 前面板即为上表状态

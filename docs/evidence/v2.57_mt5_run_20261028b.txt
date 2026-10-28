@@ -1,0 +1,88 @@
+# v2.57 MT5 run, part 3: 20261028.log local 09:10 .. 14:09 - the first live HMI-QLT rows (server 16:00 H4, processed at local 13:05)
+# 20261028.rar sha256 8fdb7918ea577488b38140c9a6149dac1418a58625ddffdcf5b1ce4580e402fa; 20261028.log 0f8beccb13bcfe9b9071aa1676f40cb03bb5a64dc5f5c61c631768e35e20a287
+# 226378 lines; server = local + 3 h; tools r2. No new "starting on" line and no runtime error in the file.
+# The log was copied while one v2.56 build was being written: EURUSD#198B build 42 (BEGIN 14:09:04.247, no END, 460 lines).
+# Every v2.57 build in the file is complete. ReloadTest skips the unclosed block ("1 INCOMPLETE", -Versus takes build 41);
+# live_coverage.py counts it as an input problem, so it is also run on a copy without those 460 lines (below).
+
+## live HMI-QLT rows (live=1), server bar 2026.10.28 16:00, local 13:04:59 .. 13:05:05
+XAUUSD#159A  OK       BEARISH     n=5 ok 4 fail 1      q_break 80.000000  q_retrace  75.885323  q_overlap 59.743773  score 73 GOOD FIVE
+XAUUSD#8C1C  OK       BEARISH     n=5 ok 4 fail 1      q_break 80.000000  q_retrace  75.885323  q_overlap 59.743773  score 73 GOOD FIVE
+EURUSD#0442  OK       BEARISH     n=3 ok 2 fail 1      q_break 66.666667  q_retrace 100.000000  q_overlap 60.700873  score 77 GOOD LOW
+EURUSD#3F83  OK       BEARISH     n=3 ok 2 fail 1      q_break 66.666667  q_retrace 100.000000  q_overlap 60.700873  score 77 GOOD LOW
+USDCAD#9646  OK       BEARISH     n=5 ok 3 fail 2      q_break 60.000000  q_retrace  45.814978  q_overlap 57.393455  score 54 FAIR FIVE
+AUDUSD#F657  OK       BULLISH     n=5 ok 2 fail 3      q_break 40.000000  q_retrace  73.020134  q_overlap 53.467300  score 55 FAIR FIVE
+GBPUSD#3674  PARTIAL  BEARISH     FEW n=2 ok 1 fail 1 pend 1   q_break NA   q_retrace 100.000000  q_overlap 49.437091
+NZDUSD#58F3  NODIR    TRANSITION  q_overlap 65.461673
+USDCHF#209F  NODIR    TRANSITION  q_overlap 48.292909
+USDJPY#D61E  NODIR    TRANSITION  q_overlap 46.671836
+(the two EURUSD charts differ only in ATR / point parameters, the two XAUUSD charts likewise; their quality rows are the same here)
+
+## live vs build (refresh at local 14:07:52 .. 14:09:04, to = 17:00 server)
+ReloadTest -LiveVsBuild (20261028.log alone): 20 of 20 charts AGREE BOTH WAYS on every covered bar; no build-side score check failed
+  v2.57 each chart: strength rows compared 1 (STR), quality rows compared 1 (QLT)
+  XAUUSD 159A / 8C1C (and v2.56 2AE3 / 6624): 11 MODEL + 8 BRI-08 rows compared; one morning pair per chart pending
+  (1 live row and 2 BRI-08 rows on edge bars, 09:49 / 09:59 local) - not included, the same rows live_coverage lists as edge rows
+  USDJPY 15F9 / D61E: LIQ BSL SWEEP 1
+live_coverage.py --ver 2.57 --offset 3 (log as uploaded): 0 differences on compared rows, NOT PASSED - 1 input problem (198B build 42 never closed)
+live_coverage.py --ver 2.57 --offset 3 (same log without 198B build 42):
+  instance       day        pairs  MODEL  LIQ  CTX PROT   B8  STR  QLT  diff  outside  leg only
+  AUDUSD#F657    20261028      10      0    0    0    0    0    1    1     0        0         0
+  EURUSD#0442    20261028      18      0    0    0    0    0    1    1     0        0         0
+  EURUSD#3F83    20261028      18      0    0    0    0    0    1    1     0        0         0
+  GBPUSD#3674    20261028      10      0    0    0    0    0    1    1     0        0         0
+  NZDUSD#58F3    20261028      10      0    0    0    0    0    1    1     0        0         0
+  USDCAD#9646    20261028      10      0    0    0    0    0    1    1     0        0         0
+  USDCHF#209F    20261028      10      0    0    0    0    0    1    1     0        0         0
+  USDJPY#D61E    20261028      10      0    1    0    0    0    1    1     0        0         0
+  XAUUSD#159A    20261028      20     11    0    0    0    8    1    1     0        3         0
+  XAUUSD#8C1C    20261028      20     11    0    0    0    8    1    1     0        3         0
+  RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+live_coverage.py --ver 2.56 (same copy): RESULT: inputs complete, 0 differences (STR 1 per chart, XAUUSD MODEL 11 + B8 8, USDJPY LIQ 1)
+
+## same-window reload, last two v2.57 builds (local 14:07 - 14:09, to = 17:00 server)
+AUDUSD#F657  b18/b19  IDENTICAL inside the comparable region (102 MODEL + 48 LIQ)   QLT IDENTICAL over 102 / 102 row(s)
+EURUSD#0442  b31/b32  IDENTICAL inside the comparable region (43 MODEL + 38 LIQ)    QLT IDENTICAL over 102 / 102 row(s)
+EURUSD#3F83  b31/b32  IDENTICAL inside the comparable region (43 MODEL + 38 LIQ)    QLT IDENTICAL over 102 / 102 row(s)
+GBPUSD#3674  b17/b18  IDENTICAL inside the comparable region (142 MODEL + 51 LIQ)   QLT IDENTICAL over 102 / 102 row(s)
+NZDUSD#58F3  b17/b18  IDENTICAL inside the comparable region (135 MODEL + 51 LIQ)   QLT IDENTICAL over 102 / 102 row(s)
+USDCAD#9646  b18/b19  IDENTICAL inside the comparable region (294 MODEL + 46 LIQ)   QLT IDENTICAL over 102 / 102 row(s)
+USDCHF#209F  b17/b18  IDENTICAL inside the comparable region (67 MODEL + 44 LIQ)    QLT IDENTICAL over 102 / 102 row(s)
+USDJPY#D61E  b17/b18  IDENTICAL inside the comparable region (83 MODEL + 47 LIQ)    QLT IDENTICAL over 102 / 102 row(s)
+XAUUSD#159A  b29/b30  IDENTICAL inside the comparable region (167 MODEL + 46 LIQ)   QLT IDENTICAL over 107 / 107 row(s)
+XAUUSD#8C1C  b33/b34  IDENTICAL inside the comparable region (161 MODEL + 46 LIQ)   QLT IDENTICAL over 107 / 107 row(s)
+every one: MODEL / LIQ / CTX / PROT / B8 / STR / QLT IDENTICAL; STR and QLT rows recompute (208 / 218 per build pair), QLT agrees with
+the build's HMI-CTX / HMI-ANCHOR rows, both histograms add up (10 of 10)
+
+## v2.56 -> v2.57, same symbol / params / window, latest complete builds (local 14:07 - 14:09)
+AUDUSD  46E1 b23 -> F657 b19   IDENTICAL apart from the quality rows - 690 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+EURUSD  198B b41 -> 0442 b32   IDENTICAL apart from the quality rows - 479 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+EURUSD  54CC b42 -> 3F83 b32   IDENTICAL apart from the quality rows - 478 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+GBPUSD  86FE b22 -> 3674 b18   IDENTICAL apart from the quality rows - 777 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+NZDUSD  A97D b23 -> 58F3 b18   IDENTICAL apart from the quality rows - 769 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+USDCAD  E6D0 b24 -> 9646 b19   IDENTICAL apart from the quality rows - 1240 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+USDCHF  7129 b22 -> 209F b18   IDENTICAL apart from the quality rows - 602 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+USDJPY  15F9 b22 -> D61E b18   IDENTICAL apart from the quality rows - 608 line(s) the same in both; 104 quality row(s) recompute, the histogram adds up
+XAUUSD  2AE3 b43 -> 159A b30   IDENTICAL apart from the quality rows - 860 line(s) the same in both; 109 quality row(s) recompute, the histogram adds up
+XAUUSD  6624 b43 -> 8C1C b34   IDENTICAL apart from the quality rows - 848 line(s) the same in both; 109 quality row(s) recompute, the histogram adds up
+(198B: build 42 is the unclosed one; -Versus takes the last complete build)
+
+## -Qlt, latest complete builds (record only)
+    merged  params 461F006E  (8 chart(s), 2936 trend H4 bars, total available on 1629 = 55 %)
+      mature events used on the trend bars: n=0 220  n=1 606  n=2 481  n=3 440  n=4 370  n=5 819
+      displayed score  P10 46  P25 60  P50 72  P75 79  P90 83
+      tiers of the scored bars (on the unrounded score)  poor 79 (5 %)  fair 652 (40 %)  good 898 (55 %)
+    merged  params A047970C  (2 chart(s), 757 trend H4 bars, total available on 455 = 60 %)
+      mature events used on the trend bars: n=0 54  n=1 148  n=2 100  n=3 126  n=4 103  n=5 226
+      displayed score  P10 46  P25 60  P50 74  P75 81  P90 88
+      tiers of the scored bars (on the unrounded score)  poor 28 (6 %)  fair 146 (32 %)  good 281 (62 %)
+    a record of the distribution, not a calibration (BRI-14 C-10): weights 40 / 35 / 25 and tiers 40 / 70 stay.
+
+## panel text these rows give (tools/quality_sim.py panel_text / compact_text; the MQL wording is checked by quality_mql_mirror.py)
+## shown until the next H4 is processed (server 20:00 bar, local 17:05)
+XAUUSD  FULL 趋势质量  良好 · 73/100（5 次事件）                                          COMPACT 质量 良好 73/100   5 次事件
+EURUSD  FULL 趋势质量  良好 · 77/100（低样本 3 次突破）                                    COMPACT 质量 良好 77/100   低样本
+USDCAD  FULL 趋势质量  一般 · 54/100（5 次事件）                                          COMPACT 质量 一般 54/100   5 次事件
+AUDUSD  FULL 趋势质量  一般 · 55/100（5 次事件）                                          COMPACT 质量 一般 55/100   5 次事件
+GBPUSD  FULL 趋势质量  样本不足（成熟突破 2/3，待确认 1）  局部表现 回撤 100 · 重叠 49    COMPACT 质量 样本不足 2/3   局部 回撤 100 重叠 49
+NZDUSD / USDCHF / USDJPY  FULL 趋势质量  暂不评级（反转待确认）                            COMPACT 质量 暂不评级
