@@ -143,3 +143,38 @@ XAUUSD#8C1C -> XAUUSD#6624   b91  -> b51  IDENTICAL apart from the stage rows - 
   a record of the distribution, not a calibration (BRI-15): 0.25 ATR, 2/3, 35 and the 65 / 70 item boundaries stay.
 
 ## params digests on HMI-BUILD-BEGIN: 461F006E (16 charts), A047970C (EURUSD 3F83 / 54CC, XAUUSD 8C1C / 6624) - unchanged
+
+## screenshots (r4; taken local 14:10 - 14:55, before the next H4 close at 17:00 - the 16:00 server bar), 6 images, 1920 x 881
+## each compared word for word with the compact rows derived above from the live HMI-STG / STR / QLT rows
+1 EURUSD#198B COMPACT  right: H4 空头｜正常回撤 / 强度 中等36/100→｜质量 良好74/100 低样本 / 原因 近期突破失败，价格往返明显 - same
+                         colours: 空头 red, 中等 white (mid), 良好 sky blue (high); H4 / ｜ / 强度 / 质量 / 原因 in the label colour
+                       left:  M5 未跟踪 · 等待价格触及 H4 POI / 今日波幅占 ADR 83% · 剩余 11.4 pip (orange: >= InpADRWarnPct 80)
+2 USDCHF#7129 COMPACT  right: H4 过渡·偏多｜反转待确认 (gold) / 强度 暂不评级｜质量 暂不评级 / 原因 空头保护高点已破 - same
+                       left:  M5 跟踪中（10.26 10:05 起）已确认 2 项 · 待确认 4 项 · 锚点失效 · H4 趋势已变 / 今日波幅占 ADR 48% · 剩余 27.8 pip
+                         log: the latest build's last HMI-ARM is block 2525 at 2026.10.26 10:05; its confirmed models BPR (10:10) and
+                         PA BREAK-RETEST (13:45); CISD and MSS references state=OK (pending), the two PA models pending -> 2 / 4. No ARMED
+                         since, so it is still the active cycle that Phase 4 checks (G-15). Open for the reviewer: whether a cycle armed
+                         three days earlier, anchor invalidated and H4 changed since, should still read as 跟踪中 (see below)
+3 USDJPY#15F9 COMPACT  right: H4 多头｜正常回撤 / 强度 弱24/100→｜质量 样本不足 1/3 / 原因 近期突破失败，价格往返明显 - same
+                         (多头 green, 弱 orchid (low); quality FEW written as 样本不足 1/3, no score)
+                       left:  M5 未跟踪 · 等待价格触及 H4 POI / 今日波幅占 ADR 62% · 剩余 31.9 pip
+4 GBPUSD#86FE COMPACT  right: H4 空头｜正常回撤 / 强度 弱11/100↓｜质量 一般48/100 低样本 / 原因 近期突破失败，近期逆向运行 - same
+                       left:  M5 跟踪中（10.28 18:30 起）已确认 3 项 · 待确认 2 项 · 锚点失效 / 今日波幅占 ADR 67% · 剩余 23.5 pip
+                         log: HMI-ARM block 2866 at 2026.10.28 18:30; BPR, PA BREAK-RETEST, PA ENGULFING (live today 16:20) confirmed,
+                         CISD NA_BROKEN, MSS state=OK and PA REJECTION pending -> 3 / 2 (+ 1 N/A)
+5 GBPUSD FULL          right: five rows - H4 趋势 ▼ 空头 / 趋势强度 弱 · 11/100 ↓ / 趋势质量 一般 · 48/100（低样本 3 次突破）/
+                         当前阶段 正常回撤 / 主要原因 近期突破失败，近期逆向运行; no 数据截至 row
+                       left:  header, the same M5 row, H4 CONTEXT BEARISH BOS 计数 3 CLEAN, 强度分项 净推进 16 · 效率 11 · 动量 0,
+                         质量分项 突破 33 · 回撤 63 · 重叠 50, H4 POI 0 ACTIVE / 9 REJECTED-BY-GAP, M5 BLOCK GAP-REJECTED 16, SESSION none,
+                         CYCLE #2861 BEAR BPR OK PA ENGULFING OK PA BREAK-RETEST OK CISD N/A [ANCHOR INVALIDATED] (wrapped, nothing cut),
+                         ADR(20) 72.1 pip | today 48.6 pip (67%) | left 23.5 pip - the same 67 % / 23.5 pip as the compact row
+                         cycle #2861 here vs #2866 in the 13:33 log: switching to FULL re-initialised the chart and its window moved,
+                         so ids are numbered afresh (A-20); same cycle by content (armed 10.28 18:30, the same three OK, CISD N/A)
+                         "< 2:4x (1)" across the 趋势强度 row is the separate countdown tool's text at the price level, not HMI
+6 USDCHF FULL          right: H4 趋势 过渡 · 偏多待确认 (gold) / 趋势强度 暂不评级 / 趋势质量 暂不评级 / 当前阶段 反转待确认 /
+                         主要原因 空头保护高点已破; no 数据截至 row
+                       left:  header, the same M5 row, H4 CONTEXT TRANSITION (pending UP) BOS 计数 0 CLEAN (no item rows: no score in a
+                         transition), H4 POI 0 ACTIVE / 8, M5 BLOCK GAP-REJECTED 10, SESSION none, CYCLE #2521 BEAR BPR OK PA BREAK-RETEST OK
+                         [ANCHOR INVALIDATED] [CTX CHANGED] (= block 2525 of the log, renumbered as in 5), ADR(20) 53.3 | 25.5 (48%) | 27.8
+                         the box covers the level label behind it (NY AM HIGH): the box is drawn after the lines, as designed
+All six as designed: compact three / two rows, detailed five rows / every diagnostic row, no 数据截至, no score standing in for a state.
