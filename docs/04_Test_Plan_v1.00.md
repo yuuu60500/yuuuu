@@ -1156,4 +1156,5 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           第 4 项 20 张图同窗口重载全部 IDENTICAL（MODEL / LIQ / CTX / PROT / B8 / STR / QLT，v2.58 另含 STG 并逐行复算；XAUUSD 四张
           的最后两次构建一 WAITING 一 READY，LIQ 另以去掉 WAITING 构建的副本 READY 对 READY 核对，相同）；第 5 项首批实时 HMI-STG
           （服务器 16:00 H4，本地 13:05）十张全部与重建一致，live_coverage --ver 2.58 / 2.57 均 0 差异；第 6 项十对 v2.57 → v2.58
-          全部「IDENTICAL apart from the stage rows」；第 7 项 -Stg 已记录。待做：第 8 项截图（精简 / 详细），r4 编译结果
+          全部「IDENTICAL apart from the stage rows」；第 7 项 -Stg 已记录。待做：第 8 项截图（精简 / 详细）
+   r4 编译（2026-10-29）：用户 0 errors / 0 warnings（包 90C6732F…4338）；11:00 重挂的十张 v2.58 即 r4（用户确认）
