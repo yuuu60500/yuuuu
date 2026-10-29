@@ -2563,6 +2563,6 @@ XAUUSD 等待重建:          最后两次构建 WAITING / READY → LIQ 记 PEN
 USDCHF 旧周期:           保留「跟踪中」+ 开始日期 + 两个异常；不改 D-1 / D-5、不关周期（G-15）
 P3（不阻塞）:            趋势方向下 NODATA / NOATR 时第三行写「无突出分项」，应为「—」（StgWhyText 只判方向）；验收方以 C09 输入复现，
                          原生日志无 NOATR 样本。本仓库确认：stage_sim.why_text 同样写法，C09 只断言前两行 —— 封版后修并补断言
-冻结:                    docs/baselines/v2.58r4.md（MQL 2386f8f、工具指纹、r4 包与运行证据包 SHA256；EX5 指纹待补）
+冻结:                    docs/baselines/v2.58r4.md（MQL 2386f8f、工具指纹、r4 包与运行证据包 SHA256；实际加载的 EX5 4a3bb167…5dbb）
 五日:                    10-30、11-02、11-03、11-04、11-05（计划）；标准见基线 §4；期间不加功能、不改公式 / 权重 / 结构 / 信号
 ```
