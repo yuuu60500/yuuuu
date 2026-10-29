@@ -1151,3 +1151,9 @@ MT5 运行验收为第 4 项（实时 vs 重建）与第 5 项（同版本重载
           stage_mql_mirror PASS（另含左上两行 23377 组输入）；日志、评分、信号、参数（461F006E）不变。第 8 项截图改为：
           精简模式 —— 右上三行（趋势中 / 过渡或区间 / 等待，按实际出现）、左上两行（跟踪中、等待区块或等待 POI，按实际出现）；
           详细模式 —— 右上五行（无数据截至）、左上全部诊断行（M5 行、六个模型的 CYCLE / LAST CYCLE 行）
+   MT5 运行（2026-10-29，docs/evidence/v2.58_mt5_run_20261029.txt；20 张图，v2.58 实例 11:00 重挂，13:33–13:34 同一根 M5 内统一刷新）：
+          第 1 项 ver=2.58、params 461F006E / A047970C 不变；第 2 项 HMI-STG 与 HMI-STR / QLT 同一组 H4、STG-HIST 每次构建一行；
+          第 4 项 20 张图同窗口重载全部 IDENTICAL（MODEL / LIQ / CTX / PROT / B8 / STR / QLT，v2.58 另含 STG 并逐行复算；XAUUSD 四张
+          的最后两次构建一 WAITING 一 READY，LIQ 另以去掉 WAITING 构建的副本 READY 对 READY 核对，相同）；第 5 项首批实时 HMI-STG
+          （服务器 16:00 H4，本地 13:05）十张全部与重建一致，live_coverage --ver 2.58 / 2.57 均 0 差异；第 6 项十对 v2.57 → v2.58
+          全部「IDENTICAL apart from the stage rows」；第 7 项 -Stg 已记录。待做：第 8 项截图（精简 / 详细），r4 编译结果

@@ -1,0 +1,145 @@
+# v2.58 MT5 run 2026-10-29: 20261029.log local 09:10 .. 13:34 - the first live HMI-STG rows (server 16:00 H4, processed at local 13:05)
+# 20261029.rar sha256 81b68366c9de4da76d1f0ee7d66345ef3697762ec886689ee7577d59eeefd652; 20261029.log 022de2a658109efa27a4e127be824dd75b8442aa54946bafbf63b83ba36f0db3
+# 318971 lines; server = local + 3 h; tools as in the v2.58r4 package (ReloadTest unchanged since v2.58 dev).
+# 20 charts: v2.57 x10 (baseline) and v2.58 x10, 8 symbols at the default params 461F006E + EURUSD / XAUUSD at the ATR params A047970C.
+# v2.58 charts started twice: local 09:21 - 09:23 (init 75 - 85) and 11:00 - 11:02 (init 86 - 95); every v2.58 build compared below
+# is from the 11:00 instances. The log cannot tell r3 from r4 (they differ only on the panel). No runtime error in the file.
+# 340 HMI-BUILD-BEGIN, 340 HMI-BUILD-END: every build complete. Refresh of all 20 charts at local 13:33:21 - 13:34:01,
+# inside one M5 bar: every latest build has to = 2026.10.29 16:25 (server).
+
+## live HMI-STG rows (live=1), server bar 2026.10.29 16:00, local 13:04:59 .. 13:05:00 - one per v2.58 chart
+AUDUSD#46E1  13:04:59  BULLISH    DEEP     DEEP+BRK_FAIL      arrow DOWN ref  67 ->   0  near 0 refresh 0 dist 440
+EURUSD#198B  13:04:59  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow FLAT ref  37 ->  36  near 0 refresh 0 dist 149
+EURUSD#54CC  13:04:59  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow FLAT ref  37 ->  36  near 0 refresh 0 dist 149
+GBPUSD#86FE  13:04:59  BEARISH    PULLBACK BRK_FAIL+COUNTER   arrow DOWN ref  26 ->  11  near 0 refresh 0 dist 467
+NZDUSD#A97D  13:05:00  TRANSITION TRANS    PROT_BROKEN        arrow NA   ref  NA ->  NA  near NA refresh NA dist NA
+USDCAD#E6D0  13:04:59  BEARISH    PULLBACK BRK_FAIL+COUNTER   arrow DOWN ref  45 ->  23  near 0 refresh 0 dist 271
+USDCHF#7129  13:04:59  TRANSITION TRANS    PROT_BROKEN        arrow NA   ref  NA ->  NA  near NA refresh NA dist NA
+USDJPY#15F9  13:04:59  BULLISH    PULLBACK BRK_FAIL+CHOP      arrow FLAT ref  26 ->  24  near 0 refresh 0 dist 284
+XAUUSD#2AE3  13:04:59  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow FLAT ref  12 ->  13  near 0 refresh 0 dist 4502
+XAUUSD#6624  13:04:59  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow FLAT ref  12 ->  13  near 0 refresh 0 dist 4502
+(arrow = displayed score vs the one 3 bars earlier, +-5: 67 -> 0 DOWN, 37 -> 36 FLAT, 26 -> 11 DOWN, 45 -> 23 DOWN, 26 -> 24 FLAT, 12 -> 13 FLAT)
+
+## what the r4 compact trend panel shows for that bar (tools/stage_sim.compact_rows on the live HMI-STG / STR / QLT rows) - for the screenshots
+AUDUSD#46E1  bar 2026.10.29 16:00   H4 多头｜深度回撤   /   强度 弱0/100↓｜质量 一般42/100   /   原因 回撤偏深，近期突破失败
+EURUSD#198B  bar 2026.10.29 16:00   H4 空头｜正常回撤   /   强度 中等36/100→｜质量 良好74/100 低样本   /   原因 近期突破失败，价格往返明显
+EURUSD#54CC  bar 2026.10.29 16:00   H4 空头｜正常回撤   /   强度 中等36/100→｜质量 良好74/100 低样本   /   原因 近期突破失败，价格往返明显
+GBPUSD#86FE  bar 2026.10.29 16:00   H4 空头｜正常回撤   /   强度 弱11/100↓｜质量 一般48/100 低样本   /   原因 近期突破失败，近期逆向运行
+NZDUSD#A97D  bar 2026.10.29 16:00   H4 过渡·偏空｜反转待确认   /   强度 暂不评级｜质量 暂不评级   /   原因 多头保护低点已破
+USDCAD#E6D0  bar 2026.10.29 16:00   H4 空头｜正常回撤   /   强度 弱23/100↓｜质量 良好74/100   /   原因 近期突破失败，近期逆向运行
+USDCHF#7129  bar 2026.10.29 16:00   H4 过渡·偏多｜反转待确认   /   强度 暂不评级｜质量 暂不评级   /   原因 空头保护高点已破
+USDJPY#15F9  bar 2026.10.29 16:00   H4 多头｜正常回撤   /   强度 弱24/100→｜质量 样本不足 1/3   /   原因 近期突破失败，价格往返明显
+XAUUSD#2AE3  bar 2026.10.29 16:00   H4 空头｜正常回撤   /   强度 弱13/100→｜质量 良好80/100   /   原因 近期突破失败，价格往返明显
+XAUUSD#6624  bar 2026.10.29 16:00   H4 空头｜正常回撤   /   强度 弱13/100→｜质量 良好80/100   /   原因 近期突破失败，价格往返明显
+(AUDUSD 弱0/100 is a computed score, state=OK: in BULLISH the 12-bar net is -91 points and the 3-bar net -275, so all three items are 0;
+ it is not a stand-in for a state. A state is written as a word: NZDUSD / USDCHF 暂不评级, USDJPY quality 样本不足 1/3.)
+
+## live vs build: ReloadTest -LiveVsBuild (20261029.log alone)
+20 of 20 charts AGREE BOTH WAYS on every covered bar; strength 1 / quality 1 row per chart, stage 1 row per v2.58 chart (STG)
+AUDUSD#46E1,M5  live events compared: 1 (+ 0 H4 structure event(s))
+AUDUSD#46E1,M5  by model: LIQ SSL SWEEP 1
+AUDUSD#F657,M5  live events compared: 1 (+ 0 H4 structure event(s))
+AUDUSD#F657,M5  by model: LIQ SSL SWEEP 1
+EURUSD#0442,M5  live events compared: 3 (+ 0 H4 structure event(s))
+EURUSD#0442,M5  by model: LIQ PDL SWEEP 1  |  LIQ SSL SWEEP 2
+EURUSD#198B,M5  live events compared: 3 (+ 0 H4 structure event(s))
+EURUSD#198B,M5  by model: LIQ PDL SWEEP 1  |  LIQ SSL SWEEP 2
+EURUSD#3F83,M5  live events compared: 3 (+ 0 H4 structure event(s))
+EURUSD#3F83,M5  by model: LIQ PDL SWEEP 1  |  LIQ SSL SWEEP 2
+EURUSD#54CC,M5  live events compared: 3 (+ 0 H4 structure event(s))
+EURUSD#54CC,M5  by model: LIQ PDL SWEEP 1  |  LIQ SSL SWEEP 2
+GBPUSD#3674,M5  live events compared: 1 (+ 0 H4 structure event(s))
+GBPUSD#3674,M5  by model: PA ENGULFING 1
+GBPUSD#86FE,M5  live events compared: 1 (+ 0 H4 structure event(s))
+GBPUSD#86FE,M5  by model: PA ENGULFING 1
+XAUUSD#6624,M5  live events compared: 0 (+ 1 H4 structure event(s))
+XAUUSD#6624,M5  protected-level rows compared: 2 (PROT / ANCHOR / INTERNAL)
+XAUUSD#8C1C,M5  live events compared: 0 (+ 1 H4 structure event(s))
+XAUUSD#8C1C,M5  protected-level rows compared: 2 (PROT / ANCHOR / INTERNAL)
+
+## live_coverage.py --offset 3 (log as uploaded)
+--ver 2.58:
+== category coverage, v2.58
+  AUDUSD#46E1    intraday: LIQ, STR, QLT, STG       across a sleep only: -                  edge only: -            no sample: MODEL, CTX, PROT, B8
+  EURUSD#198B    intraday: LIQ, STR, QLT, STG       across a sleep only: -                  edge only: -            no sample: MODEL, CTX, PROT, B8
+  EURUSD#54CC    intraday: LIQ, STR, QLT, STG       across a sleep only: -                  edge only: -            no sample: MODEL, CTX, PROT, B8
+  GBPUSD#86FE    intraday: MODEL, STR, QLT, STG     across a sleep only: -                  edge only: -            no sample: LIQ, CTX, PROT, B8
+  NZDUSD#A97D    intraday: STR, QLT, STG            across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  USDCAD#E6D0    intraday: STR, QLT, STG            across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  USDCHF#7129    intraday: STR, QLT, STG            across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  USDJPY#15F9    intraday: STR, QLT, STG            across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  XAUUSD#2AE3    intraday: STR, QLT, STG            across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, CTX, PROT, B8
+  XAUUSD#6624    intraday: CTX, PROT, STR, QLT, STG across a sleep only: -                  edge only: -            no sample: MODEL, LIQ, B8
+
+RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+--ver 2.57:
+RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+
+## same-window reload, last two builds per chart (refresh 13:33 - 13:34, to = 16:25 server)
+AUDUSD#46E1  b3/b4    IDENTICAL inside the comparable region (102 MODEL + 49 LIQ)   STG IDENTICAL over 103 / 103 row(s)
+AUDUSD#F657  b26/b27  IDENTICAL inside the comparable region (102 MODEL + 49 LIQ)
+EURUSD#0442  b41/b42  IDENTICAL inside the comparable region (43 MODEL + 40 LIQ)
+EURUSD#198B  b5/b6    IDENTICAL inside the comparable region (43 MODEL + 40 LIQ)   STG IDENTICAL over 103 / 103 row(s)
+EURUSD#3F83  b10/b11  IDENTICAL inside the comparable region (43 MODEL + 40 LIQ)
+EURUSD#54CC  b5/b6    IDENTICAL inside the comparable region (43 MODEL + 40 LIQ)   STG IDENTICAL over 103 / 103 row(s)
+GBPUSD#3674  b6/b7    IDENTICAL inside the comparable region (145 MODEL + 48 LIQ)
+GBPUSD#86FE  b2/b3    IDENTICAL inside the comparable region (145 MODEL + 48 LIQ)   STG IDENTICAL over 103 / 103 row(s)
+NZDUSD#58F3  b23/b24  IDENTICAL inside the comparable region (115 MODEL + 49 LIQ)
+NZDUSD#A97D  b2/b3    IDENTICAL inside the comparable region (115 MODEL + 49 LIQ)   STG IDENTICAL over 103 / 103 row(s)
+USDCAD#9646  b25/b26  IDENTICAL inside the comparable region (308 MODEL + 50 LIQ)
+USDCAD#E6D0  b2/b3    IDENTICAL inside the comparable region (308 MODEL + 50 LIQ)   STG IDENTICAL over 103 / 103 row(s)
+USDCHF#209F  b23/b24  IDENTICAL inside the comparable region (67 MODEL + 43 LIQ)
+USDCHF#7129  b2/b3    IDENTICAL inside the comparable region (67 MODEL + 43 LIQ)   STG IDENTICAL over 103 / 103 row(s)
+USDJPY#15F9  b2/b3    IDENTICAL inside the comparable region (80 MODEL + 50 LIQ)   STG IDENTICAL over 103 / 103 row(s)
+USDJPY#D61E  b9/b10   IDENTICAL inside the comparable region (80 MODEL + 50 LIQ)
+XAUUSD#159A  b86/b87  MODEL IDENTICAL inside the comparable region (153 rows)
+XAUUSD#2AE3  b50/b51  MODEL IDENTICAL inside the comparable region (153 rows)   STG IDENTICAL over 107 / 107 row(s)
+XAUUSD#6624  b50/b51  MODEL IDENTICAL inside the comparable region (147 rows)   STG IDENTICAL over 107 / 107 row(s)
+XAUUSD#8C1C  b90/b91  MODEL IDENTICAL inside the comparable region (147 rows)
+every chart: CTX / PROT / B8 / STR / QLT IDENTICAL; STR and QLT rows recompute; every v2.58 chart: STG rows recompute from their bar's
+HMI-STR / HMI-QLT and agree with the build's HMI-CTX / HMI-PROT rows, both histograms add up (10 of 10).
+XAUUSD: the refresh made 47 quick rebuilds per chart while the liquidity history was WAITING (13:33:39 - 13:33:56), then one READY
+build (13:34:01). The last two builds are WAITING / READY, so LIQ is PENDING there by rule (MODEL compared). LIQ checked READY against
+READY on a copy of the log without those 47 WAITING builds per XAUUSD chart (nothing else removed):
+  XAUUSD#2AE3  b3/b51   IDENTICAL inside the comparable region (153 MODEL + 47 LIQ) (same window)
+  XAUUSD#6624  b3/b51   IDENTICAL inside the comparable region (147 MODEL + 47 LIQ) (same window)
+  XAUUSD#159A  b39/b87  IDENTICAL inside the comparable region (153 MODEL + 47 LIQ) (same window)
+  XAUUSD#8C1C  b43/b91  IDENTICAL inside the comparable region (147 MODEL + 47 LIQ) (same window)
+
+## v2.57 -> v2.58, same symbol / params / window, latest complete builds (13:33 - 13:34)
+AUDUSD#F657 -> AUDUSD#46E1   b27  -> b4   IDENTICAL apart from the stage rows - 790 line(s) the same in both; 105 stage row(s) recompute, the histogram adds up
+EURUSD#0442 -> EURUSD#198B   b42  -> b6   IDENTICAL apart from the stage rows - 588 line(s) the same in both; 105 stage row(s) recompute, the histogram adds up
+EURUSD#3F83 -> EURUSD#54CC   b11  -> b6   IDENTICAL apart from the stage rows - 588 line(s) the same in both; 105 stage row(s) recompute, the histogram adds up
+GBPUSD#3674 -> GBPUSD#86FE   b7   -> b3   IDENTICAL apart from the stage rows - 889 line(s) the same in both; 105 stage row(s) recompute, the histogram adds up
+NZDUSD#58F3 -> NZDUSD#A97D   b24  -> b3   IDENTICAL apart from the stage rows - 822 line(s) the same in both; 105 stage row(s) recompute, the histogram adds up
+USDCAD#9646 -> USDCAD#E6D0   b26  -> b3   IDENTICAL apart from the stage rows - 1373 line(s) the same in both; 105 stage row(s) recompute, the histogram adds up
+USDCHF#209F -> USDCHF#7129   b24  -> b3   IDENTICAL apart from the stage rows - 708 line(s) the same in both; 105 stage row(s) recompute, the histogram adds up
+USDJPY#D61E -> USDJPY#15F9   b10  -> b3   IDENTICAL apart from the stage rows - 701 line(s) the same in both; 105 stage row(s) recompute, the histogram adds up
+XAUUSD#159A -> XAUUSD#2AE3   b87  -> b51  IDENTICAL apart from the stage rows - 935 line(s) the same in both; 109 stage row(s) recompute, the histogram adds up
+XAUUSD#8C1C -> XAUUSD#6624   b91  -> b51  IDENTICAL apart from the stage rows - 923 line(s) the same in both; 109 stage row(s) recompute, the histogram adds up
+
+## ReloadTest -Stg (record, latest complete build per v2.58 chart)
+--- stage / reason distribution (HMI-STG-HIST, latest complete build per chart) ---
+  AUDUSD#46E1,M5         build 4    2026.07.06 12:00 .. 2026.10.29 16:00  bars 500  nodata 14  noatr 0  trans 62  range 9  build 64  deep 51  push 30  consol 6  pullback 264  arrows up 157 / down 186 / flat 48 / new 24
+  EURUSD#198B,M5         build 6    2026.07.06 12:00 .. 2026.10.29 16:00  bars 500  nodata 14  noatr 0  trans 50  range 9  build 7  deep 81  push 27  consol 2  pullback 310  arrows up 166 / down 169 / flat 77 / new 15
+  EURUSD#54CC,M5         build 6    2026.07.06 12:00 .. 2026.10.29 16:00  bars 500  nodata 14  noatr 0  trans 51  range 9  build 7  deep 81  push 27  consol 2  pullback 309  arrows up 166 / down 168 / flat 77 / new 15
+  GBPUSD#86FE,M5         build 3    2026.07.06 12:00 .. 2026.10.29 16:00  bars 500  nodata 14  noatr 0  trans 122  range 32  build 32  deep 45  push 20  consol 2  pullback 233  arrows up 110 / down 131 / flat 58 / new 33
+  NZDUSD#A97D,M5         build 3    2026.07.06 12:00 .. 2026.10.29 16:00  bars 500  nodata 14  noatr 0  trans 102  range 15  build 25  deep 32  push 40  consol 5  pullback 267  arrows up 143 / down 155 / flat 47 / new 24
+  USDCAD#E6D0,M5         build 3    2026.07.06 12:00 .. 2026.10.29 16:00  bars 500  nodata 14  noatr 0  trans 112  range 18  build 83  deep 41  push 37  consol 10  pullback 185  arrows up 124 / down 153 / flat 52 / new 27
+  USDCHF#7129,M5         build 3    2026.07.06 12:00 .. 2026.10.29 16:00  bars 500  nodata 14  noatr 0  trans 127  range 8  build 10  deep 28  push 32  consol 6  pullback 275  arrows up 117 / down 142 / flat 64 / new 28
+  USDJPY#15F9,M5         build 3    2026.07.06 12:00 .. 2026.10.29 16:00  bars 500  nodata 14  noatr 0  trans 118  range 8  build 71  deep 55  push 20  consol 4  pullback 210  arrows up 111 / down 144 / flat 72 / new 33
+  XAUUSD#2AE3,M5         build 51   2026.07.06 12:00 .. 2026.10.29 16:00  bars 500  nodata 14  noatr 0  trans 134  range 16  build 53  deep 30  push 31  consol 5  pullback 217  arrows up 113 / down 156 / flat 37 / new 30
+  XAUUSD#6624,M5         build 51   2026.07.06 12:00 .. 2026.10.29 16:00  bars 500  nodata 14  noatr 0  trans 132  range 16  build 53  deep 33  push 31  consol 5  pullback 216  arrows up 113 / down 158 / flat 37 / new 30
+  merged  params 461F006E STG1-NEAR25-DEEP2.3-EFF35-POS65.70-ARR3.5  (8 chart(s), 2946 trend H4 bars)
+    trend stages  build 345 (12 %) deep 363 (12 %) push 237 (8 %) consol 40 (1 %) pullback 1961 (67 %)
+    other         nodata 112 noatr 0 trans 827 range 115
+    reasons       PROT_BROKEN 680 SWING_BROKEN 147 TIMEOUT 94 NO_PROT 345 LEG 0 DEEP 363 BRK_FAIL 2062 COUNTER 925 CHOP 995 MOVE 179 RET 193 BRK 5 EFF 0 MOM 10 OVL 0
+    arrows        up 1041  down 1236  flat 455  new 214
+  merged  params A047970C STG1-NEAR25-DEEP2.3-EFF35-POS65.70-ARR3.5  (2 chart(s), 764 trend H4 bars)
+    trend stages  build 60 (8 %) deep 114 (15 %) push 58 (8 %) consol 7 (1 %) pullback 525 (69 %)
+    other         nodata 28 noatr 0 trans 183 range 25
+    reasons       PROT_BROKEN 136 SWING_BROKEN 47 TIMEOUT 25 NO_PROT 60 LEG 0 DEEP 114 BRK_FAIL 528 COUNTER 247 CHOP 251 MOVE 63 RET 64 BRK 1 EFF 0 MOM 6 OVL 0
+    arrows        up 279  down 326  flat 114  new 45
+  a record of the distribution, not a calibration (BRI-15): 0.25 ATR, 2/3, 35 and the 65 / 70 item boundaries stay.
+
+## params digests on HMI-BUILD-BEGIN: 461F006E (16 charts), A047970C (EURUSD 3F83 / 54CC, XAUUSD 8C1C / 6624) - unchanged
