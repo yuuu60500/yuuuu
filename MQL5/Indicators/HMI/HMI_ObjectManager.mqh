@@ -334,6 +334,25 @@ void OM_BoxClear(const string tt, const int maxrows)
    for(int i = 0; i <= 2 * maxrows; i++) OM_DeleteName(OM_Name(tt, 0, i));
   }
 
+// the background (sub 0); left / top as the corner measures them
+void OM_BoxBg(const string tt, const ENUM_BASE_CORNER corner, const int left, const int top, const int W, const int H)
+  {
+   string bg = OM_Name(tt, 0, 0);
+   if(ObjectCreate(0, bg, OBJ_RECTANGLE_LABEL, 0, 0, 0)) OM_Register(bg);
+   ObjectSetInteger(0, bg, OBJPROP_CORNER, corner);
+   ObjectSetInteger(0, bg, OBJPROP_XDISTANCE, left);
+   ObjectSetInteger(0, bg, OBJPROP_YDISTANCE, top);
+   ObjectSetInteger(0, bg, OBJPROP_XSIZE, W);
+   ObjectSetInteger(0, bg, OBJPROP_YSIZE, H);
+   ObjectSetInteger(0, bg, OBJPROP_BGCOLOR, OM_PanelBg());
+   ObjectSetInteger(0, bg, OBJPROP_BORDER_TYPE, BORDER_FLAT);
+   ObjectSetInteger(0, bg, OBJPROP_COLOR, InpPanelBorderColor);
+   ObjectSetInteger(0, bg, OBJPROP_WIDTH, 1);
+   ObjectSetInteger(0, bg, OBJPROP_BACK, false);
+   ObjectSetInteger(0, bg, OBJPROP_SELECTABLE, false);
+   ObjectSetInteger(0, bg, OBJPROP_HIDDEN, true);
+  }
+
 // Sub 0 = the background, 1 .. maxrows = the left column, maxrows + 1 .. = the
 // right one; an empty left column (all "") gives a one-column box. For a
 // right / lower corner the distances are measured to the box's left / top
@@ -366,20 +385,7 @@ void OM_DrawBox(const string tt, const ENUM_BASE_CORNER corner, const int bx, co
    bool lower = (corner == CORNER_LEFT_LOWER  || corner == CORNER_RIGHT_LOWER);
    int left = (right ? bx + W : bx);
    int top  = (lower ? by + H : by);
-   string bg = OM_Name(tt, 0, 0);
-   if(ObjectCreate(0, bg, OBJ_RECTANGLE_LABEL, 0, 0, 0)) OM_Register(bg);
-   ObjectSetInteger(0, bg, OBJPROP_CORNER, corner);
-   ObjectSetInteger(0, bg, OBJPROP_XDISTANCE, left);
-   ObjectSetInteger(0, bg, OBJPROP_YDISTANCE, top);
-   ObjectSetInteger(0, bg, OBJPROP_XSIZE, W);
-   ObjectSetInteger(0, bg, OBJPROP_YSIZE, H);
-   ObjectSetInteger(0, bg, OBJPROP_BGCOLOR, OM_PanelBg());
-   ObjectSetInteger(0, bg, OBJPROP_BORDER_TYPE, BORDER_FLAT);
-   ObjectSetInteger(0, bg, OBJPROP_COLOR, InpPanelBorderColor);
-   ObjectSetInteger(0, bg, OBJPROP_WIDTH, 1);
-   ObjectSetInteger(0, bg, OBJPROP_BACK, false);
-   ObjectSetInteger(0, bg, OBJPROP_SELECTABLE, false);
-   ObjectSetInteger(0, bg, OBJPROP_HIDDEN, true);
+   OM_BoxBg(tt, corner, left, top, W, H);
    int xl = (right ? left - pad : left + pad);
    int xv = (right ? left - pad - lw - gap : left + pad + lw + gap);
    for(int i = 0; i < rows; i++)
@@ -390,9 +396,56 @@ void OM_DrawBox(const string tt, const ENUM_BASE_CORNER corner, const int bx, co
      }
   }
 
-//--- the trend panel (requirement §2): H4 direction, strength, quality, stage, reasons, data time ---
+// v2.58r4: a one-column box whose rows are runs of coloured segments
+// (seg / sc / rw = text, colour, row; rows in order). A segment starts at the
+// measured width of its row's text before it - the whole prefix, not a sum of
+// pieces - so a row reads as one text. Subs 1 .. maxsub; deletes 0 .. maxsub.
+void OM_DrawSegBox(const string tt, const ENUM_BASE_CORNER corner, const int bx, const int by, const int fsize,
+                   const string &seg[], const color &sc[], const int &rw[], const int n, const int maxsub)
+  {
+   for(int i = 0; i <= maxsub; i++) OM_DeleteName(OM_Name(tt, 0, i));
+   int segs = MathMin(n, maxsub);
+   if(segs <= 0) return;
+   TextSetFont(InpPanelFontName, -fsize * 10);
+   int off[];
+   ArrayResize(off, segs);
+   int rwid = 0, th = 0, cur = -1;
+   string pre = "";
+   for(int i = 0; i < segs; i++)
+     {
+      if(rw[i] != cur) { cur = rw[i];  pre = ""; }
+      uint w = 0, h = 0;
+      off[i] = 0;
+      if(pre != "" && TextGetSize(pre, w, h)) off[i] = (int)w;
+      pre += seg[i];
+      if(TextGetSize(pre, w, h)) { rwid = MathMax(rwid, (int)w);  th = MathMax(th, (int)h); }
+     }
+   if(th <= 0) th = fsize + 6;
+   int pad  = 6;
+   int step = th + 2;
+   int rows = rw[segs - 1] + 1;
+   int W = pad + rwid + pad + 6;                      // + 6 as in OM_DrawBox
+   int H = pad + rows * step - 2 + pad;
+   bool right = (corner == CORNER_RIGHT_UPPER || corner == CORNER_RIGHT_LOWER);
+   bool lower = (corner == CORNER_LEFT_LOWER  || corner == CORNER_RIGHT_LOWER);
+   int left = (right ? bx + W : bx);
+   int top  = (lower ? by + H : by);
+   OM_BoxBg(tt, corner, left, top, W, H);
+   for(int i = 0; i < segs; i++)
+     {
+      if(seg[i] == "") continue;
+      int x = (right ? left - pad - off[i] : left + pad + off[i]);
+      int y = (lower ? top - pad - rw[i] * step : top + pad + rw[i] * step);
+      OM_BoxLabel(OM_Name(tt, 0, 1 + i), seg[i], corner, x, y, fsize, sc[i]);
+     }
+  }
+
+//--- the trend panel (requirement §2): H4 direction, strength, quality, stage, reasons ---
+#define TPN_ROWS 8                    // the trend panel's subs: 0 .. 2 TPN_ROWS (FULL's two columns, COMPACT's segments)
+
 color OM_TrendColor(const int ck)
   {
+   if(ck == PC_LAB) return(InpTrendLabelColor);                // v2.58r4: 强度 / 质量 / 原因 / ｜ in a compact row
    if(ck == PC_HIGH || ck == PC_MID || ck == PC_LOW)          // v2.58r3: tier colours, never red / green by default
      {
       if(!InpTrendTierColors) return(InpTrendValueColor);
@@ -405,15 +458,28 @@ color OM_TrendColor(const int ck)
    return(InpPanelCtxRangeColor);
   }
 
+// COMPACT (default): three rows - H4 空头｜正常回撤 / 强度 …｜质量 … / 原因 …
+// FULL: the five labelled rows. Neither has the 数据截至 row (v2.58r4).
 void OM_DrawTrendPanel()
   {
-   if(InpPanelMode == PANEL_OFF) { OM_BoxClear(TT_TPN, 6);  return; }
+   if(InpPanelMode == PANEL_OFF) { OM_BoxClear(TT_TPN, TPN_ROWS);  return; }
+   if(InpPanelMode == PANEL_COMPACT)
+     {
+      string seg[];
+      int    ck[], rw[];
+      int n = StgCompactRows(seg, ck, rw);
+      color sc[];
+      ArrayResize(sc, n);
+      for(int i = 0; i < n; i++) sc[i] = OM_TrendColor(ck[i]);
+      OM_DrawSegBox(TT_TPN, InpTrendCorner, InpTrendX, InpTrendY, InpTrendFontSize, seg, sc, rw, n, 2 * TPN_ROWS);
+      return;
+     }
    string lab[], val[];
    int    ck[];
    StgPanelRows(lab, val, ck);
-   color lc[6], vc[6];
-   for(int i = 0; i < 6; i++) { lc[i] = InpTrendLabelColor;  vc[i] = OM_TrendColor(ck[i]); }
-   OM_DrawBox(TT_TPN, InpTrendCorner, InpTrendX, InpTrendY, InpTrendFontSize, lab, lc, val, vc, 6, 6);
+   color lc[STG_FULL_ROWS], vc[STG_FULL_ROWS];
+   for(int i = 0; i < STG_FULL_ROWS; i++) { lc[i] = InpTrendLabelColor;  vc[i] = OM_TrendColor(ck[i]); }
+   OM_DrawBox(TT_TPN, InpTrendCorner, InpTrendX, InpTrendY, InpTrendFontSize, lab, lc, val, vc, STG_FULL_ROWS, TPN_ROWS);
   }
 
 //================== kill zone bookkeeping ==========================
@@ -517,12 +583,9 @@ int BlkVis(const M5Block &b)
   }
 
 //--- panel text ----------------------------------------------------
-// COMPACT keeps only what you cannot read off the chart:
-//   - the context direction (and therefore whether anything can appear)
-//   - which models in this cycle have fired, and which are N/A
-//     (N/A means "no reference was frozen, it will never fire" - that is
-//      invisible on the chart, so it is the one thing worth the pixels)
-// Everything else is diagnostics and lives in FULL.
+// PANEL_FULL's cycle row: which models of the cycle have fired, and which are
+// N/A ("no reference was frozen, it will never fire" - invisible on the
+// chart). v2.58r4: no longer in COMPACT, whose M5 row gives the counts.
 string OM_PanelCycleLine()
   {
    if(!SafeIdx(g_active_cyc, g_cyc_n)) return("CYCLE: none");
@@ -552,10 +615,36 @@ void OM_PanelAdd(string &L[], color &C[], int &n, const string text, const color
    for(int i = 0; i < k && n < MAX_PANEL_ROWS; i++) { L[n] = parts[i];  C[n] = clr;  n++; }
   }
 
-// v2.58: the trend (direction, strength, quality, stage, reasons, data time)
-// is the trend panel's; this one keeps the diagnostics. COMPACT: POI /
-// session and the cycle; FULL adds the structure counters, the score items,
-// the gap rejections and the liquidity history state.
+// v2.58r4 COMPACT row 1 (StgM5Row): the active cycle's model counts and flags,
+// else the session, else the context
+string OM_M5StatusRow(bool &tracking)
+  {
+   bool cyc_on = (SafeIdx(g_active_cyc, g_cyc_n) && g_cyc[g_active_cyc].state == CY_ACTIVE);
+   int done = 0, pend = 0;
+   string armed = "";
+   bool anc = false, chg = false;
+   if(cyc_on)
+     {
+      for(int m = 0; m < MDL_COUNT; m++)
+        {
+         if(g_cyc[g_active_cyc].result[m] == MR_CONFIRMED) done++;
+         if(g_cyc[g_active_cyc].result[m] == MR_PENDING)   pend++;
+        }
+      armed = StgShortTime(g_cyc[g_active_cyc].armed_time);
+      anc   = g_cyc[g_active_cyc].anchor_invalidated;
+      chg   = g_cyc[g_active_cyc].ctx_changed;
+     }
+   tracking = (cyc_on && pend > 0);
+   return(StgM5Row(g_ready, cyc_on, armed, done, pend, anc, chg, g_sess.active, StgShortTime(g_sess.start_time),
+                   g_ctx == CTX_BULLISH || g_ctx == CTX_BEARISH));
+  }
+
+// v2.58: the trend (direction, strength, quality, stage, reasons) is the trend
+// panel's; this one keeps the diagnostics. v2.58r4 COMPACT: two rows - the M5
+// tracking state and today's range against ADR (+ ATR when switched on, + the
+// liquidity history wait while it lasts). FULL: the header, the same M5 row,
+// the structure counters, the score items, POI / gap rejections, session,
+// liquidity history, the cycle with its six models, ATR / ADR.
 void OM_DrawPanel()
   {
    OM_DrawTrendPanel();
@@ -573,13 +662,33 @@ void OM_DrawPanel()
    if(g_ctx == CTX_TRANSITION)
       ctx += " (pending " + (g_ctx_pending == DIR_BULL ? "UP" : "DOWN") + ")";
 
-   // No build yet / a rebuild waiting for data: the header only - never the
-   // state of an older build (the trend panel says 等待数据)
-   if(!g_ready)
-      OM_PanelAdd(L, C, n, "HMI v" + HMI_VERSION + "  MARK ONLY - NO ENTRY DECISION", base);
-   else if(InpPanelMode == PANEL_FULL)
+   bool tracking = false;
+   string m5row = OM_M5StatusRow(tracking);
+
+   if(InpPanelMode == PANEL_COMPACT)
+     {
+      // No build yet / a rebuild waiting for data: M5 等待数据 and 等待数据 for
+      // ADR - never the state of an older build
+      OM_PanelAdd(L, C, n, m5row, base);
+      if(g_ready && InpShowATR) OM_PanelAdd(L, C, n, RangesATRText(), base);
+      if(InpShowADR)
+        {
+         double p = RangesADRUsedPct();
+         OM_PanelAdd(L, C, n, StgADRRow(g_ready && p >= 0.0, DoubleToString(p, 0),
+                                        RangesPips(MathMax(g_adr - g_today_range, 0.0)), p >= InpADRExhaustPct),
+                     (g_ready ? RangesADRColor(base) : base));
+        }
+      if(g_ready && g_lh_state == LH_WAITING) OM_PanelAdd(L, C, n, HMI_U(ZH_LIQ_WAIT), base);
+     }
+   else if(!g_ready)
      {
       OM_PanelAdd(L, C, n, "HMI v" + HMI_VERSION + "  MARK ONLY - NO ENTRY DECISION", base);
+      OM_PanelAdd(L, C, n, m5row, base);
+     }
+   else   // PANEL_FULL
+     {
+      OM_PanelAdd(L, C, n, "HMI v" + HMI_VERSION + "  MARK ONLY - NO ENTRY DECISION", base);
+      OM_PanelAdd(L, C, n, m5row, base);
       // the BOS count (g_ctx_strength) and CLEAN / MESSY are structure
       // diagnostics, not the trend strength / quality (requirement §1.4)
       OM_PanelAdd(L, C, n, "H4 CONTEXT: " + ctx +
@@ -599,18 +708,12 @@ void OM_DrawPanel()
                      " level(s) from " + TimeToString(g_lh_need, TIME_DATE|TIME_MINUTES) +
                      " (attempt " + IntegerToString(g_lh_attempts) +
                      (g_lh_attempts >= HMI_LH_FAST_TRIES ? ", slow retry" : "") + ")   |   liquidity lines provisional", base);
-      OM_PanelAdd(L, C, n, "CYCLE " + OM_PanelCycleLine(), base);
+      // a cycle with no model left to check is history (StgM5Row): LAST CYCLE
+      if(!SafeIdx(g_active_cyc, g_cyc_n)) OM_PanelAdd(L, C, n, OM_PanelCycleLine(), base);
+      else OM_PanelAdd(L, C, n, (tracking ? "CYCLE " : "LAST CYCLE ") + OM_PanelCycleLine(), base);
+      if(InpShowATR) OM_PanelAdd(L, C, n, RangesATRText(), base);
+      if(InpShowADR) OM_PanelAdd(L, C, n, RangesADRText(), RangesADRColor(base));
      }
-   else   // PANEL_COMPACT
-     {
-      OM_PanelAdd(L, C, n, "POI " + IntegerToString(poi_active) +
-                  "   |   " + (g_sess.active ? "SESSION " + TimeToString(g_sess.start_time, TIME_MINUTES) : "no session") +
-                  (g_lh_state == LH_WAITING ? "   |   LIQ WAITING" : ""), base);
-      OM_PanelAdd(L, C, n, OM_PanelCycleLine(), base);
-     }
-
-   if(g_ready && InpShowATR) OM_PanelAdd(L, C, n, RangesATRText(), base);
-   if(g_ready && InpShowADR) OM_PanelAdd(L, C, n, RangesADRText(), RangesADRColor(base));
 
    for(int i = 0; i < n; i++) { E[i] = "";  EC[i] = base; }
    OM_DrawBox(TT_CTX, InpPanelCorner, InpPanelX, InpPanelY, TS_PANEL.size, E, EC, L, C, n, MAX_PANEL_ROWS);

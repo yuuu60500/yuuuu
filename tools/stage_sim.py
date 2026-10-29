@@ -212,7 +212,7 @@ ZH_REASON = {"TIMEOUT": f"过渡超 {TRANS_MAX} 根未确认", "NO_PROT": "缺�
              "MOVE": "同向推进明显", "RET": "回撤较浅", "BRK": "突破全部守住",
              "EFF": "推进效率高", "MOM": "近期推进有力", "OVL": "K 线重叠少"}
 ZH_ARROW = {"UP": "↑", "DOWN": "↓", "FLAT": "→", "NEW": "新趋势"}
-LABELS = ("H4 趋势", "趋势强度", "趋势质量", "当前阶段", "主要原因", "数据截至")
+LABELS = ("H4 趋势", "趋势强度", "趋势质量", "当前阶段", "主要原因")   # v2.58r4: no 数据截至 row
 
 
 def stage_zh(r):
@@ -252,16 +252,26 @@ def quality_value(q, wait):
     return f"{Q.ZH_TIER[q['tier']]} · {q['score']}/100（{Q._sample(q)}）"
 
 
-def panel_rows(r, s, q, ctx, when, wait=False, ready=True):
-    """the trend panel, six (label, value, colour) rows; colour: BULL / BEAR / TRANS / RANGE for the direction row,
-    HIGH / MID / LOW for a scored strength / quality row by its tier (v2.58r3), else BASE. r, s, q = the stage, strength and quality records of the last processed bar (None before any);
-    when = its close time; wait = a series did not deliver (the strength WAIT state)"""
+def why_text(r):
+    """the reasons row: at most two, 无突出分项 in a trend without one, — outside a trend"""
+    if r["reasons"]:
+        return "，".join(reason_zh(c, r) for c in r["reasons"])
+    return "无突出分项" if r["dir"] != 0 else "—"
+
+
+TIER_CK = {"STRONG": "HIGH", "MED": "MID", "WEAK": "LOW", "GOOD": "HIGH", "FAIR": "MID", "POOR": "LOW"}
+
+
+def panel_rows(r, s, q, ctx, wait=False, ready=True):
+    """PANEL_FULL's trend panel, five (label, value, colour) rows; colour: BULL / BEAR / TRANS / RANGE for the direction
+    row, HIGH / MID / LOW for a scored strength / quality row by its tier (v2.58r3), else BASE. r, s, q = the stage,
+    strength and quality records of the last processed bar (None before any); wait = a series did not deliver (the
+    strength WAIT state). v2.58r4: the 数据截至 row is gone (the bar time stays in the HMI-STR / QLT / STG rows)."""
     if not ready or r is None:
-        vals = ["等待数据"] * 4 + ["—", "等待数据"]
+        vals = ["等待数据"] * 4 + ["—"]
         return [(lab, v, "BASE") for lab, v in zip(LABELS, vals)]
     if wait:
-        vals = ["等待数据", strength_value(s, None, True), quality_value(q, True), "等待数据", "—",
-                f"上次有效结果 {when} H4 收盘（服务器时间）"]
+        vals = ["等待数据", strength_value(s, None, True), quality_value(q, True), "等待数据", "—"]
         return [(lab, v, "BASE") for lab, v in zip(LABELS, vals)]
     if ctx == BULL_CTX:
         dv, dc = "▲ 多头", "BULL"
@@ -271,18 +281,97 @@ def panel_rows(r, s, q, ctx, when, wait=False, ready=True):
         dv, dc = "过渡 · " + ("偏多待确认" if r["pend"] == 1 else "偏空待确认"), "TRANS"
     else:
         dv, dc = "区间震荡", "RANGE"
-    if r["reasons"]:
-        why = "，".join(reason_zh(c, r) for c in r["reasons"])
-    else:
-        why = "无突出分项" if r["dir"] != 0 else "—"
-    vals = [dv, strength_value(s, r["arrow"], False), quality_value(q, False), stage_zh(r), why,
-            f"{when} H4 收盘（服务器时间）"]
-    cks = [dc, "BASE", "BASE", "BASE", "BASE", "BASE"]
+    vals = [dv, strength_value(s, r["arrow"], False), quality_value(q, False), stage_zh(r), why_text(r)]
+    cks = [dc, "BASE", "BASE", "BASE", "BASE"]
     if s["state"] == "OK":
-        cks[1] = {"STRONG": "HIGH", "MED": "MID", "WEAK": "LOW"}[s["tier"]]
+        cks[1] = TIER_CK[s["tier"]]
     if q["state"] == "OK":
-        cks[2] = {"GOOD": "HIGH", "FAIR": "MID", "POOR": "LOW"}[q["tier"]]
+        cks[2] = TIER_CK[q["tier"]]
     return list(zip(LABELS, vals, cks))
+
+
+# ---- v2.58r4 PANEL_COMPACT (the default) ----------------------------------------------------------------------------
+def strength_short(s, arrow):
+    """the compact strength value and its colour key: 弱25/100↓, 弱25/100 新趋势; a state is named, never a score"""
+    if s["state"] == "NODATA":
+        return ("样本不足" if s["reason"] == "HISTORY" else "不可用"), "BASE"
+    if s["state"] == "NODIR":
+        return "暂不评级", "BASE"
+    a = {"UP": "↑", "DOWN": "↓", "FLAT": "→"}.get(arrow, " 新趋势")
+    return f"{S.ZH_TIER[s['tier']]}{s['score']}/100{a}", TIER_CK[s["tier"]]
+
+
+def quality_short(q):
+    """the compact quality value: 良好74/100 (5 mature events), 良好74/100 低样本 (3 or 4), 样本不足 n/3 (fewer)"""
+    if q["state"] == "NODATA":
+        return "样本不足", "BASE"
+    if q["state"] == "NODIR":
+        return "暂不评级", "BASE"
+    if q["state"] == "PARTIAL":
+        return (f"样本不足 {q['n']}/3" if "FEW" in q["reason"].split("+") else "不可用"), "BASE"
+    return f"{Q.ZH_TIER[q['tier']]}{q['score']}/100" + (" 低样本" if q["sample"] == "LOW" else ""), TIER_CK[q["tier"]]
+
+
+def compact_rows(r, s, q, ctx, wait=False, ready=True):
+    """the trend panel in PANEL_COMPACT: three rows, each a list of (text, colour key) segments; LAB = the label colour.
+        H4 空头｜正常回撤 / 强度 弱25/100↓｜质量 良好74/100 / 原因 回撤偏深，近期逆向运行"""
+    if not ready or r is None or wait:
+        return [[("H4 ", "LAB"), ("等待数据", "BASE")],
+                [("强度 ", "LAB"), ("等待数据", "BASE"), ("｜", "LAB"), ("质量 ", "LAB"), ("等待数据", "BASE")],
+                [("原因 ", "LAB"), ("—", "BASE")]]
+    if ctx == BULL_CTX:
+        d = ("多头", "BULL")
+    elif ctx == BEAR_CTX:
+        d = ("空头", "BEAR")
+    elif ctx == TRANS:
+        d = ("过渡·" + ("偏多" if r["pend"] == 1 else "偏空"), "TRANS")
+    else:
+        d = ("区间震荡", "RANGE")
+    row0 = [("H4 ", "LAB"), d]
+    if not (ctx == RANGE and r["stage"] == "RANGE"):        # 区间震荡 is said once
+        row0 += [("｜", "LAB"), (stage_zh(r), "BASE")]
+    row1 = [("强度 ", "LAB"), strength_short(s, r["arrow"]), ("｜", "LAB"), ("质量 ", "LAB"), quality_short(q)]
+    return [row0, row1, [("原因 ", "LAB"), (why_text(r), "BASE")]]
+
+
+def row_text(row):
+    return "".join(t for t, _ in row)
+
+
+def cycle_counts(results):
+    """the active cycle's six results (PENDING / CONFIRMED / NA) -> (confirmed, pending)"""
+    return sum(1 for x in results if x == "CONFIRMED"), sum(1 for x in results if x == "PENDING")
+
+
+def m5_row(ready, cyc, sess, trend):
+    """the diagnostic panel's compact row 1, the M5 tracking state. cyc = None or the active cycle (CY_ACTIVE) as
+    dict(armed, results, anchor, ctx); sess = None or the active session's start ("10.28 13:05"). A cycle is being
+    tracked while a model is still PENDING; only then are its flags shown (锚点失效 / H4 趋势已变) - a cycle with
+    every model resolved is history and leaves the row to the session / context."""
+    if not ready:
+        return "M5 等待数据"
+    if cyc is not None:
+        done, pend = cycle_counts(cyc["results"])
+        if pend > 0:
+            t = f"M5 跟踪中（{cyc['armed']} 起）已确认 {done} 项 · 待确认 {pend} 项"
+            if cyc["anchor"]:
+                t += " · 锚点失效"
+            if cyc["ctx"]:
+                t += " · H4 趋势已变"
+            return t
+    if sess is not None:
+        return f"M5 未跟踪 · H4 POI 已触及（{sess}），等待 M5 区块"
+    return "M5 未跟踪 · " + ("等待价格触及 H4 POI" if trend else "H4 非趋势，暂停新跟踪")
+
+
+def adr_row(ok, pct, left, exhausted):
+    """the diagnostic panel's compact row 2 (pct, left as HMI_Ranges formats them)"""
+    if not ok:
+        return "今日波幅占 ADR：等待数据"
+    return f"今日波幅占 ADR {pct}% · 剩余 {left} pip" + ("（已用尽）" if exhausted else "")
+
+
+LIQ_WAIT_ROW = "流动性历史等待中，流动性线暂定"     # compact row 3, only while the liquidity history waits
 
 
 def items_rows(s, q):
@@ -488,55 +577,52 @@ def cases():
                           ("A06 no OK score 3 bars ago: 新趋势", None, "NEW")):
         case(nm, "PULLBACK", ["MOVE", "RET"], srec(score=60), qrec(x=60), hl=(2000, 1980), ref=ref, want_arrow=want)
 
-    # ---- the panel (§2) --------------------------------------------------------------------------------------------
-    t1 = "2026.10.28 16:00"
+    # ---- the panel (§2): PANEL_FULL, five rows (v2.58r4: no 数据截至) ------------------------------------------
     s_ok = dict(srec(score=76, tier="STRONG"))
     q_ok = qrec(score=82, tier="GOOD", sample="FIVE", n=5, s=5, x=20)
     r = stage_rec(BULL_CTX, 0, "-", True, s_ok, q_ok, (1999, 2000), (71, True))
-    rows = panel_rows(r, s_ok, q_ok, BULL_CTX, t1)
+    rows = panel_rows(r, s_ok, q_ok, BULL_CTX)
     want = [("H4 趋势", "▲ 多头", "BULL"), ("趋势强度", "强 · 76/100 ↑", "HIGH"), ("趋势质量", "良好 · 82/100（5 次事件）", "HIGH"),
-            ("当前阶段", "延续推进", "BASE"), ("主要原因", "同向推进明显，回撤较浅", "BASE"),
-            ("数据截至", "2026.10.28 16:00 H4 收盘（服务器时间）", "BASE")]
-    check("P01 the requirement's normal example (§2): six rows", rows == want, f"{rows}")
+            ("当前阶段", "延续推进", "BASE"), ("主要原因", "同向推进明显，回撤较浅", "BASE")]
+    check("P01 the requirement's normal example (§2): five rows, no 数据截至 (r4)", rows == want, f"{rows}")
     rb = stage_rec(BEAR_CTX, 0, "-", True, s_ok, flip(q_ok), (Q.MP - 1999, Q.MP - 1990), (71, True))
-    rows = panel_rows(rb, s_ok, flip(q_ok), BEAR_CTX, t1)
+    rows = panel_rows(rb, s_ok, flip(q_ok), BEAR_CTX)
     check("P02 bear mirror: ▼ 空头 red, 低位整理", rows[0] == ("H4 趋势", "▼ 空头", "BEAR") and rows[3][1] == "低位整理",
           f"{rows}")
     sm, sw_ = dict(s_ok, tier="MED", score=50), dict(s_ok, tier="WEAK", score=20)
     qf, qp_ = dict(q_ok, tier="FAIR", score=55), dict(q_ok, tier="POOR", score=30)
-    ck = [(panel_rows(r, a, b, BULL_CTX, t1)[1][2], panel_rows(r, a, b, BULL_CTX, t1)[2][2]) for a, b in ((sm, qf), (sw_, qp_))]
+    ck = [(panel_rows(r, a, b, BULL_CTX)[1][2], panel_rows(r, a, b, BULL_CTX)[2][2]) for a, b in ((sm, qf), (sw_, qp_))]
     check("P02b tier colours (r3): 中等 / 一般 MID, 弱 / 较差 LOW; waiting rows uncoloured",
-          ck == [("MID", "MID"), ("LOW", "LOW")] and all(c == "BASE" for _, _, c in panel_rows(r, s_ok, q_ok, BULL_CTX, t1, wait=True)),
+          ck == [("MID", "MID"), ("LOW", "LOW")] and all(c == "BASE" for _, _, c in panel_rows(r, s_ok, q_ok, BULL_CTX, wait=True)),
           f"{ck}")
     sn = srec(state="NODIR")
     qn = qrec(state="NODIR", x=None)
     rt = stage_rec(TRANS, -1, "BREAK", None, sn, qn, None, None)
-    rows = panel_rows(rt, sn, qn, TRANS, t1)
+    rows = panel_rows(rt, sn, qn, TRANS)
     want = [("H4 趋势", "过渡 · 偏空待确认", "TRANS"), ("趋势强度", "暂不评级", "BASE"), ("趋势质量", "暂不评级", "BASE"),
-            ("当前阶段", "反转待确认", "BASE"), ("主要原因", "多头保护低点已破", "BASE"),
-            ("数据截至", "2026.10.28 16:00 H4 收盘（服务器时间）", "BASE")]
+            ("当前阶段", "反转待确认", "BASE"), ("主要原因", "多头保护低点已破", "BASE")]
     check("P03 the requirement's transition example (§2)", rows == want, f"{rows}")
     rr = stage_rec(RANGE, 0, "TIMEOUT", None, sn, qn, None, None)
-    rows = panel_rows(rr, sn, qn, RANGE, t1)
+    rows = panel_rows(rr, sn, qn, RANGE)
     check("P04 RANGE: 区间震荡 grey, 暂不评级 both, the timeout as reason",
           rows[0] == ("H4 趋势", "区间震荡", "RANGE") and rows[1][1] == rows[2][1] == "暂不评级" and
           rows[4][1] == f"过渡超 {TRANS_MAX} 根未确认", f"{rows}")
-    rows = panel_rows(r, s_ok, q_ok, BULL_CTX, t1, wait=True)
-    check("P05 waiting: no current value, the last valid result named as such with its time",
+    rows = panel_rows(r, s_ok, q_ok, BULL_CTX, wait=True)
+    check("P05 waiting: no current value, the last valid result named as such",
           [v for _, v, _ in rows] == ["等待数据", "等待数据（上次有效结果 强 · 76/100）", "等待数据（上次有效结果 良好 · 82/100）",
-                                      "等待数据", "—", f"上次有效结果 {t1} H4 收盘（服务器时间）"], f"{rows}")
-    rows = panel_rows(None, None, None, RANGE, t1, ready=False)
-    check("P06 before the first build: 等待数据 everywhere, no time",
-          [v for _, v, _ in rows] == ["等待数据"] * 4 + ["—", "等待数据"], f"{rows}")
+                                      "等待数据", "—"], f"{rows}")
+    rows = panel_rows(None, None, None, RANGE, ready=False)
+    check("P06 before the first build: 等待数据 everywhere",
+          [v for _, v, _ in rows] == ["等待数据"] * 4 + ["—"], f"{rows}")
     qp = qrec(state="PARTIAL", reason="FEW", n=2, s=1, fail=1, pend=1, x=0, leg=300, so=5_561_920)
     rp = stage_rec(BEAR_CTX, 0, "-", True, s_ok, flip(qp), (Q.MP - 1999, Q.MP - 2000), None)
-    rows = panel_rows(rp, s_ok, flip(qp), BEAR_CTX, t1)
+    rows = panel_rows(rp, s_ok, flip(qp), BEAR_CTX)
     check("P07 partial quality as in v2.57 (局部表现), 新趋势 arrow",
           rows[2][1] == "样本不足（成熟突破 2/3，待确认 1）  局部表现 回撤 100 · 重叠 49" and rows[1][1].endswith("新趋势"),
           f"{rows}")
     sx = srec(state="NODATA", reason="HISTORY", T=None)
     rx = stage_rec(RANGE, 0, "INIT", None, sx, qrec(state="NODATA", x=None), None, None)
-    rows = panel_rows(rx, sx, qrec(state="NODATA", x=None), RANGE, t1)
+    rows = panel_rows(rx, sx, qrec(state="NODATA", x=None), RANGE)
     check("P08 history too short: 样本不足 on strength, quality and stage; reason —",
           [v for _, v, _ in rows][1:5] == ["样本不足（H4 不足 15 根）", "样本不足（H4 不足 12 根）", "样本不足", "—"], f"{rows}")
     # every value with its label fits one OBJ_LABEL, and the longest reason pair as well
@@ -545,10 +631,86 @@ def cases():
     sets = ((r, s_ok, q_ok, BULL_CTX), (rb, s_ok, flip(q_ok), BEAR_CTX), (rt, sn, qn, TRANS), (rr, sn, qn, RANGE),
             (rp, s_ok, flip(qp), BEAR_CTX), (rx, sx, qrec(state="NODATA", x=None), RANGE))
     allrows = [f"{lab}  {v}" for rr_, ss_, qq_, cc_ in sets for w_ in (False, True)
-               for lab, v, _ in panel_rows(rr_, ss_, qq_, cc_, t1, wait=w_)] + [f"主要原因  {longest}"]
+               for lab, v, _ in panel_rows(rr_, ss_, qq_, cc_, wait=w_)] + [f"主要原因  {longest}"]
     worst = max(allrows, key=len)
     check(f"P09 every trend panel row fits an OBJ_LABEL ({LABEL_MAX}; longest {len(worst)}: {worst})",
           len(worst) <= LABEL_MAX)
+    full_all = [v for rr_, ss_, qq_, cc_ in sets for w_ in (False, True) for _, v, _ in panel_rows(rr_, ss_, qq_, cc_, wait=w_)]
+    check("P11 (r4) no FULL row carries a time or 数据截至 any more",
+          not any("数据截至" in v or "收盘" in v or "服务器时间" in v for v in full_all) and
+          all(len(panel_rows(*x, wait=w_)) == 5 for x in sets for w_ in (False, True)))
+
+    # ---- v2.58r4 PANEL_COMPACT: the trend panel's three rows ---------------------------------------------------
+    s_w = srec(score=25, tier="WEAK")
+    q74 = qrec(score=74, tier="GOOD", sample="FIVE", n=5, s=5, x=60)
+    rw = stage_rec(BEAR_CTX, 0, "-", True, s_w, flip(q74), (Q.MP - 2000, Q.MP - 1980), (30, True))
+    cr = compact_rows(rw, s_w, flip(q74), BEAR_CTX)
+    check("C01 the request's example: H4 空头｜正常回撤 / 强度 弱25/100↓｜质量 良好74/100 / 原因 (≤ 2)",
+          rw["stage"] == "PULLBACK" and rw["arrow"] == "DOWN" and
+          [row_text(x) for x in cr[:2]] == ["H4 空头｜正常回撤", "强度 弱25/100↓｜质量 良好74/100"] and
+          row_text(cr[2]) == "原因 " + why_text(rw) and len(rw["reasons"]) <= 2 and len(cr) == 3, f"{cr}")
+    check("C02 colours: H4 / ｜ / 强度 / 质量 / 原因 in the label colour, 空头 red, the scores by tier, stage / reasons plain",
+          [c for _, c in cr[0]] == ["LAB", "BEAR", "LAB", "BASE"] and [c for _, c in cr[1]] == ["LAB", "LOW", "LAB", "LAB", "HIGH"]
+          and [c for _, c in cr[2]] == ["LAB", "BASE"], f"{cr}")
+    q_lo = [dict(flip(q74), sample="LOW", n=k, s=k) for k in (3, 4)]
+    vals = [quality_short(x)[0] for x in q_lo] + [quality_short(flip(q74))[0]]
+    check("C03 quality: 5 次事件 hidden, 3 or 4 mature events still say 低样本",
+          vals == ["良好74/100 低样本", "良好74/100 低样本", "良好74/100"], f"{vals}")
+    vals = [strength_short(s_w, a)[0] for a in ("UP", "DOWN", "FLAT", "NEW")]
+    check("C04 strength arrows: ↑ ↓ → right after the score, 新趋势 after a space",
+          vals == ["弱25/100↑", "弱25/100↓", "弱25/100→", "弱25/100 新趋势"], f"{vals}")
+    cr = compact_rows(rt, sn, qn, TRANS)
+    check("C05 transition: H4 过渡·偏空｜反转待确认 (gold), 暂不评级 both, the broken level as reason",
+          [row_text(x) for x in cr] == ["H4 过渡·偏空｜反转待确认", "强度 暂不评级｜质量 暂不评级", "原因 多头保护低点已破"] and
+          cr[0][1][1] == "TRANS", f"{cr}")
+    cr = compact_rows(rr, sn, qn, RANGE)
+    check("C06 range: H4 区间震荡 said once, 暂不评级 both, the timeout as reason",
+          [row_text(x) for x in cr] == ["H4 区间震荡", "强度 暂不评级｜质量 暂不评级", f"原因 过渡超 {TRANS_MAX} 根未确认"],
+          f"{cr}")
+    waits = [compact_rows(r, s_ok, q_ok, BULL_CTX, wait=True), compact_rows(None, None, None, RANGE, ready=False)]
+    check("C07 waiting / before the first build: 等待数据 named, no old score, no 0",
+          all([row_text(x) for x in w] == ["H4 等待数据", "强度 等待数据｜质量 等待数据", "原因 —"] for w in waits) and
+          not any(ch.isdigit() for w in waits for x in w[1:] for ch in row_text(x)), f"{waits}")
+    cr = compact_rows(rx, sx, qrec(state="NODATA", x=None), RANGE)
+    check("C08 history too short: H4 区间震荡｜样本不足, 样本不足 both",
+          [row_text(x) for x in cr] == ["H4 区间震荡｜样本不足", "强度 样本不足｜质量 样本不足", "原因 —"], f"{cr}")
+    sa = srec(state="NODATA", reason="ATR", T=None)
+    qa = flip(qrec(state="PARTIAL", reason="ANCHOR", x=None, leg=None, ext=None, n=4))
+    ra = stage_rec(BEAR_CTX, 0, "-", True, sa, qa, (Q.MP - 2000, Q.MP - 1980), None)
+    vals = [row_text(compact_rows(rp, s_ok, flip(qp), BEAR_CTX)[1]), row_text(compact_rows(ra, sa, qa, BEAR_CTX)[1]),
+            row_text(compact_rows(ra, sa, qa, BEAR_CTX)[0])]
+    check("C09 partial quality: 样本不足 n/3 (too few mature events), 不可用 (anchor / leg); ATR invalid: 不可用",
+          vals == ["强度 强76/100 新趋势｜质量 样本不足 2/3", "强度 不可用｜质量 不可用", "H4 空头｜不可用"], f"{vals}")
+    states = [(srec(state=st, reason=rs_, T=None), q_) for st, rs_ in (("NODATA", "HISTORY"), ("NODATA", "ATR"), ("NODIR", "-"))
+              for q_ in (qrec(state="NODATA", x=None), qrec(state="NODIR", x=None), qp, qa)]
+    shown = [strength_short(a, "UP")[0] for a, _ in states] + [quality_short(b)[0] for _, b in states]
+    check("C10 no state stands in as a score: nothing but OK shows /100 or a 0",
+          not any("/100" in v or v.split()[-1] == "0" for v in shown), f"{sorted(set(shown))}")
+
+    # ---- v2.58r4 PANEL_COMPACT: the diagnostic panel's rows -----------------------------------------------------
+    P_, C_, N_ = "PENDING", "CONFIRMED", "NA"
+    cy = dict(armed="10.28 13:05", results=[C_, P_, N_, C_, P_, P_], anchor=True, ctx=True)
+    vals = [m5_row(False, cy, "10.28 12:40", True), m5_row(True, cy, None, True),
+            m5_row(True, dict(cy, anchor=False, ctx=False), "10.28 12:40", False)]
+    check("M01 tracking: counts, then only this cycle's flags (锚点失效 / H4 趋势已变); not ready: M5 等待数据; "
+          "a tracked cycle comes before the session",
+          vals == ["M5 等待数据", "M5 跟踪中（10.28 13:05 起）已确认 2 项 · 待确认 3 项 · 锚点失效 · H4 趋势已变",
+                   "M5 跟踪中（10.28 13:05 起）已确认 2 项 · 待确认 3 项"], f"{vals}")
+    done = dict(cy, results=[C_, N_, N_, C_, C_, N_])
+    vals = [m5_row(True, done, "10.28 14:20", True), m5_row(True, done, None, True), m5_row(True, done, None, False),
+            m5_row(True, None, None, True)]
+    check("M02 a cycle with every model resolved is history: no flags, the session or the context instead",
+          vals == ["M5 未跟踪 · H4 POI 已触及（10.28 14:20），等待 M5 区块", "M5 未跟踪 · 等待价格触及 H4 POI",
+                   "M5 未跟踪 · H4 非趋势，暂停新跟踪", "M5 未跟踪 · 等待价格触及 H4 POI"] and
+          not any("锚点" in v or "已变" in v for v in vals), f"{vals}")
+    vals = [adr_row(True, "47", "45.2", False), adr_row(True, "112", "0.0", True), adr_row(False, "-1", "0.0", False)]
+    check("D01 ADR row: share of ADR and pips left; 已用尽 at the exhaust level; 等待数据 without D1 data, no 0",
+          vals == ["今日波幅占 ADR 47% · 剩余 45.2 pip", "今日波幅占 ADR 112% · 剩余 0.0 pip（已用尽）", "今日波幅占 ADR：等待数据"],
+          f"{vals}")
+    rows_all = [row_text(x) for rr_, ss_, qq_, cc_ in sets for w_ in (False, True) for x in compact_rows(rr_, ss_, qq_, cc_, wait=w_)]
+    rows_all += [m5_row(True, dict(cy, results=[C_] * 5 + [P_]), None, True), LIQ_WAIT_ROW, vals[1], "原因 " + longest]
+    worst = max(rows_all, key=len)
+    check(f"C11 every compact row is shorter than an OBJ_LABEL's limit (longest {len(worst)}: {worst})", len(worst) <= LABEL_MAX)
     # ---- the diagnostic panel's long rows ----------------------------------------------------------------------
     cyc = ("CYCLE #1582 BEAR    CISD OK  MSS OK  BPR OK  PA ENGULFING OK  PA REJECTION OK  PA BREAK-RETEST OK"
            "   [ANCHOR INVALIDATED]   [CTX CHANGED]")
@@ -583,8 +745,15 @@ def replay(path_csv):
           f"bars {dif[:5]}")
     t1 = "2026.01.01 00:00"
     longest = max((f"{lab}  {v}" for h in range(len(bars)) for lab, v, _ in
-                   panel_rows(recs[h], strs[h], qrecs[h], ctxs[h], t1)), key=len)
+                   panel_rows(recs[h], strs[h], qrecs[h], ctxs[h])), key=len)
     check(f"R3 every panel row of the replay fits an OBJ_LABEL (longest {len(longest)}: {longest})", len(longest) <= LABEL_MAX)
+    comp = [[row_text(x) for x in compact_rows(recs[h], strs[h], qrecs[h], ctxs[h])] for h in range(len(bars))]
+    lc = max((t for rows in comp for t in rows), key=len)
+    nums = [t for h, rows in enumerate(comp) for t in rows[1:2]
+            if (strs[h]["state"] != "OK" and "/100" in t.split("｜")[0]) or (qrecs[h]["state"] != "OK" and "/100" in t.split("｜")[1])]
+    check(f"R5 (r4) compact: three rows on every bar, no score outside OK, longest {len(lc)}: {lc}",
+          all(len(rows) == 3 for rows in comp) and not nums and len(lc) <= LABEL_MAX, f"{nums[:3]}")
+    print("compact row 1 on the last bar: " + comp[-1][0] + "   row 2: " + comp[-1][1] + "   row 3: " + comp[-1][2])
     trend = [r for r in recs if r["dir"] != 0]
     seen = {r["stage"] for r in recs}
     print("\nrecord only - nothing below changes the definition")

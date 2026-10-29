@@ -2236,3 +2236,26 @@ tools     stage_sim.py 87/87（+P02b 等级色）；stage_mql_mirror.py 同步�
 不变      全部日志行、阶段 / 原因 / 箭头、面板文字、参数摘要 461F006E；版本仍 2.58
 ```
 
+## v2.58r4 —— 精简面板：右上三行、左上两行（显示；日志、评分、信号、参数不变；未编译）
+
+```
+Date:     2026-10-29
+来源:     用户转验收方：左右信息栏精简，仅调整显示 —— 右上默认三行（「H4 空头｜正常回撤」/「强度 弱25/100↓｜质量 良好74/100」/
+          最多两条原因），删「数据截至」整行（时间留在日志）；质量默认不写「5 次事件」，3 或 4 次仍写「低样本」；左上默认两行
+          （M5 跟踪状态、今日波幅占 ADR 与剩余 pip），POI 数量、周期号、方向、CISD / MSS / BPR / PA 列表移到详细模式；当前跟踪的
+          异常用简短中文提示，历史周期的异常不混入；等待、样本不足、区间、过渡明确写状态，不用旧分或 0
+MQL       HMI_StageEngine.mqh：StgCompactRows（右上三行，分段 + 颜色键 PC_LAB）、StgStrengthShort / StgQualityShort、StgWhyText、
+          StgM5Row / StgADRRow（左上两行文字）、StgShortTime；StgPanelRows 改五行（STG_FULL_ROWS）；新中文词 ZH_BAR … ZH_LIQ_WAIT
+          HMI_ObjectManager.mqh：OM_BoxBg（背景抽出）、OM_DrawSegBox（分段行：每段按同行前文的实测宽度定位）、OM_TrendColor 解析
+          PC_LAB、OM_DrawTrendPanel 按模式（精简三行 / 详细五行，TPN_ROWS 统一清理）、OM_M5StatusRow（活动周期已确认 / 待确认计数与
+          标志）、OM_DrawPanel 精简 / 详细分开（详细模式加 M5 行，周期无待确认模型时写 LAST CYCLE，「CYCLE CYCLE: none」改为
+          「CYCLE: none」）
+          HMI_Defs.mqh：PanelMode 选项说明（参数对话框里显示）
+取法      docs/02 BRI-15 S-4b，G-15 至 G-18（「当前有效跟踪」= CY_ACTIVE 且有待确认模型；时间 MM.DD hh:mm 服务器时间；
+          详细模式等待时仍写带「上次有效结果」字样的分，精简模式不写；流动性历史等待时精简模式临时多一行）
+tools     stage_sim.py 102/102（P01–P09 改五行，+P11 无时间行；C01–C11 精简右上：原文示例逐字、颜色、低样本、箭头、过渡、区间、
+          等待无数字、样本不足 n/3、不可用、无状态冒充分数、行宽；M01–M02 左上 M5 行：跟踪 / 历史周期不带异常 / 会话 / 趋势 / 非趋势；
+          D01 ADR 行）；--replay 5/5（+R5：每根三行、OK 以外无分数）；stage_mql_mirror.py PASS（面板字符串 25376 条含精简行，
+          左上两行 23377 组输入，0 差异）
+不变      全部日志行（HMI-STR / QLT / STG 在内）、阶段 / 原因 / 箭头、参数摘要 461F006E、版本 2.58、ReloadTest 与日志用例
+```

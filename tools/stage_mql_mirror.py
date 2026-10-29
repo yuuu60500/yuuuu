@@ -1,5 +1,6 @@
 r"""v2.58: HMI_StageEngine.mqh transliterated line by line into Python (StgOnH4Bar, StgLog, StgPanelRows,
-StgStrItemsText, StgQltItemsText, StgWrap / StgRFind), fed the way H4ProcessBar feeds the MQL - the strength and quality
+StgStrItemsText, StgQltItemsText, StgWrap / StgRFind; v2.58r4 StgCompactRows, StgM5Row with HMI_ObjectManager's
+OM_M5StatusRow counting, StgADRRow), fed the way H4ProcessBar feeds the MQL - the strength and quality
 records of the bar (tools/strength_sim.py and tools/quality_sim.py, whose own mirrors checked them against the MQL),
 g_ctx / g_ctx_pending / g_ctx_time / g_prot / g_leg_seq from the v2.54 structure model - and compared with
 tools/stage_sim.py: every HMI-STG row character for character, every panel string, every wrapped diagnostic row.
@@ -12,6 +13,7 @@ running the indicator.
     python3 tools/stage_mql_mirror.py [<H1 csv>]      scenario series (+ the csv: every bar, and its mirror)
 """
 import os
+import itertools
 import random
 import re
 import sys
@@ -243,26 +245,128 @@ def quality_value(q, wait):
             U("ZH_RP"))
 
 
-def panel_rows(r, s, q, ctx, when, wait):
-    lab = [U("ZH_LAB_DIR"), U("ZH_STRENGTH"), U("ZH_QUALITY"), U("ZH_LAB_STAGE"), U("ZH_LAB_WHY"), U("ZH_ASOF")]
-    ck = ["BASE"] * 6
-    w = when + " H4 " + U("ZH_CLOSE") + U("ZH_SERVER")
+def why_text(r):                                        # StgWhyText
+    why = ""
+    for i, c in enumerate(r["rs"]): why += ("" if i == 0 else U("ZH_COMMA")) + reason_zh(c, r)
+    if why == "": why = U("ZH_R_NONE" if r["dir"] != 0 else "ZH_DASH")
+    return why
+
+
+def panel_rows(r, s, q, ctx, wait, ready=True):         # StgPanelRows (v2.58r4: STG_FULL_ROWS = 5)
+    lab = [U("ZH_LAB_DIR"), U("ZH_STRENGTH"), U("ZH_QUALITY"), U("ZH_LAB_STAGE"), U("ZH_LAB_WHY")]
+    ck = ["BASE"] * 5
+    if not ready:
+        return list(zip(lab, [U("ZH_WAIT")] * 4 + [U("ZH_DASH")], ck))
     if wait:
-        val = [U("ZH_WAIT"), strength_value(s, None, r["arrow"], True), quality_value(q, True), U("ZH_WAIT"), U("ZH_DASH"),
-               U("ZH_LASTOK") + " " + w]
+        val = [U("ZH_WAIT"), strength_value(s, None, r["arrow"], True), quality_value(q, True), U("ZH_WAIT"), U("ZH_DASH")]
         return list(zip(lab, val, ck))
     if ctx == BULL_CTX: v0 = U("ZH_UP_TRI") + " " + U("ZH_BULL"); ck[0] = "BULL"
     elif ctx == BEAR_CTX: v0 = U("ZH_DN_TRI") + " " + U("ZH_BEAR"); ck[0] = "BEAR"
     elif ctx == TRANS:
         v0 = U("ZH_TRANS_HEAD") + " " + U("ZH_DOT") + " " + U("ZH_PEND_UP" if r["pend"] == 1 else "ZH_PEND_DN"); ck[0] = "TRANS"
     else: v0 = U("ZH_RANGE"); ck[0] = "RANGE"
-    why = ""
-    for i, c in enumerate(r["rs"]): why += ("" if i == 0 else U("ZH_COMMA")) + reason_zh(c, r)
-    if why == "": why = U("ZH_R_NONE" if r["dir"] != 0 else "ZH_DASH")
-    val = [v0, strength_value(s, None, r["arrow"], False), quality_value(q, False), stage_zh(r), why, w]
+    val = [v0, strength_value(s, None, r["arrow"], False), quality_value(q, False), stage_zh(r), why_text(r)]
     if s["state"] == 0: ck[1] = {"STRONG": "HIGH", "MED": "MID", "WEAK": "LOW"}[s["tier"]]
     if q["state"] == "OK": ck[2] = {"GOOD": "HIGH", "FAIR": "MID", "POOR": "LOW"}[q["tier"]]
     return list(zip(lab, val, ck))
+
+
+# ---- v2.58r4 PANEL_COMPACT: StgStrengthShort / StgQualityShort / StgCompactRows / StgM5Row / StgADRRow --------------
+def strength_short(s, arrow):
+    c = "BASE"
+    if s["state"] == 2: return U("ZH_FEW" if s["reason"] == 1 else "ZH_NA"), c
+    if s["state"] == 1: return U("ZH_NORATE"), c
+    c = "HIGH" if s["tier"] == "STRONG" else ("MID" if s["tier"] == "MED" else "LOW")
+    a = (U("ZH_ARR_UP") if arrow == 1 else (U("ZH_ARR_DN") if arrow == 2 else (U("ZH_ARR_FLAT") if arrow == 3 else " " + U("ZH_ARR_NEW"))))
+    return U(STZ[s["tier"]]) + str(s["score"]) + "/100" + a, c
+
+
+def quality_short(q):
+    c = "BASE"
+    if q["state"] == "NODATA": return U("ZH_FEW"), c
+    if q["state"] == "NODIR": return U("ZH_NORATE"), c
+    if q["state"] == "PARTIAL":
+        return (U("ZH_FEW") + " " + str(q["n"]) + "/" + "3" if "FEW" in q["reason"].split("+") else U("ZH_NA")), c
+    c = "HIGH" if q["tier"] == "GOOD" else ("MID" if q["tier"] == "FAIR" else "LOW")
+    return U(QTZ[q["tier"]]) + str(q["score"]) + "/100" + (" " + U("ZH_LOWSMP") if q["sample"] == "LOW" else ""), c
+
+
+def compact_rows(r, s, q, ctx, wait, ready=True):
+    seg = []                                            # (row, text, colour) as StgSeg appends them
+    add = lambda row, t, c: seg.append((row, t, c))     # noqa: E731
+    if not ready or wait:
+        add(0, "H4 ", "LAB"); add(0, U("ZH_WAIT"), "BASE")
+        add(1, U("ZH_STR_SHORT") + " ", "LAB"); add(1, U("ZH_WAIT"), "BASE"); add(1, U("ZH_BAR"), "LAB")
+        add(1, U("ZH_QLT_SHORT") + " ", "LAB"); add(1, U("ZH_WAIT"), "BASE")
+        add(2, U("ZH_WHY_SHORT") + " ", "LAB"); add(2, U("ZH_DASH"), "BASE")
+    else:
+        add(0, "H4 ", "LAB")
+        if ctx == BULL_CTX: add(0, U("ZH_BULL"), "BULL")
+        elif ctx == BEAR_CTX: add(0, U("ZH_BEAR"), "BEAR")
+        elif ctx == TRANS: add(0, U("ZH_TRANS_HEAD") + U("ZH_DOT") + U("ZH_LEAN_UP" if r["pend"] == 1 else "ZH_LEAN_DN"), "TRANS")
+        else: add(0, U("ZH_RANGE"), "RANGE")
+        if not (ctx == RANGE and r["stage"] == 3):
+            add(0, U("ZH_BAR"), "LAB"); add(0, stage_zh(r), "BASE")
+        add(1, U("ZH_STR_SHORT") + " ", "LAB")
+        sv, c = strength_short(s, r["arrow"]); add(1, sv, c)
+        add(1, U("ZH_BAR"), "LAB"); add(1, U("ZH_QLT_SHORT") + " ", "LAB")
+        qv, c = quality_short(q); add(1, qv, c)
+        add(2, U("ZH_WHY_SHORT") + " ", "LAB"); add(2, why_text(r), "BASE")
+    rows = [[], [], []]
+    for row, t, c in seg: rows[row].append((t, c))
+    return rows
+
+
+def m5_row(ready, cyc_on, armed, done, pend, anchor_bad, ctx_chg, sess_on, sess_t, trend):
+    if not ready: return "M5 " + U("ZH_WAIT")
+    if cyc_on and pend > 0:
+        t = ("M5 " + U("ZH_M5_TRACK") + U("ZH_LP") + armed + " " + U("ZH_M5_FROM") + U("ZH_RP") + U("ZH_M5_DONE") + " " +
+             str(done) + " " + U("ZH_M5_ITEM") + " " + U("ZH_DOT") + " " + U("ZH_PENDING") + " " + str(pend) + " " + U("ZH_M5_ITEM"))
+        if anchor_bad: t += " " + U("ZH_DOT") + " " + U("ZH_M5_ANCHOR")
+        if ctx_chg: t += " " + U("ZH_DOT") + " " + U("ZH_M5_CTX")
+        return t
+    head = "M5 " + U("ZH_M5_IDLE") + " " + U("ZH_DOT") + " "
+    if sess_on: return head + U("ZH_M5_POI") + U("ZH_LP") + sess_t + U("ZH_RP") + U("ZH_COMMA") + U("ZH_M5_WAITBLK")
+    return head + U("ZH_M5_WAITPOI" if trend else "ZH_M5_PAUSE")
+
+
+def om_m5(ready, results, armed, anc, chg, sess_on, sess_t, trend):   # OM_M5StatusRow (cycle state -> StgM5Row)
+    cyc_on = results is not None
+    done = pend = 0
+    if cyc_on:
+        for m in results:
+            if m == "CONFIRMED": done += 1
+            if m == "PENDING": pend += 1
+    return m5_row(ready, cyc_on, armed if cyc_on else "", done, pend, anc if cyc_on else False, chg if cyc_on else False,
+                  sess_on, sess_t, trend)
+
+
+def adr_row(ok, pct, left, exhausted):
+    if not ok: return U("ZH_ADR_TODAY") + U("ZH_COLON") + U("ZH_WAIT")
+    return (U("ZH_ADR_TODAY") + " " + pct + "% " + U("ZH_DOT") + " " + U("ZH_ADR_LEFT") + " " + left + " pip" +
+            (U("ZH_LP") + U("ZH_ADR_EXH") + U("ZH_RP") if exhausted else ""))
+
+
+def left_rows():
+    """every combination of the inputs of the diagnostic panel's compact rows, mirror vs model"""
+    n = bad = 0
+    res_sets = [None] + [list(x) for x in itertools.product(("PENDING", "CONFIRMED", "NA"), repeat=6)]   # the six models
+    for ready in (False, True):
+        for full in res_sets:
+            for anc in (False, True):
+                for chg in (False, True):
+                    for sess in (None, "10.28 12:40"):
+                        for trend in (False, True):
+                            a = om_m5(ready, full, "10.28 13:05", anc, chg, sess is not None, sess or "", trend)
+                            b = G.m5_row(ready, None if full is None else dict(armed="10.28 13:05", results=full, anchor=anc, ctx=chg),
+                                         sess, trend)
+                            n += 1; bad += a != b
+    for ok in (False, True):
+        for pct, left in (("0", "85.3"), ("47", "45.2"), ("100", "0.0"), ("112", "0.0")):
+            for ex in (False, True):
+                n += 1; bad += adr_row(ok, pct, left, ex) != G.adr_row(ok, pct, left, ex)
+    n += 1; bad += U("ZH_LIQ_WAIT") != G.LIQ_WAIT_ROW
+    return n, bad
 
 
 def str_items(s):
@@ -317,13 +421,18 @@ def compare(name, bars):
         fa, fb = a.split(","), b.split(",")
         print("  bar", h, [(x, y) for x, y in zip(fa, fb) if x != y][:4])
     pn = pbad = 0
-    when = "2026.10.28 16:00"
     for h in range(len(bars)):
         s, q = fd[h][5], fd[h][6]["rec"]
         for w in (False, True):
-            a = panel_rows(mrecs[h], s, q, ctxs[h], when, w)
-            b = G.panel_rows(recs[h], strs[h], qrecs[h], ctxs[h], when, wait=w)
+            a = panel_rows(mrecs[h], s, q, ctxs[h], w)
+            b = G.panel_rows(recs[h], strs[h], qrecs[h], ctxs[h], wait=w)
             pn += 1; pbad += a != b
+            a = compact_rows(mrecs[h], s, q, ctxs[h], w)                   # v2.58r4
+            b = G.compact_rows(recs[h], strs[h], qrecs[h], ctxs[h], wait=w)
+            pn += 1; pbad += a != b
+        pn += 2
+        pbad += (panel_rows(None, None, None, RANGE, False, ready=False) != G.panel_rows(None, None, None, RANGE, ready=False))
+        pbad += (compact_rows(None, None, None, RANGE, False, ready=False) != G.compact_rows(None, None, None, RANGE, ready=False))
         si, qi = G.items_rows(strs[h], qrecs[h])
         pn += 2; pbad += (str_items(s) != si) + (qlt_items(q) != qi)
     print(f"{'':{len(name)}}  panel strings: {pn} compared, {pbad} differ")
@@ -375,10 +484,11 @@ def main():
             rows += len(b); rbad += k; pn += n; pbad += bad
             seen |= {r["stage"] for r in G.run([tuple(x) for x in b])[0]}
     wn, wbad = wraps()
+    ln, lbad = left_rows()
     print(f"HMI-STG rows: {rows} compared, {rbad} differ;  panel strings: {pn} compared, {pbad} differ;  "
-          f"wrapped rows: {wn} random texts, {wbad} differ")
+          f"wrapped rows: {wn} random texts, {wbad} differ;  compact diagnostic rows (r4): {ln} input sets, {lbad} differ")
     print(f"stages met: {', '.join(s for s in G.STAGES if s in seen)}")
-    ok = rbad == 0 and pbad == 0 and wbad == 0
+    ok = rbad == 0 and pbad == 0 and wbad == 0 and lbad == 0
     print("PASS" if ok else "FAIL")
     sys.exit(0 if ok else 1)
 

@@ -95,8 +95,8 @@ enum M5LayerVis
 enum PanelMode
   {
    PANEL_OFF,        // no panel at all
-   PANEL_COMPACT,    // 2 lines (+ ADR / ATR if enabled)
-   PANEL_FULL        // every diagnostic line
+   PANEL_COMPACT,    // compact: trend panel 3 rows, diagnostic panel 2 rows
+   PANEL_FULL        // detailed: every row
   };
 
 //--- structs --------------------------------------------------------

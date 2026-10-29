@@ -200,3 +200,56 @@ python3 tools/stage_sim.py --replay EURUSD     -> 4/4 PASS
 python3 tools/stage_mql_mirror.py EURUSD       -> HMI-STG rows 3172, panel strings 12688 (label, text and colour key), wrapped 4000: 0 differ; PASS
 python3 tools/params_digest.py                 -> params=461F006E
 
+
+## r4 (2026-10-29): compact panels - trend panel 3 rows, diagnostic panel 2 rows; 数据截至 removed (display only)
+MQL changed: HMI_StageEngine.mqh, HMI_ObjectManager.mqh, HMI_Defs.mqh (PanelMode option text). Logs, scores, signals unchanged.
+## python3 tools/stage_sim.py
+PASS  P01 the requirement's normal example (§2): five rows, no 数据截至 (r4)
+PASS  P02 bear mirror: ▼ 空头 red, 低位整理
+PASS  P02b tier colours (r3): 中等 / 一般 MID, 弱 / 较差 LOW; waiting rows uncoloured
+PASS  P03 the requirement's transition example (§2)
+PASS  P04 RANGE: 区间震荡 grey, 暂不评级 both, the timeout as reason
+PASS  P05 waiting: no current value, the last valid result named as such
+PASS  P06 before the first build: 等待数据 everywhere
+PASS  P07 partial quality as in v2.57 (局部表现), 新趋势 arrow
+PASS  P08 history too short: 样本不足 on strength, quality and stage; reason —
+PASS  P09 every trend panel row fits an OBJ_LABEL (63; longest 47: 趋势质量  样本不足（成熟突破 2/3，待确认 1）  局部表现 回撤 100 · 重叠 49)
+PASS  P11 (r4) no FULL row carries a time or 数据截至 any more
+PASS  C01 the request's example: H4 空头｜正常回撤 / 强度 弱25/100↓｜质量 良好74/100 / 原因 (≤ 2)
+PASS  C02 colours: H4 / ｜ / 强度 / 质量 / 原因 in the label colour, 空头 red, the scores by tier, stage / reasons plain
+PASS  C03 quality: 5 次事件 hidden, 3 or 4 mature events still say 低样本
+PASS  C04 strength arrows: ↑ ↓ → right after the score, 新趋势 after a space
+PASS  C05 transition: H4 过渡·偏空｜反转待确认 (gold), 暂不评级 both, the broken level as reason
+PASS  C06 range: H4 区间震荡 said once, 暂不评级 both, the timeout as reason
+PASS  C07 waiting / before the first build: 等待数据 named, no old score, no 0
+PASS  C08 history too short: H4 区间震荡｜样本不足, 样本不足 both
+PASS  C09 partial quality: 样本不足 n/3 (too few mature events), 不可用 (anchor / leg); ATR invalid: 不可用
+PASS  C10 no state stands in as a score: nothing but OK shows /100 or a 0
+PASS  M01 tracking: counts, then only this cycle's flags (锚点失效 / H4 趋势已变); not ready: M5 等待数据; a tracked cycle comes before the session
+PASS  M02 a cycle with every model resolved is history: no flags, the session or the context instead
+PASS  D01 ADR row: share of ADR and pips left; 已用尽 at the exhaust level; 等待数据 without D1 data, no 0
+PASS  C11 every compact row is shorter than an OBJ_LABEL's limit (longest 55: M5 跟踪中（10.28 13:05 起）已确认 5 项 · 待确认 1 项 · 锚点失效 · H4 趋势已变)
+PASS  P10 wrap: every piece within 63 characters and at least half of it, nothing but a | lost, split between words
+102/102 PASS
+
+## python3 tools/stage_sim.py --replay EURUSD_H1.csv
+PASS  R1 prefix: the stage record of h from bars[:h+1] equals the full run (every 37th bar from 40)
+PASS  R2 mirror: mirrored bars give the same stage, reasons and arrow on every bar (0 differ)
+PASS  R3 every panel row of the replay fits an OBJ_LABEL (longest 47: 趋势质量  样本不足（成熟突破 2/3，待确认 1）  局部表现 回撤 100 · 重叠 61)
+PASS  R5 (r4) compact: three rows on every bar, no score outside OK, longest 28: 强度 中等65/100→｜质量 一般64/100 低样本
+compact row 1 on the last bar: H4 空头｜延续推进   row 2: 强度 强78/100 新趋势｜质量 样本不足 0/3   row 3: 原因 同向推进明显，回撤较浅
+PASS  R4 every stage but NOATR occurs on real data (8 of 9)
+5/5 PASS
+
+## python3 tools/stage_mql_mirror.py EURUSD_H1.csv
+HMI-STG rows: 3172 compared, 0 differ;  panel strings: 25376 compared, 0 differ;  wrapped rows: 4000 random texts, 0 differ;  compact diagnostic rows (r4): 23377 input sets, 0 differ
+stages met: NODATA, TRANS, RANGE, BUILD, DEEP, PUSH, CONSOL, PULLBACK
+PASS
+
+## regression
+127/127 PASS
+81/81 PASS
+PASS
+params=461F006E
+28/28
+pwsh -File tools/logtests/Run-LogTests.ps1   -> 228/228 cases as expected (ReloadTest unchanged)

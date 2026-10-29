@@ -366,6 +366,27 @@ void StgLogHist()
 #define ZH_I_MOVE        "\\u51C0\\u63A8\\u8FDB"                             // 净推进
 #define ZH_I_EFF         "\\u6548\\u7387"                                    // 效率
 #define ZH_I_MOM         "\\u52A8\\u91CF"                                    // 动量
+// v2.58r4: the compact panels
+#define ZH_BAR           "\\uFF5C"                                           // ｜
+#define ZH_WHY_SHORT     "\\u539F\\u56E0"                                    // 原因
+#define ZH_LEAN_UP       "\\u504F\\u591A"                                    // 偏多
+#define ZH_LEAN_DN       "\\u504F\\u7A7A"                                    // 偏空
+#define ZH_M5_TRACK      "\\u8DDF\\u8E2A\\u4E2D"                             // 跟踪中
+#define ZH_M5_IDLE       "\\u672A\\u8DDF\\u8E2A"                             // 未跟踪
+#define ZH_M5_FROM       "\\u8D77"                                           // 起
+#define ZH_M5_DONE       "\\u5DF2\\u786E\\u8BA4"                             // 已确认
+#define ZH_M5_ITEM       "\\u9879"                                           // 项
+#define ZH_M5_ANCHOR     "\\u951A\\u70B9\\u5931\\u6548"                      // 锚点失效
+#define ZH_M5_CTX        "H4 \\u8D8B\\u52BF\\u5DF2\\u53D8"                   // H4 趋势已变
+#define ZH_M5_POI        "H4 POI \\u5DF2\\u89E6\\u53CA"                      // H4 POI 已触及
+#define ZH_M5_WAITBLK    "\\u7B49\\u5F85 M5 \\u533A\\u5757"                  // 等待 M5 区块
+#define ZH_M5_WAITPOI    "\\u7B49\\u5F85\\u4EF7\\u683C\\u89E6\\u53CA H4 POI" // 等待价格触及 H4 POI
+#define ZH_M5_PAUSE      "H4 \\u975E\\u8D8B\\u52BF\\uFF0C\\u6682\\u505C\\u65B0\\u8DDF\\u8E2A" // H4 非趋势，暂停新跟踪
+#define ZH_COLON         "\\uFF1A"                                           // ：
+#define ZH_ADR_TODAY     "\\u4ECA\\u65E5\\u6CE2\\u5E45\\u5360 ADR"           // 今日波幅占 ADR
+#define ZH_ADR_LEFT      "\\u5269\\u4F59"                                    // 剩余
+#define ZH_ADR_EXH       "\\u5DF2\\u7528\\u5C3D"                             // 已用尽
+#define ZH_LIQ_WAIT      "\\u6D41\\u52A8\\u6027\\u5386\\u53F2\\u7B49\\u5F85\\u4E2D\\uFF0C\\u6D41\\u52A8\\u6027\\u7EBF\\u6682\\u5B9A" // 流动性历史等待中，流动性线暂定
 
 #define PC_BASE   0              // the trend panel's row colours (resolved in HMI_ObjectManager)
 #define PC_BULL   1
@@ -375,6 +396,7 @@ void StgLogHist()
 #define PC_HIGH   5              // v2.58r3: strength / quality rows by tier (强 / 良好, 中等 / 一般, 弱 / 较差)
 #define PC_MID    6
 #define PC_LOW    7
+#define PC_LAB    8              // v2.58r4: a compact row's label words (强度 / 质量 / 原因 / ｜) in the label colour
 
 string StgStageZh(const StgRec &r)
   {
@@ -449,25 +471,35 @@ string StgQualityValue(const QltRec &q, const bool wait)
                                : HMI_U(ZH_LOWSMP) + " " + IntegerToString(q.n) + " " + HMI_U(ZH_TIMES_BRK)) + HMI_U(ZH_RP));
   }
 
-//--- the six rows of the trend panel (requirement §2): labels, values, colour keys ---
+// the reasons row: at most two, 无突出分项 in a trend without one, — outside a trend
+string StgWhyText(const StgRec &r)
+  {
+   string why = "";
+   for(int i = 0; i < r.rn; i++) why += (i > 0 ? HMI_U(ZH_COMMA) : "") + StgReasonZh(r.rs[i], r);
+   if(why == "") why = HMI_U(r.dir != 0 ? ZH_R_NONE : ZH_DASH);
+   return(why);
+  }
+
+//--- PANEL_FULL's trend panel (requirement §2): labels, values, colour keys. v2.58r4: five rows -
+// the 数据截至 row is gone from both modes (the bar time stays in every HMI-STR / QLT / STG row)
+#define STG_FULL_ROWS 5
+
 void StgPanelRows(string &lab[], string &val[], int &ck[])
   {
-   ArrayResize(lab, 6);  ArrayResize(val, 6);  ArrayResize(ck, 6);
+   ArrayResize(lab, STG_FULL_ROWS);  ArrayResize(val, STG_FULL_ROWS);  ArrayResize(ck, STG_FULL_ROWS);
    lab[0] = HMI_U(ZH_LAB_DIR);   lab[1] = HMI_U(ZH_STRENGTH);  lab[2] = HMI_U(ZH_QUALITY);
-   lab[3] = HMI_U(ZH_LAB_STAGE); lab[4] = HMI_U(ZH_LAB_WHY);   lab[5] = HMI_U(ZH_ASOF);
-   for(int i = 0; i < 6; i++) ck[i] = PC_BASE;
+   lab[3] = HMI_U(ZH_LAB_STAGE); lab[4] = HMI_U(ZH_LAB_WHY);
+   for(int i = 0; i < STG_FULL_ROWS; i++) ck[i] = PC_BASE;
    int h = g_stg_n - 1;
    if(!g_ready || h < 0 || h >= g_h4_n || h >= g_str_n || h >= g_qlt_n)
      {
       for(int i = 0; i < 4; i++) val[i] = HMI_U(ZH_WAIT);
       val[4] = HMI_U(ZH_DASH);
-      val[5] = HMI_U(ZH_WAIT);
       return;
      }
    StgRec r = g_stg[h];
    StrRec s = g_str[h];
    QltRec q = g_qlt[h];
-   string when = StrBarTime(h) + " H4 " + HMI_U(ZH_CLOSE) + HMI_U(ZH_SERVER);
    if(g_str_wait)
      {
       val[0] = HMI_U(ZH_WAIT);
@@ -475,7 +507,6 @@ void StgPanelRows(string &lab[], string &val[], int &ck[])
       val[2] = StgQualityValue(q, true);
       val[3] = HMI_U(ZH_WAIT);
       val[4] = HMI_U(ZH_DASH);
-      val[5] = HMI_U(ZH_LASTOK) + " " + when;
       return;
      }
    if(g_ctx == CTX_BULLISH)      { val[0] = HMI_U(ZH_UP_TRI) + " " + HMI_U(ZH_BULL);  ck[0] = PC_BULL; }
@@ -491,11 +522,124 @@ void StgPanelRows(string &lab[], string &val[], int &ck[])
    if(s.state == STR_OK) ck[1] = (s.tier == ST_STRONG ? PC_HIGH : (s.tier == ST_MED ? PC_MID : PC_LOW));
    if(q.state == QLT_OK) ck[2] = (q.tier == QT_GOOD ? PC_HIGH : (q.tier == QT_FAIR ? PC_MID : PC_LOW));
    val[3] = StgStageZh(r);
-   string why = "";
-   for(int i = 0; i < r.rn; i++) why += (i > 0 ? HMI_U(ZH_COMMA) : "") + StgReasonZh(r.rs[i], r);
-   if(why == "") why = HMI_U(r.dir != 0 ? ZH_R_NONE : ZH_DASH);
-   val[4] = why;
-   val[5] = when;
+   val[4] = StgWhyText(r);
+  }
+
+//--- v2.58r4 PANEL_COMPACT's trend panel: three rows of coloured segments ----------------------
+//   H4 空头｜正常回撤
+//   强度 弱25/100↓｜质量 良好74/100
+//   原因 回撤偏深，近期逆向运行
+// No old score and no 0 stands in for a state: 等待数据 / 样本不足 / 不可用 / 暂不评级 are shown as such.
+string StgStrengthShort(const StrRec &s, const int arrow, int &c)
+  {
+   c = PC_BASE;
+   if(s.state == STR_NODATA) return(HMI_U(s.reason == SR_HISTORY ? ZH_FEW : ZH_NA));
+   if(s.state == STR_NODIR)  return(HMI_U(ZH_NORATE));
+   c = (s.tier == ST_STRONG ? PC_HIGH : (s.tier == ST_MED ? PC_MID : PC_LOW));
+   string a = (arrow == AR_UP ? HMI_U(ZH_ARR_UP) : (arrow == AR_DOWN ? HMI_U(ZH_ARR_DN)
+              : (arrow == AR_FLAT ? HMI_U(ZH_ARR_FLAT) : " " + HMI_U(ZH_ARR_NEW))));
+   return(StrTierZh(s.tier) + IntegerToString(s.score) + "/100" + a);
+  }
+
+// 5 mature events: no sample note; 3 or 4: 低样本; fewer: 样本不足 n/3
+string StgQualityShort(const QltRec &q, int &c)
+  {
+   c = PC_BASE;
+   if(q.state == QLT_NODATA) return(HMI_U(ZH_FEW));
+   if(q.state == QLT_NODIR)  return(HMI_U(ZH_NORATE));
+   if(q.state == QLT_PARTIAL)
+      return((q.reason & QR_FEW) != 0 ? HMI_U(ZH_FEW) + " " + IntegerToString(q.n) + "/" + IntegerToString(QLT_EV_MIN)
+                                      : HMI_U(ZH_NA));
+   c = (q.tier == QT_GOOD ? PC_HIGH : (q.tier == QT_FAIR ? PC_MID : PC_LOW));
+   return(QltTierZh(q.tier) + IntegerToString(q.score) + "/100" + (q.sample == QS_LOW ? " " + HMI_U(ZH_LOWSMP) : ""));
+  }
+
+void StgSeg(string &seg[], int &ck[], int &rw[], int &n, const int row, const string text, const int c)
+  {
+   ArrayResize(seg, n + 1);  ArrayResize(ck, n + 1);  ArrayResize(rw, n + 1);
+   seg[n] = text;  ck[n] = c;  rw[n] = row;
+   n++;
+  }
+
+int StgCompactRows(string &seg[], int &ck[], int &rw[])
+  {
+   ArrayResize(seg, 0);  ArrayResize(ck, 0);  ArrayResize(rw, 0);
+   int n = 0;
+   int h = g_stg_n - 1;
+   if(!g_ready || g_str_wait || h < 0 || h >= g_h4_n || h >= g_str_n || h >= g_qlt_n)
+     {
+      StgSeg(seg, ck, rw, n, 0, "H4 ", PC_LAB);
+      StgSeg(seg, ck, rw, n, 0, HMI_U(ZH_WAIT), PC_BASE);
+      StgSeg(seg, ck, rw, n, 1, HMI_U(ZH_STR_SHORT) + " ", PC_LAB);
+      StgSeg(seg, ck, rw, n, 1, HMI_U(ZH_WAIT), PC_BASE);
+      StgSeg(seg, ck, rw, n, 1, HMI_U(ZH_BAR), PC_LAB);
+      StgSeg(seg, ck, rw, n, 1, HMI_U(ZH_QLT_SHORT) + " ", PC_LAB);
+      StgSeg(seg, ck, rw, n, 1, HMI_U(ZH_WAIT), PC_BASE);
+      StgSeg(seg, ck, rw, n, 2, HMI_U(ZH_WHY_SHORT) + " ", PC_LAB);
+      StgSeg(seg, ck, rw, n, 2, HMI_U(ZH_DASH), PC_BASE);
+      return(n);
+     }
+   StgRec r = g_stg[h];
+   StrRec s = g_str[h];
+   QltRec q = g_qlt[h];
+   StgSeg(seg, ck, rw, n, 0, "H4 ", PC_LAB);
+   if(g_ctx == CTX_BULLISH)      StgSeg(seg, ck, rw, n, 0, HMI_U(ZH_BULL), PC_BULL);
+   else if(g_ctx == CTX_BEARISH) StgSeg(seg, ck, rw, n, 0, HMI_U(ZH_BEAR), PC_BEAR);
+   else if(g_ctx == CTX_TRANSITION)
+      StgSeg(seg, ck, rw, n, 0, HMI_U(ZH_TRANS_HEAD) + HMI_U(ZH_DOT) + HMI_U(r.pend == 1 ? ZH_LEAN_UP : ZH_LEAN_DN), PC_TRANS);
+   else                          StgSeg(seg, ck, rw, n, 0, HMI_U(ZH_RANGE), PC_RANGE);
+   if(!(g_ctx == CTX_RANGE && r.stage == SG_RANGE))        // 区间震荡 is said once
+     {
+      StgSeg(seg, ck, rw, n, 0, HMI_U(ZH_BAR), PC_LAB);
+      StgSeg(seg, ck, rw, n, 0, StgStageZh(r), PC_BASE);
+     }
+   int c = PC_BASE;
+   StgSeg(seg, ck, rw, n, 1, HMI_U(ZH_STR_SHORT) + " ", PC_LAB);
+   string sv = StgStrengthShort(s, r.arrow, c);
+   StgSeg(seg, ck, rw, n, 1, sv, c);
+   StgSeg(seg, ck, rw, n, 1, HMI_U(ZH_BAR), PC_LAB);
+   StgSeg(seg, ck, rw, n, 1, HMI_U(ZH_QLT_SHORT) + " ", PC_LAB);
+   string qv = StgQualityShort(q, c);
+   StgSeg(seg, ck, rw, n, 1, qv, c);
+   StgSeg(seg, ck, rw, n, 2, HMI_U(ZH_WHY_SHORT) + " ", PC_LAB);
+   StgSeg(seg, ck, rw, n, 2, StgWhyText(r), PC_BASE);
+   return(n);
+  }
+
+//--- v2.58r4 the diagnostic panel's compact rows (texts only; HMI_ObjectManager gathers the state) ---
+// "2026.10.28 13:05" -> "10.28 13:05" (server time, as on the chart's time axis)
+string StgShortTime(const datetime t) { return(StringSubstr(TimeToString(t, TIME_DATE|TIME_MINUTES), 5)); }
+
+// Row 1, the M5 tracking state. A cycle is being tracked while Phase 4 still
+// checks it and something can still be marked: CY_ACTIVE with a model PENDING.
+// Only that cycle's flags are shown (锚点失效 = D-5's anchor_invalidated,
+// H4 趋势已变 = D-1's ctx_changed); a cycle with every model resolved, or a
+// closed one, is history and appears in PANEL_FULL's LAST CYCLE row only.
+string StgM5Row(const bool ready, const bool cyc_on, const string armed, const int done, const int pend,
+                const bool anchor_bad, const bool ctx_chg, const bool sess_on, const string sess_t, const bool trend)
+  {
+   if(!ready) return("M5 " + HMI_U(ZH_WAIT));
+   if(cyc_on && pend > 0)
+     {
+      string s = "M5 " + HMI_U(ZH_M5_TRACK) + HMI_U(ZH_LP) + armed + " " + HMI_U(ZH_M5_FROM) + HMI_U(ZH_RP) +
+                 HMI_U(ZH_M5_DONE) + " " + IntegerToString(done) + " " + HMI_U(ZH_M5_ITEM) + " " + HMI_U(ZH_DOT) + " " +
+                 HMI_U(ZH_PENDING) + " " + IntegerToString(pend) + " " + HMI_U(ZH_M5_ITEM);
+      if(anchor_bad) s += " " + HMI_U(ZH_DOT) + " " + HMI_U(ZH_M5_ANCHOR);
+      if(ctx_chg)    s += " " + HMI_U(ZH_DOT) + " " + HMI_U(ZH_M5_CTX);
+      return(s);
+     }
+   string head = "M5 " + HMI_U(ZH_M5_IDLE) + " " + HMI_U(ZH_DOT) + " ";
+   if(sess_on)
+      return(head + HMI_U(ZH_M5_POI) + HMI_U(ZH_LP) + sess_t + HMI_U(ZH_RP) + HMI_U(ZH_COMMA) + HMI_U(ZH_M5_WAITBLK));
+   return(head + HMI_U(trend ? ZH_M5_WAITPOI : ZH_M5_PAUSE));
+  }
+
+// Row 2, today's range against ADR (pct and left formatted by HMI_Ranges)
+string StgADRRow(const bool ok, const string pct, const string left, const bool exhausted)
+  {
+   if(!ok) return(HMI_U(ZH_ADR_TODAY) + HMI_U(ZH_COLON) + HMI_U(ZH_WAIT));
+   return(HMI_U(ZH_ADR_TODAY) + " " + pct + "% " + HMI_U(ZH_DOT) + " " + HMI_U(ZH_ADR_LEFT) + " " + left + " pip" +
+          (exhausted ? HMI_U(ZH_LP) + HMI_U(ZH_ADR_EXH) + HMI_U(ZH_RP) : ""));
   }
 
 //--- PANEL_FULL's item rows (diagnostic panel): the strength and quality items of the same bar ---
