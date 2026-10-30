@@ -1,0 +1,39 @@
+# v2.58r4 five-day run (candidate, docs/baselines/v2.58r4.md): 10-30, 11-02, 11-03, 11-04, 11-05 (planned)
+# ten charts only (v2.57 removed 10-29 afternoon); EX5 4a3bb167...5dbb; params 461F006E (8) / A047970C (EURUSD, XAUUSD ATR)
+
+## day 1 2026-10-30, part 1: 20261030.log as sent in the morning, local 09:06 .. 09:09
+# sha256 9e30ce1f2fd4777e667ea56589ded152eff9f3b2f996dfe15ef0110febafbe68; 21962 lines; no runtime error
+# MT5 was not restarted: same run 1792585034 and the same init numbers as 10-29 - the PC slept from about 17:05 and woke at 09:06.
+# 09:06:22 each chart logged HMI-STR-WAIT (series not yet synchronised after the wake, last=2026.10.29 20:00), then rebuilt
+# 09:06:24 - 09:06:27 (to = 2026.10.30 12:00 server), all READY; a refresh at 09:09:03 - 09:09:25 rebuilt each chart again.
+# 24 builds, all complete. No WAITING streak this time.
+
+## across the sleep (A-60): the 10-29 rows after its last build (the 17:05 live H4, server 20:00) vs the first build of 10-30
+live_coverage.py --ver 2.58 --offset 3 20261029.log 20261030.log:
+    AUDUSD#46E1: both directions agree for STR 1, QLT 1, STG 1
+    EURUSD#198B: both directions agree for STR 1, QLT 1, STG 1
+    EURUSD#54CC: both directions agree for STR 1, QLT 1, STG 1
+    GBPUSD#86FE: both directions agree for CTX 1, PROT 2, STR 1, QLT 1, STG 1
+    NZDUSD#A97D: both directions agree for STR 1, QLT 1, STG 1
+    USDCAD#E6D0: both directions agree for LIQ 1, STR 1, QLT 1, STG 1
+    USDCHF#7129: both directions agree for CTX 1, PROT 2, STR 1, QLT 1, STG 1
+    USDJPY#15F9: both directions agree for STR 1, QLT 1, STG 1
+    XAUUSD#2AE3: both directions agree for STR 1, QLT 1, STG 1
+    XAUUSD#6624: both directions agree for STR 1, QLT 1, STG 1
+  every row forward 'exact'; reverse: the awake window after the last 10-29 build held no build row missing from live
+  includes the live structure events of 17:05: USDCHF HMI-CTX TRANS_FAIL -> BEARISH with PROT / ANCHOR INVALID,
+  GBPUSD HMI-CTX CHOCH UP -> TRANSITION with PROT BREAK / ANCHOR RESET, USDCAD LIQ SSL SWEEP
+  RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+
+## same-window reload, last two builds (the 09:09 refresh), 20261030.log alone
+  AUDUSD       b7/b8    IDENTICAL inside the comparable region (102 MODEL + 51 LIQ)
+  EURUSD#198B  b12/b13  IDENTICAL inside the comparable region (43 MODEL + 41 LIQ)
+  EURUSD#54CC  b12/b13  IDENTICAL inside the comparable region (43 MODEL + 41 LIQ)
+  GBPUSD       b4/b5    IDENTICAL inside the comparable region (145 MODEL + 54 LIQ)
+  NZDUSD       b6/b7    IDENTICAL inside the comparable region (115 MODEL + 50 LIQ)
+  USDCAD       b6/b7    IDENTICAL inside the comparable region (259 MODEL + 51 LIQ)
+  USDCHF       b4/b5    IDENTICAL inside the comparable region (71 MODEL + 43 LIQ)
+  USDJPY       b6/b7    IDENTICAL inside the comparable region (85 MODEL + 47 LIQ)
+  XAUUSD#2AE3  b57/b58  IDENTICAL inside the comparable region (146 MODEL + 46 LIQ)
+  XAUUSD#6624  b57/b58  IDENTICAL inside the comparable region (143 MODEL + 46 LIQ)
+  every chart: MODEL / LIQ / CTX / PROT / B8 / STR / QLT / STG IDENTICAL; STR, QLT, STG rows recompute
