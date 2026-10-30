@@ -178,3 +178,38 @@ XAUUSD#8C1C -> XAUUSD#6624   b91  -> b51  IDENTICAL apart from the stage rows - 
                          [ANCHOR INVALIDATED] [CTX CHANGED] (= block 2525 of the log, renumbered as in 5), ADR(20) 53.3 | 25.5 (48%) | 27.8
                          the box covers the level label behind it (NY AM HIGH): the box is drawn after the lines, as designed
 All six as designed: compact three / two rows, detailed five rows / every diagnostic row, no 数据截至, no score standing in for a state.
+
+## part 2 (2026-10-30): the complete 20261029.log, local 09:10 .. 17:05:00 (not one of the five days; the run before them)
+# 20261029.rar sha256 fbe45152f01cdb976d679ae92cafc7ce9503fa29f0094fbfdffc125aa9855878; 20261029.log a175b240a9e4a8cc58a2e48717b64a00baeca10add6dbd31b75c314f1bb2f198
+# 348056 lines; its first 318971 lines are byte for byte the 13:34 copy above. After 13:34: only v2.58 builds (32, all
+# complete); v2.57 charts removed later without a further build. No runtime error.
+# 14:28 - 14:29: GBPUSD and USDCHF switched to FULL for the screenshots and back (two re-inits each, init 96 - 99).
+# 17:02:17 - 17:03:09: two refresh rounds of the ten charts (to = 19:55 server), three minutes BEFORE the 17:05 live H4.
+ReloadTest -LiveVsBuild: 20 of 20 AGREE BOTH WAYS; afternoon live rows checked as well - GBPUSD LIQ BSL BROKEN / BSL SWEEP / PDH SWEEP,
+  USDCHF LIQ SSL BROKEN (each against the 17:02 builds)
+live_coverage.py --ver 2.58: RESULT: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+same-window reload, the two 17:02 rounds:
+  AUDUSD#46E1  b5/b6    IDENTICAL inside the comparable region (102 MODEL + 51 LIQ); all eight categories IDENTICAL, STG recomputes
+  EURUSD#198B  b9/b10   IDENTICAL inside the comparable region (43 MODEL + 42 LIQ); all eight categories IDENTICAL, STG recomputes
+  EURUSD#54CC  b9/b10   IDENTICAL inside the comparable region (43 MODEL + 42 LIQ); all eight categories IDENTICAL, STG recomputes
+  GBPUSD#86FE  b2/b3    IDENTICAL inside the comparable region (145 MODEL + 51 LIQ); all eight categories IDENTICAL, STG recomputes
+  NZDUSD#A97D  b4/b5    IDENTICAL inside the comparable region (115 MODEL + 48 LIQ); all eight categories IDENTICAL, STG recomputes
+  USDCAD#E6D0  b4/b5    IDENTICAL inside the comparable region (302 MODEL + 48 LIQ); all eight categories IDENTICAL, STG recomputes
+  USDCHF#7129  b2/b3    IDENTICAL inside the comparable region (67 MODEL + 44 LIQ); all eight categories IDENTICAL, STG recomputes
+  USDJPY#15F9  b4/b5    IDENTICAL inside the comparable region (67 MODEL + 50 LIQ); all eight categories IDENTICAL, STG recomputes
+  XAUUSD#2AE3  b54/b55  IDENTICAL inside the comparable region (148 MODEL + 47 LIQ); all eight categories IDENTICAL, STG recomputes
+  XAUUSD#6624  b54/b55  IDENTICAL inside the comparable region (143 MODEL + 47 LIQ); all eight categories IDENTICAL, STG recomputes
+  (XAUUSD: both 17:02 builds READY, so LIQ is judged here directly: 47 / 47)
+17:05 live H4 (server 20:00) - after the last build of the day, to be checked against the first build of 20261030.log (A-60):
+  AUDUSD#46E1  BULLISH    PULLBACK BRK_FAIL+COUNTER   arrow DOWN
+  EURUSD#198B  BEARISH    PULLBACK BRK_FAIL+COUNTER   arrow DOWN
+  EURUSD#54CC  BEARISH    PULLBACK BRK_FAIL+COUNTER   arrow DOWN
+  GBPUSD#86FE  TRANSITION TRANS    PROT_BROKEN        arrow NA
+  NZDUSD#A97D  TRANSITION TRANS    PROT_BROKEN        arrow NA
+  USDCAD#E6D0  BEARISH    CONSOL   BRK_FAIL           arrow UP
+  USDCHF#7129  BEARISH    BUILD    NO_PROT+CHOP       arrow NEW
+  USDJPY#15F9  BULLISH    DEEP     DEEP+BRK_FAIL      arrow DOWN
+  XAUUSD#2AE3  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow UP
+  XAUUSD#6624  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow UP
+  with live structure rows: USDCHF HMI-CTX TRANS_FAIL -> BEARISH + PROT / ANCHOR INVALID; GBPUSD HMI-CTX CHOCH UP -> TRANSITION +
+  PROT BREAK / ANCHOR RESET
