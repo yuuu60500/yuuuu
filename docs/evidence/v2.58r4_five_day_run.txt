@@ -79,3 +79,41 @@ live_coverage.py --ver 2.58: on the file as sent NOT PASSED - 1 input problem(s)
   window moved, common region 10-08 16:55 .. 10-30 16:55, all eight categories IDENTICAL
   every chart: MODEL / LIQ / CTX / PROT / B8 / STR / QLT / STG IDENTICAL; STR, QLT, STG rows recompute
   (the complete 20261030.log, sent later, replaces this copy for the record)
+
+## day 1 2026-10-30, complete: 20261030.log sent 11-02, local 09:06 .. 17:07:00 (replaces the two partial copies above)
+# rar sha256 d53cd61f1c4aa1e8f0a1dba45018f25bc6e1d4fb037d34e15425f8284bbfde13; log b3fd59f3e3357aa3dc7067fc854999f86a2d5d5b134a86074a9940920b4645b8
+# 83526 lines; 92 BEGIN / 92 END - every build complete (the USDCAD build cut in the 14:29 copy ends 14:29:35 here).
+# No re-init, no runtime error. Further single-symbol history rebuilds after an HMI-STR-WAIT: NZDUSD 15:14, USDCHF 15:51.
+# Refresh: two rounds 17:06:16 - 17:07:00 (to = 20:05 server), after the 17:05 live H4; the file ends there (MT5 or the PC stopped after the refresh).
+# Tooling note: the work container was reset over the weekend; unar and PowerShell 7.4.6 reinstalled, repository tools unchanged;
+# logtests rerun with it: 228/228 cases as expected.
+
+## live H4 rows, server 20:00 (local 17:05) - the 16:00 rows are listed under part 2
+  AUDUSD#46E1  20:00  BULLISH    PULLBACK BRK_FAIL+COUNTER   arrow DOWN   9 -> 0
+  EURUSD#198B  20:00  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow UP     0 -> 18
+  EURUSD#54CC  20:00  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow UP     0 -> 18
+  GBPUSD#86FE  20:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  NZDUSD#A97D  20:00  BULLISH    PULLBACK BRK_FAIL+COUNTER   arrow DOWN  46 -> 12
+  USDCAD#E6D0  20:00  BEARISH    PUSH     BRK_FAIL           arrow UP    65 -> 82
+  USDCHF#7129  20:00  BEARISH    BUILD    NO_PROT+COUNTER    arrow DOWN  84 -> 44
+  USDJPY#15F9  20:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  XAUUSD#2AE3  20:00  BEARISH    PUSH     BRK_FAIL           arrow UP    47 -> 90
+  XAUUSD#6624  20:00  BEARISH    PUSH     BRK_FAIL           arrow UP    47 -> 90
+
+## live vs build: ReloadTest -LiveVsBuild: 10 of 10 AGREE BOTH WAYS; STR / QLT / STG 2 rows per chart (16:00 and 20:00 server);
+   AUDUSD LIQ 2, GBPUSD LIQ 2, XAUUSD x2 LIQ 1 + CTX 1 + PROT 2
+live_coverage.py --ver 2.58: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+
+## same-window reload, last two builds (the 17:06 - 17:07 refresh rounds)
+  AUDUSD       b12/b13  IDENTICAL inside the comparable region (102 MODEL + 52 LIQ)
+  EURUSD#198B  b21/b22  IDENTICAL inside the comparable region (43 MODEL + 41 LIQ)
+  EURUSD#54CC  b21/b22  IDENTICAL inside the comparable region (43 MODEL + 41 LIQ)
+  GBPUSD       b9/b10   IDENTICAL inside the comparable region (145 MODEL + 54 LIQ)
+  NZDUSD       b11/b12  IDENTICAL inside the comparable region (115 MODEL + 50 LIQ)
+  USDCAD       b11/b12  IDENTICAL inside the comparable region (237 MODEL + 51 LIQ)
+  USDCHF       b9/b10   IDENTICAL inside the comparable region (71 MODEL + 43 LIQ)
+  USDJPY       b11/b12  IDENTICAL inside the comparable region (76 MODEL + 47 LIQ)
+  XAUUSD#2AE3  b67/b68  IDENTICAL inside the comparable region (138 MODEL + 47 LIQ)
+  XAUUSD#6624  b67/b68  IDENTICAL inside the comparable region (135 MODEL + 47 LIQ)
+  every chart: MODEL / LIQ / CTX / PROT / B8 / STR / QLT / STG IDENTICAL; STR, QLT, STG rows recompute
+## day 1: no runtime error, every build complete, history rebuilds finish READY, live = rebuild, reload identical
