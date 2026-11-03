@@ -171,16 +171,16 @@ live_coverage.py --ver 2.58: inputs complete, 0 differences (categories without 
 live_coverage.py --ver 2.58 --offset 2: inputs complete, 0 differences (categories without a sample are listed above, not passed)
 
 ## reload, last two builds
-  AUDUSD       b17/b18  window moved)  IDENTICAL inside the comparable region (102 MODEL + 53 LIQ)
-  EURUSD#198B  b29/b30  same window)   IDENTICAL inside the comparable region (53 MODEL + 44 LIQ)
-  EURUSD#54CC  b29/b30  same window)   IDENTICAL inside the comparable region (53 MODEL + 44 LIQ)
-  GBPUSD       b14/b15  window moved)  PENDING REVIEW: nothing differs inside the region; 1 row(s) before it (A only)
-  NZDUSD       b16/b17  window moved)  PENDING REVIEW: nothing differs inside the region; 1 row(s) before it (A only)
-  USDCAD       b16/b17  window moved)  PENDING REVIEW: nothing differs inside the region; 5 row(s) before it (A only)
-  USDCHF       b14/b15  window moved)  IDENTICAL inside the comparable region (71 MODEL + 43 LIQ)
-  USDJPY       b16/b17  window moved)  IDENTICAL inside the comparable region (34 MODEL + 42 LIQ)
-  XAUUSD#2AE3  b75/b76  same window)   IDENTICAL inside the comparable region (142 MODEL + 45 LIQ)
-  XAUUSD#6624  b75/b76  same window)   IDENTICAL inside the comparable region (138 MODEL + 45 LIQ)
+  AUDUSD       b17/b18  window moved   IDENTICAL inside the comparable region (102 MODEL + 53 LIQ)
+  EURUSD#198B  b29/b30  same window    IDENTICAL inside the comparable region (53 MODEL + 44 LIQ)
+  EURUSD#54CC  b29/b30  same window    IDENTICAL inside the comparable region (53 MODEL + 44 LIQ)
+  GBPUSD       b14/b15  window moved   PENDING REVIEW: nothing differs inside the region; 1 row(s) before it (A only)
+  NZDUSD       b16/b17  window moved   PENDING REVIEW: nothing differs inside the region; 1 row(s) before it (A only)
+  USDCAD       b16/b17  window moved   PENDING REVIEW: nothing differs inside the region; 5 row(s) before it (A only)
+  USDCHF       b14/b15  window moved   IDENTICAL inside the comparable region (71 MODEL + 43 LIQ)
+  USDJPY       b16/b17  window moved   IDENTICAL inside the comparable region (34 MODEL + 42 LIQ)
+  XAUUSD#2AE3  b75/b76  same window    IDENTICAL inside the comparable region (142 MODEL + 45 LIQ)
+  XAUUSD#6624  b75/b76  same window    IDENTICAL inside the comparable region (138 MODEL + 45 LIQ)
   every chart: all eight categories IDENTICAL inside the comparable region; STR, QLT, STG rows recompute
   GBPUSD / NZDUSD / USDCAD: the 14:31 and 17:06 builds have windows 2.5 h apart; the A-only rows (GBPUSD LIQ BSL SWEEP 10-08 17:20,
   NZDUSD LIQ BSL SWEEP 10-08 17:40, USDCAD MODEL cycles 429 / 433 10-08 18:15 - 21:10) lie at the start of A's window, where B was
