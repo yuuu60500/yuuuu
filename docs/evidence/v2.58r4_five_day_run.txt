@@ -186,3 +186,62 @@ live_coverage.py --ver 2.58 --offset 2: inputs complete, 0 differences (categori
   NZDUSD LIQ BSL SWEEP 10-08 17:40, USDCAD MODEL cycles 429 / 433 10-08 18:15 - 21:10) lie at the start of A's window, where B was
   still in warm-up (B warmup_end 10-08 18:20 / 18:30) - the moving-window limit A-59. By rule PENDING REVIEW, not written as a pass;
   a second refresh round right after the first gives every chart a same-window pair (as on 10-29 / 10-30).
+
+## day 3 2026-11-03: 20261103.log, local 09:10 .. 17:13:42
+# rar sha256 e4f4a9371e7c816437e9126c6e5f8aefdbc4cc5e754c188e2935394e126ad741; log ddfa753d8b3dd0e9a494bee871de63a4246875e0ad6904dc8959e2714f456d75
+# 81092 lines; 88 BEGIN / 88 END, all complete; no re-init, no runtime error; same MT5 process (run 1792585034),
+# woke 09:10 (HMI-STR-WAIT, every chart rebuilt, READY). Server = local + 2 h.
+# Builds: 09:10 wake; 09:16 - 09:17 refresh; history rebuilds 10:00 - 10:06 (six symbols) and 11:02 (XAUUSD x2), READY;
+# 14:16 two refresh rounds (26 builds, after the 14:05 live H4); 17:13 two refresh rounds (28 builds).
+
+## live H4 rows (server 12:00 at local 10:05, server 16:00 at local 14:05)
+  AUDUSD#46E1  12:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  AUDUSD#46E1  16:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  EURUSD#198B  12:00  BEARISH    DEEP     DEEP+BRK_FAIL      arrow DOWN  18 -> 3
+  EURUSD#198B  16:00  BEARISH    DEEP     DEEP+BRK_FAIL      arrow DOWN  28 -> 0
+  EURUSD#54CC  12:00  BEARISH    DEEP     DEEP+BRK_FAIL      arrow DOWN  18 -> 3
+  EURUSD#54CC  16:00  BEARISH    DEEP     DEEP+BRK_FAIL      arrow DOWN  28 -> 0
+  GBPUSD#86FE  12:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  GBPUSD#86FE  16:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  NZDUSD#A97D  12:00  BULLISH    PULLBACK BRK_FAIL+CHOP      arrow UP     0 -> 8
+  NZDUSD#A97D  16:00  BULLISH    DEEP     DEEP+BRK_FAIL      arrow UP     0 -> 12
+  USDCAD#E6D0  12:00  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow UP     3 -> 13
+  USDCAD#E6D0  16:00  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow UP     0 -> 5
+  USDCHF#7129  12:00  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow DOWN  56 -> 35
+  USDCHF#7129  16:00  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow UP    17 -> 34
+  USDJPY#15F9  12:00  BULLISH    BUILD    NO_PROT            arrow NEW   NA -> 63
+  USDJPY#15F9  16:00  BULLISH    BUILD    NO_PROT            arrow NEW   NA -> 78
+  XAUUSD#2AE3  12:00  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow UP    41 -> 67
+  XAUUSD#2AE3  16:00  BEARISH    PULLBACK BRK_FAIL+COUNTER   arrow DOWN  30 -> 0
+  XAUUSD#6624  12:00  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow UP    41 -> 67
+  XAUUSD#6624  16:00  BEARISH    PULLBACK BRK_FAIL+COUNTER   arrow DOWN  30 -> 0
+
+## live vs build: ReloadTest -LiveVsBuild: 10 of 10 AGREE BOTH WAYS; STR / QLT / STG 2 rows per chart
+  EURUSD#198B   live events compared: 1 (+ 0 H4 structure event(s))
+  EURUSD#198B   by model: MSS 1
+  EURUSD#54CC   live events compared: 2 (+ 0 H4 structure event(s))
+  EURUSD#54CC   by model: LIQ SSL SWEEP 1  |  MSS 1
+  USDCAD   live events compared: 3 (+ 0 H4 structure event(s))
+  USDCAD   by model: BPR 1  |  LIQ BSL SWEEP 1  |  PA ENGULFING 1
+  USDJPY   live events compared: 5 (+ 1 H4 structure event(s))
+  USDJPY   protected-level rows compared: 2 (PROT / ANCHOR / INTERNAL)
+  USDJPY   by model: LIQ BSL BROKEN 3  |  LIQ PDH BROKEN 1  |  LIQ PWH BROKEN 1
+  XAUUSD#2AE3   live events compared: 17 (+ 0 H4 structure event(s))
+  XAUUSD#2AE3   by model: BPR 5  |  CISD 4  |  LIQ BSL SWEEP 1  |  LIQ PDH SWEEP 1  |  MSS 1  |  PA BREAK-RETEST 1  |  PA ENGULFING 3  |  PA REJECTION 1
+  XAUUSD#6624   live events compared: 16 (+ 0 H4 structure event(s))
+  XAUUSD#6624   by model: BPR 5  |  CISD 3  |  LIQ BSL SWEEP 1  |  LIQ PDH SWEEP 1  |  MSS 1  |  PA BREAK-RETEST 1  |  PA ENGULFING 3  |  PA REJECTION 1
+live_coverage.py --ver 2.58 --offset 2 20261102.log 20261103.log: across a sleep none (11-02 ended after its last build);
+  inputs complete, 0 differences (categories without a sample are listed above, not passed)
+
+## reload, last two builds (the second 17:13 round against the first) - every pair in the same window
+  AUDUSD       b24/b25  IDENTICAL inside the comparable region (102 MODEL + 56 LIQ)
+  EURUSD#198B  b40/b41  IDENTICAL inside the comparable region (76 MODEL + 42 LIQ)
+  EURUSD#54CC  b40/b41  IDENTICAL inside the comparable region (76 MODEL + 43 LIQ)
+  GBPUSD       b21/b22  IDENTICAL inside the comparable region (145 MODEL + 51 LIQ)
+  NZDUSD       b23/b24  IDENTICAL inside the comparable region (115 MODEL + 50 LIQ)
+  USDCAD       b23/b24  IDENTICAL inside the comparable region (238 MODEL + 48 LIQ)
+  USDCHF       b21/b22  IDENTICAL inside the comparable region (71 MODEL + 49 LIQ)
+  USDJPY       b23/b24  IDENTICAL inside the comparable region (27 MODEL + 48 LIQ)
+  XAUUSD#2AE3  b87/b88  IDENTICAL inside the comparable region (151 MODEL + 46 LIQ)
+  XAUUSD#6624  b87/b88  IDENTICAL inside the comparable region (147 MODEL + 46 LIQ)
+  every chart: MODEL / LIQ / CTX / PROT / B8 / STR / QLT / STG IDENTICAL; STR, QLT, STG rows recompute
