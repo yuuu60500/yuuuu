@@ -245,3 +245,56 @@ live_coverage.py --ver 2.58 --offset 2 20261102.log 20261103.log: across a sleep
   XAUUSD#2AE3  b87/b88  IDENTICAL inside the comparable region (151 MODEL + 46 LIQ)
   XAUUSD#6624  b87/b88  IDENTICAL inside the comparable region (147 MODEL + 46 LIQ)
   every chart: MODEL / LIQ / CTX / PROT / B8 / STR / QLT / STG IDENTICAL; STR, QLT, STG rows recompute
+
+## day 4 2026-11-04: 20261104.log, local 09:06 .. 17:12:37
+# rar sha256 7c715418f9f87a65fbe73f88b7b0a8ffa4793793689a9c123010664c5a4b3504; log e1a03588141286327ef70589452477b50bf81aa48707d915b47b966c2c945969
+# 102333 lines; 110 BEGIN / 110 END, all complete; no runtime error in the file. Woke 09:06 (same process, run 1792585034).
+# TERMINAL RESTART: after the 14:05 live H4 the file has nothing until 14:18:26, where all ten charts start again under a new
+# run (1793801902, init 1 - 10, same instance ids). The Experts log does not say why; cause asked from the user (terminal journal).
+# Builds: 09:06 wake; 09:15 / 09:18 single rebuilds; history rebuilds 10:00 - 10:03 (seven) and 11:02 (XAUUSD x2), READY;
+# 14:18 restart (first build of every chart); 14:22 two refresh rounds; 16:41 - 16:43 rebuilds of all ten; 17:12 two refresh rounds.
+
+## live H4 rows (server 12:00 at local 10:05, server 16:00 at local 14:05) - both before the restart
+  AUDUSD#46E1  12:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  AUDUSD#46E1  16:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  EURUSD#198B  12:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  EURUSD#198B  16:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  EURUSD#54CC  12:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  EURUSD#54CC  16:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  GBPUSD#86FE  12:00  BULLISH    PUSH     MOVE+RET           arrow NEW   NA -> 72
+  GBPUSD#86FE  16:00  BULLISH    PULLBACK MOVE+RET           arrow DOWN  82 -> 71
+  NZDUSD#A97D  12:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  NZDUSD#A97D  16:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  USDCAD#E6D0  12:00  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow UP     0 -> 33
+  USDCAD#E6D0  16:00  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow UP    18 -> 39
+  USDCHF#7129  12:00  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow UP    34 -> 50
+  USDCHF#7129  16:00  BEARISH    PULLBACK BRK_FAIL+COUNTER   arrow DOWN  84 -> 29
+  USDJPY#15F9  12:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  USDJPY#15F9  16:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  XAUUSD#2AE3  12:00  BEARISH    DEEP     DEEP+BRK_FAIL      arrow FLAT   0 -> 0
+  XAUUSD#2AE3  16:00  BEARISH    DEEP     DEEP+BRK_FAIL      arrow DOWN   8 -> 0
+  XAUUSD#6624  12:00  BEARISH    DEEP     DEEP+BRK_FAIL      arrow FLAT   0 -> 0
+  XAUUSD#6624  16:00  BEARISH    DEEP     DEEP+BRK_FAIL      arrow DOWN   8 -> 0
+
+## live vs build
+live_coverage.py --ver 2.58 --offset 2 20261103.log 20261104.log: inputs complete, 0 differences (categories without a sample are listed above, not passed)
+  across the terminal restart (A-60, not intraday evidence): every chart's live rows between its last build of run 1792585034 and
+  the restart - both live H4s (STR / QLT / STG), EURUSD x2 live CTX TRANS_SAMELEG, USDCAD / USDCHF / GBPUSD marks - checked forward
+  against its first build of run 1793801902: all exact (82 forward rows exact over the two files, none differ)
+  intraday after the restart: NZDUSD LIQ 2, USDCAD LIQ 3, USDCHF MODEL 7 + B8 4 - 0 differences; XAUUSD x2 10:05 H4 intraday (11:02 build)
+ReloadTest -LiveVsBuild: every chart's pair across the restart PENDING by rule (terminal restarted between the builds, A-60);
+  the other pairs AGREE BOTH WAYS (NZDUSD, USDCAD, USDCHF, XAUUSD x2); nothing disagrees
+
+## reload, last two builds (the second 17:12 round against the first)
+  AUDUSD       b6/b7    same window   IDENTICAL inside the comparable region (85 MODEL + 53 LIQ)
+  EURUSD#198B  b11/b12  same window   IDENTICAL inside the comparable region (76 MODEL + 45 LIQ)
+  EURUSD#54CC  b11/b12  same window   IDENTICAL inside the comparable region (76 MODEL + 46 LIQ)
+  GBPUSD       b6/b7    same window   IDENTICAL inside the comparable region (145 MODEL + 53 LIQ)
+  NZDUSD       b5/b6    window moved  IDENTICAL inside the comparable region (103 MODEL + 51 LIQ)
+  USDCAD       b6/b7    same window   IDENTICAL inside the comparable region (205 MODEL + 55 LIQ)
+  USDCHF       b6/b7    same window   IDENTICAL inside the comparable region (117 MODEL + 46 LIQ)
+  USDJPY       b6/b7    same window   IDENTICAL inside the comparable region (27 MODEL + 47 LIQ)
+  XAUUSD#2AE3  b10/b11  same window   IDENTICAL inside the comparable region (162 MODEL + 46 LIQ)
+  XAUUSD#6624  b10/b11  same window   IDENTICAL inside the comparable region (166 MODEL + 46 LIQ)
+  every chart: MODEL / LIQ / CTX / PROT / B8 / STR / QLT / STG IDENTICAL; STR, QLT, STG rows recompute
+  (NZDUSD rebuilt only once in the 17:12 rounds, so its pair is 16:43 b5 / 17:12 b6, window moved 30 min; nothing differs before or inside the region)
