@@ -374,13 +374,15 @@ builds       469 (92 + 62 + 88 + 110 + 117), every BEGIN with its END. 3 builds 
              (EURUSD x2 11-02 14:30:49, AUDUSD 11-05 17:10:01); each chart's next build, 2 s and 5 s later, was READY - no
              repeated waiting like the 47 XAUUSD builds of 10-29; the last two builds compared every day were READY
 errors       no runtime error in any of the five files
-continuity   the PC slept every night (MT5 resumed each morning: HMI-STR-WAIT, then every chart rebuilt READY within seconds);
+continuity   daytime use with the PC asleep every night - not 24 h continuous running; MT5 resumed each morning (HMI-STR-WAIT, then
+             every chart rebuilt READY: first wait -> first READY 2.4 - 15.2 s, longest 15.179 s EURUSD 11-05; one build 0.013 - 0.644 s);
              one PC reboot by the user 11-04 14:18 (MT5 restarted with it); no crash, no freeze, no endless rebuilding.
              History rebuilds of single symbols during the day (MT5 refreshing a symbol's history) each finished in under a second, READY.
              Broker clock moved from local + 3 h to local + 2 h on the 11-01 weekend; the tools were run with the right offset per day.
 live H4      100 rows = 10 H4 closes x 10 charts, each with STR / QLT / STG (table: v2.58r4_five_day_live_h4.tsv):
                ctx       BEARISH 48, TRANSITION 37, BULLISH 15
-               stage     TRANS 37, PULLBACK 36, DEEP 15, BUILD 6, PUSH 6 (no CONSOL / RANGE / NODATA live in the five days)
+               stage     TRANS 37, PULLBACK 36, DEEP 15, BUILD 6, PUSH 6 (no stage CONSOL / RANGE / NODATA at a live close in the five
+                         days - the stage only; quality was PARTIAL (样本不足 / anchor) 22 times)
                strength  WEAK 39, NODIR 37 (暂不评级), STRONG 14, MED 10;  arrow DOWN 28, UP 25, FLAT 6, NEW 4, NA 37
                quality   NODIR 37, PARTIAL 22, FAIR 26 (12 FIVE / 14 LOW), GOOD 14 (FIVE), POOR 1 (FIVE) - the first live 较差
                reasons   BRK_FAIL 52, PROT_BROKEN 37, CHOP 21, COUNTER 17, DEEP 15, NO_PROT 6, MOVE 2, RET 2
@@ -394,3 +396,9 @@ reload       every day the last two builds of every chart: all eight categories 
              pairs PENDING REVIEW for rows before the region only (A-59), nothing inside the region differs
 not judged   10-30 morning partial copies and the 14:29 copy are superseded by the complete 20261030.log; 10-29 (the day before the run)
              is in docs/evidence/v2.58_mt5_run_20261029.txt
+
+## reviewer 2026-11-06 「HMI v2.58r4 五日验收通过与正式封版结论」: PASSED - v2.58r4 sealed for use (Audit Round 53)
+   independent: 26/26 MQL unchanged, EX5 = frozen record, 47/47 package fingerprints, 469/469 builds closed, 100 live STR / QLT / STG
+   groups = rebuild, STR / QLT / STG 49563 rows each recomputed, 50 daily reload pairs; LIQ WAITING recovered 1.87 / 1.965 / 5.094 s
+   kept: the 11-02 window-moved PENDING REVIEW (A-59), six moving-window charts missing one early STR / QLT / STG row before the region,
+   15 edge rows; the run is daytime use plus nightly sleep, not 24 h continuous; recovery figures are this machine's, not a promise
