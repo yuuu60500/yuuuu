@@ -65,11 +65,30 @@ H4 Context
 | [docs/03_Module_Architecture_v1.00.md](docs/03_Module_Architecture_v1.00.md) | 代码架构：文件 / 模块 / Enum / Struct / 调用顺序 |
 | [docs/04_Test_Plan_v1.00.md](docs/04_Test_Plan_v1.00.md) | Replay Test Plan + Repaint Test Plan (Rule 71 / Rule 72) |
 | [docs/05_Changelog_v1.00.md](docs/05_Changelog_v1.00.md) | 版本记录 (Rule 74) |
-| [docs/06_Audit_Round1_v1.00.md](docs/06_Audit_Round1_v1.00.md) | 第一轮代码审计 (Rule 66 / 67) |
+| [docs/06_Audit_Round1_v1.00.md](docs/06_Audit_Round1_v1.00.md) | 审计记录（第 1 轮起，至 Audit Round 53 正式封版）(Rule 66 / 67) |
+| [docs/07_Baselines.md](docs/07_Baselines.md) | 各版本可回退基线索引 |
+| [docs/baselines/v2.58r4.md](docs/baselines/v2.58r4.md) | **当前正式使用基线**：源码 / EX5 / 工具指纹、参数配置、已知限制、五日结果、封版与归档 |
+| [docs/evidence/](docs/evidence/) | 各版本运行与离线核对记录（五日运行：`v2.58r4_five_day_run.txt`、`v2.58r4_five_day_live_h4.tsv`） |
 
 ---
 
-## 当前阶段状态
+## 当前状态（2026-11-06）
+
+**v2.58r4 是正式使用基线**：验收方「HMI v2.58r4 五日验收通过与正式封版结论」（2026-11-06）判定通过，正式封版落地使用；
+「正式归档审核确认」（同日）核对源码、EX5、回退源码与归档指纹一致。本轮开发与验收已结束。详见 [docs/baselines/v2.58r4.md](docs/baselines/v2.58r4.md)。
+
+| 项目 | 状态 |
+|------|------|
+| 源码 | `MQL5/Indicators/HMI`，26 个文件，提交 `2386f8f`（之后只改文档） |
+| 编译 | 0 errors / 0 warnings（用户与验收方，2026-10-29） |
+| 正式 EX5 | `H4M5_Identification.ex5`，328788 字节，SHA256 `4A3BB167…5DBB` |
+| 参数 | 默认 `461F006E`；ATR 配置 `A047970C`（只改 `InpBreakMarginMode = MARGIN_ATR_FRAC`） |
+| 离线 / 工具 | stage_sim 102/102、mirror PASS、logtests 228/228、live_coverage_tests 28/28 |
+| 五日运行验收 | 10-30、11-02 至 11-05：469 次构建完整、无运行时错误；100 组实时 H4 强度 / 质量 / 阶段与重建一致；实时 MODEL / LIQ / CTX / PROT / B8 0 差异；每日重载可比区间一致（11-02 三张图窗口移动，区间前记 PENDING REVIEW） |
+| 回退 | v2.57 基线 `833c7a3`（[docs/baselines/v2.57.md](docs/baselines/v2.57.md)） |
+| 保留限制 | 移动窗口（A-59）、编号随窗口重排（A-20）、MSS C5 原生罕见分支只有离线覆盖；P3 原因文字与一个输入显示名留后续独立版本 |
+
+### 早期阶段记录（2026-09，历史，不代表当前状态）
 
 | 项目 | 状态 |
 |------|------|
@@ -97,6 +116,7 @@ MQL5/Indicators/HMI/             <- 整个指标就这一个文件夹
    HMI_H4StructureEngine.mqh        BOS / CHOCH
    HMI_H4ContextEngine.mqh          4 状态 Context 机
    HMI_H4RangeEngine.mqh            版本化 Trading Range + Liquidity
+   HMI_LiquidityLevels.mqh          BRI-09 流动性水平 / SWEEP / BROKEN（只标记）
    HMI_H4POIEngine.mqh              H4 POI 全生命周期
    HMI_M5BlockEngine.mqh            Refinement Session / M5 OB / Breaker
    HMI_CycleManager.mqh             ARMED 仲裁 / Reference 冻结 / Cycle 隔离
@@ -104,14 +124,16 @@ MQL5/Indicators/HMI/             <- 整个指标就这一个文件夹
    HMI_MSSEngine.mqh                MSS（不引用其它模型）
    HMI_BPREngine.mqh                BPR（不引用其它模型）
    HMI_PriceActionEngine.mqh        PA x3（不引用其它模型）
+   HMI_StrengthEngine.mqh           v2.56 趋势强度（BRI-13，只显示）
+   HMI_QualityEngine.mqh            v2.57 趋势质量（BRI-14，只显示）
+   HMI_StageEngine.mqh              v2.58 当前阶段 / 主要原因 / 强度箭头 / 面板文字（BRI-15，只显示）
    HMI_ObjectManager.mqh            唯一允许调用 Object* 的模块
    HMI_AlertManager.mqh             Phase 7 告警
 ```
 
 安装：把 `MQL5/Indicators/HMI` **整个文件夹**复制到 MT5 数据文件夹的 `MQL5\Indicators\` 下，
-挂在 **M5** 图表上。**不需要动 `Include` 目录。**
+挂在 **M5** 图表上。**不需要动 `Include` 目录。** ATR 配置的图：在输入参数里把 `InpBreakMarginMode` 改为 `MARGIN_ATR_FRAC`，
+其余保持默认（或加载自己保存的 .set）；构建日志的 `params=` 应为 `A047970C`。
 
-> **编译状态：PASS**（v2.02，2026-09-22，MetaEditor 实测 0 errors / 0 warnings）。
-> **Replay 状态：NOT VERIFIED** —— 编译通过只证明语法与类型正确，
-> 不证明任何一条业务规则被正确实现。`docs/04` 的全部用例仍未执行，
-> 任何"Replay PASS"的说法都必须由真实运行结果支撑（Rule 71 / 72）。
+> **历史记录（2026-09-22，v2.02）：** 当时编译 PASS、Replay NOT VERIFIED、`docs/04` 用例尚未执行。
+> 此后各版本均以真实 MT5 运行结果验收（Rule 71 / 72），当前状态见上方「当前状态」与 `docs/04` 各版本清单。

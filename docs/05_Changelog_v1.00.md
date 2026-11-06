@@ -2294,3 +2294,15 @@ Date:     2026-11-06
 归档      HMI_v2.58r4_official_archive_MQL5.zip（SHA256 6f75b815…8902）：源码、EX5、参数配置说明、工具、文档、v2.57 回退源码
 之后      P3 原因文字、「H4 区间线颜色」输入显示名、图案美化放到后续独立版本，不覆盖本基线
 ```
+
+## v2.58r4 —— 正式归档审核确认与归档 r2（只改文档）
+
+```
+Date:     2026-11-06
+来源:     验收方「HMI v2.58r4 正式归档审核确认」：归档通过（源码 26/26、EX5、回退源码 25/25、指纹 67/67、参数）；两处非阻塞文档收尾
+改动      README：开头加「当前状态（2026-11-06）」并链接 docs/baselines/v2.58r4.md；2026-09 的阶段表与「Replay NOT VERIFIED」标为历史；
+          源码清单补 HMI_LiquidityLevels / StrengthEngine / QualityEngine / StageEngine；文档表补 07、baselines、evidence；
+          安装说明写明 ATR 配置的手动设置（只改 InpBreakMarginMode = MARGIN_ATR_FRAC）
+          归档 r2：参数配置.txt 与归档说明改为按文字手动设置 ATR 配置（包内无 .set）
+不变      源码、EX5、版本号、工具、五日验收状态与五日证据包
+```
