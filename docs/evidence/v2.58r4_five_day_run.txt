@@ -299,3 +299,98 @@ ReloadTest -LiveVsBuild: every chart's pair across the restart PENDING by rule (
   XAUUSD#6624  b10/b11  same window   IDENTICAL inside the comparable region (166 MODEL + 46 LIQ)
   every chart: MODEL / LIQ / CTX / PROT / B8 / STR / QLT / STG IDENTICAL; STR, QLT, STG rows recompute
   (NZDUSD rebuilt only once in the 17:12 rounds, so its pair is 16:43 b5 / 17:12 b6, window moved 30 min; nothing differs before or inside the region)
+
+## day 5 2026-11-05: 20261105.log sent 11-06, local 09:07 .. 17:11:24
+# rar sha256 c8819796273e25f438a4b8ef46c76e9e95e7f61a3d58e63c370393cf23b2dc62; log 3252cad71bf1c91816f805f5a131e3b94ff94b854b098289da3451458172be7e
+# 107399 lines; 117 BEGIN / 117 END, all complete; no re-init, no runtime error; same process as after the 11-04 reboot
+# (run 1793801902), woke 09:07 (HMI-STR-WAIT, every chart rebuilt, READY). Server = local + 2 h.
+# Builds: 09:07 wake; history rebuilds 10:37 - 10:44 (all symbols), READY; 14:43 - 14:44 two refresh rounds (after the 14:05 live H4);
+# 17:09 - 17:11 two refresh rounds.
+
+## live H4 rows (server 12:00 at local 10:05, server 16:00 at local 14:05)
+  AUDUSD#46E1  12:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  AUDUSD#46E1  16:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  EURUSD#198B  12:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  EURUSD#198B  16:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  EURUSD#54CC  12:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  EURUSD#54CC  16:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  GBPUSD#86FE  12:00  BULLISH    PULLBACK COUNTER+CHOP       arrow DOWN  52 -> 33
+  GBPUSD#86FE  16:00  BULLISH    PULLBACK COUNTER+CHOP       arrow DOWN  67 -> 29
+  NZDUSD#A97D  12:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  NZDUSD#A97D  16:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  USDCAD#E6D0  12:00  BEARISH    PULLBACK BRK_FAIL+CHOP      arrow UP     6 -> 27
+  USDCAD#E6D0  16:00  BEARISH    PULLBACK BRK_FAIL+COUNTER   arrow DOWN  28 -> 4
+  USDCHF#7129  12:00  BEARISH    PULLBACK BRK_FAIL+COUNTER   arrow DOWN  12 -> 4
+  USDCHF#7129  16:00  BEARISH    PULLBACK BRK_FAIL+COUNTER   arrow DOWN  48 -> 8
+  USDJPY#15F9  12:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  USDJPY#15F9  16:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  XAUUSD#2AE3  12:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  XAUUSD#2AE3  16:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  XAUUSD#6624  12:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+  XAUUSD#6624  16:00  TRANSITION TRANS    PROT_BROKEN        arrow NA    NA -> NA
+
+## live vs build: ReloadTest -LiveVsBuild: 10 of 10 AGREE BOTH WAYS; STR / QLT / STG 2 rows per chart
+  AUDUSD   live events compared: 3 (+ 0 H4 structure event(s))
+  AUDUSD   by model: LIQ PDL SWEEP 1  |  LIQ SSL BROKEN 1  |  LIQ SSL SWEEP 1
+  EURUSD#198B   live events compared: 1 (+ 0 H4 structure event(s))
+  EURUSD#198B   by model: LIQ SSL SWEEP 1
+  EURUSD#54CC   live events compared: 1 (+ 0 H4 structure event(s))
+  EURUSD#54CC   by model: LIQ SSL SWEEP 1
+  GBPUSD   live events compared: 17 (+ 0 H4 structure event(s))
+  GBPUSD   by model: BPR 4  |  CISD 3  |  MSS 3  |  PA BREAK-RETEST 1  |  PA ENGULFING 3  |  PA REJECTION 3
+  NZDUSD   live events compared: 1 (+ 0 H4 structure event(s))
+  NZDUSD   by model: LIQ SSL SWEEP 1
+  USDCAD   live events compared: 7 (+ 0 H4 structure event(s))
+  USDCAD   protected-level rows compared: 1 (PROT / ANCHOR / INTERNAL)
+  USDCAD   by model: BPR 3  |  CISD 1  |  LIQ BSL SWEEP 1  |  PA ENGULFING 1  |  PA REJECTION 1
+  USDCHF   live events compared: 5 (+ 0 H4 structure event(s))
+  USDCHF   by model: BPR 1  |  CISD 1  |  MSS 1  |  PA ENGULFING 1  |  PA REJECTION 1
+  USDJPY   live events compared: 1 (+ 0 H4 structure event(s))
+  USDJPY   by model: LIQ SSL SWEEP 1
+  two live PA BREAK-RETEST marks on the edge bar of the next build (GBPUSD 17:09:59, USDCHF 14:39:59): both present in that build,
+  not counted as proof (edge rule) - ReloadTest notes them as 'live row on an edge bar, not provably covered'
+live_coverage.py --ver 2.58 --offset 2 20261104.log 20261105.log: across a sleep none; inputs complete, 0 differences (categories without a sample are listed above, not passed)
+
+## reload, last two builds (the second 17:10 - 17:11 round against the first) - every pair in the same window
+  AUDUSD       b18/b19  IDENTICAL inside the comparable region (75 MODEL + 57 LIQ)
+  EURUSD#198B  b26/b27  IDENTICAL inside the comparable region (74 MODEL + 42 LIQ)
+  EURUSD#54CC  b26/b27  IDENTICAL inside the comparable region (74 MODEL + 43 LIQ)
+  GBPUSD       b15/b16  IDENTICAL inside the comparable region (119 MODEL + 51 LIQ)
+  NZDUSD       b14/b15  IDENTICAL inside the comparable region (101 MODEL + 56 LIQ)
+  USDCAD       b15/b16  IDENTICAL inside the comparable region (211 MODEL + 51 LIQ)
+  USDCHF       b15/b16  IDENTICAL inside the comparable region (126 MODEL + 44 LIQ)
+  USDJPY       b15/b16  IDENTICAL inside the comparable region (9 MODEL + 46 LIQ)
+  XAUUSD#2AE3  b25/b26  IDENTICAL inside the comparable region (162 MODEL + 47 LIQ)
+  XAUUSD#6624  b25/b26  IDENTICAL inside the comparable region (166 MODEL + 47 LIQ)
+  every chart: MODEL / LIQ / CTX / PROT / B8 / STR / QLT / STG IDENTICAL; STR, QLT, STG rows recompute
+
+## EX5 at the end of the run (user, 11-06): H4M5_Identification.ex5 328788 bytes, sha256
+   4a3bb167ec4a916d7b9973f814bc389a66470b0278ae3181c09f8d4ab3f25dbb - the same file as recorded 10-29 (docs/baselines/v2.58r4.md)
+
+## ===== five-day summary: 10-30, 11-02, 11-03, 11-04, 11-05 =====
+program      the same EX5 throughout (4a3bb167...5dbb at the start 10-29 and at the end 11-06); no recompilation; inputs not changed;
+             ten charts, params 461F006E (8) / A047970C (EURUSD, XAUUSD ATR)
+builds       469 (92 + 62 + 88 + 110 + 117), every BEGIN with its END. 3 builds ended with the liquidity history still WAITING
+             (EURUSD x2 11-02 14:30:49, AUDUSD 11-05 17:10:01); each chart's next build, 2 s and 5 s later, was READY - no
+             repeated waiting like the 47 XAUUSD builds of 10-29; the last two builds compared every day were READY
+errors       no runtime error in any of the five files
+continuity   the PC slept every night (MT5 resumed each morning: HMI-STR-WAIT, then every chart rebuilt READY within seconds);
+             one PC reboot by the user 11-04 14:18 (MT5 restarted with it); no crash, no freeze, no endless rebuilding.
+             History rebuilds of single symbols during the day (MT5 refreshing a symbol's history) each finished in under a second, READY.
+             Broker clock moved from local + 3 h to local + 2 h on the 11-01 weekend; the tools were run with the right offset per day.
+live H4      100 rows = 10 H4 closes x 10 charts, each with STR / QLT / STG (table: v2.58r4_five_day_live_h4.tsv):
+               ctx       BEARISH 48, TRANSITION 37, BULLISH 15
+               stage     TRANS 37, PULLBACK 36, DEEP 15, BUILD 6, PUSH 6 (no CONSOL / RANGE / NODATA live in the five days)
+               strength  WEAK 39, NODIR 37 (暂不评级), STRONG 14, MED 10;  arrow DOWN 28, UP 25, FLAT 6, NEW 4, NA 37
+               quality   NODIR 37, PARTIAL 22, FAIR 26 (12 FIVE / 14 LOW), GOOD 14 (FIVE), POOR 1 (FIVE) - the first live 较差
+               reasons   BRK_FAIL 52, PROT_BROKEN 37, CHOP 21, COUNTER 17, DEEP 15, NO_PROT 6, MOVE 2, RET 2
+live = build every live row checked against a later build of the same chart, 0 differences:
+               intraday   MODEL 96, LIQ 43, CTX 4, PROT 11, B8 96, STR / QLT / STG 82 each
+               across the 11-04 reboot (forward, A-60): MODEL 10, LIQ 7, CTX 3, B8 8, STR / QLT / STG 18 each
+               all ten live H4 closes: STR / QLT / STG 100 / 100 / 100
+               edge rows (on the last bar of the next build, present in it, not counted): 15
+reload       every day the last two builds of every chart: all eight categories IDENTICAL inside the comparable region, STR / QLT / STG
+             rows recompute; same-window pairs on 10-30, 11-03, 11-04 (9 of 10), 11-05; on 11-02 (one refresh round) three window-moved
+             pairs PENDING REVIEW for rows before the region only (A-59), nothing inside the region differs
+not judged   10-30 morning partial copies and the 14:29 copy are superseded by the complete 20261030.log; 10-29 (the day before the run)
+             is in docs/evidence/v2.58_mt5_run_20261029.txt
