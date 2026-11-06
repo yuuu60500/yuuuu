@@ -2291,6 +2291,6 @@ Date:     2026-11-06
           ATR 配置（只改 InpBreakMarginMode = MARGIN_ATR_FRAC）A047970C；五日证据包 066346C2…ADCC
 文档      docs/baselines/v2.58r4.md 改为「正式使用基线，2026-11-06 验收通过」（§5 按验收方核对更正：晨间恢复最长 15.179 秒、单次构建
           0.013–0.644 秒、非 24 小时连续运行、「样本不足」分阶段与质量两层写；§6 封版与归档）；07、04、06 Audit Round 53；README 版本行
-归档      HMI_v2.58r4_official_archive_MQL5.zip：源码、EX5、参数配置说明、工具、文档、v2.57 回退源码
+归档      HMI_v2.58r4_official_archive_MQL5.zip（SHA256 6f75b815…8902）：源码、EX5、参数配置说明、工具、文档、v2.57 回退源码
 之后      P3 原因文字、「H4 区间线颜色」输入显示名、图案美化放到后续独立版本，不覆盖本基线
 ```
