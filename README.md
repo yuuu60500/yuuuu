@@ -67,6 +67,7 @@ H4 Context
 | [docs/05_Changelog_v1.00.md](docs/05_Changelog_v1.00.md) | 版本记录 (Rule 74) |
 | [docs/06_Audit_Round1_v1.00.md](docs/06_Audit_Round1_v1.00.md) | 审计记录（第 1 轮起，至 Audit Round 53 正式封版）(Rule 66 / 67) |
 | [docs/07_Baselines.md](docs/07_Baselines.md) | 各版本可回退基线索引 |
+| [docs/08_User_Manual_v2.58r4.md](docs/08_User_Manual_v2.58r4.md) | 使用说明书（v2.58r4 正式版）：安装、面板、图表标记、常用设置 |
 | [docs/baselines/v2.58r4.md](docs/baselines/v2.58r4.md) | **当前正式使用基线**：源码 / EX5 / 工具指纹、参数配置、已知限制、五日结果、封版与归档 |
 | [docs/evidence/](docs/evidence/) | 各版本运行与离线核对记录（五日运行：`v2.58r4_five_day_run.txt`、`v2.58r4_five_day_live_h4.tsv`） |
 
