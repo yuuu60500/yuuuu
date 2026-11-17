@@ -1,6 +1,7 @@
 # H4 Context → M5 Identification Indicator
 
-**Version:** spec v1.00 (frozen baseline) / code **v2.58r4 — official baseline, accepted 2026-11-06** (docs/baselines/v2.58r4.md)
+**Version:** spec v1.00 (frozen baseline) / code **v2.58r4 — official baseline, accepted 2026-11-06** (docs/baselines/v2.58r4.md)  
+**In development:** v2.59 — display-only tidy-up of M5 blocks and BPR zones (docs/05, "v2.59"); v2.58r4 stays the official baseline
 **Platform:** MetaTrader 5 / MQL5 Custom Indicator
 **Mode:** Trend-Following Only
 **Purpose:** MARK ONLY — Detect / Confirm / Track / Mark / Invalidate

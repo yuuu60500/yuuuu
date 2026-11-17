@@ -570,6 +570,24 @@ int POIVis(const H4POI &p)
    return(p.state == POI_TOUCHED ? 1 : 0);
   }
 
+// v2.59 display only: open time of the first M5 bar of the oldest of the last
+// `days` server-time days in the loaded window; 0 = no limit (days <= 0, or the
+// window holds no more than that many days).
+datetime M5DaysKeepFrom(const int days)
+  {
+   if(days <= 0 || g_m5_n <= 0) return(0);
+   long cur  = (long)g_m5[g_m5_n - 1].time / 86400;
+   int  seen = 1;
+   for(int k = g_m5_n - 2; k >= 0; k--)
+     {
+      long d = (long)g_m5[k].time / 86400;
+      if(d == cur) continue;
+      if(++seen > days) return(g_m5[k + 1].time);
+      cur = d;
+     }
+   return(0);
+  }
+
 int BlkVis(const M5Block &b)
   {
    switch(b.state)
@@ -924,12 +942,21 @@ void OM_SyncAll()
         }
 
    //--- M5 blocks ---------------------------------------------------
+   datetime blk_from = M5DaysKeepFrom(InpM5BlockDays);
    if(InpShowM5Blocks && M5LayerOn())
       for(int i = 0; i < g_blk_n; i++)
         {
          if(!InpShowCounterDirBlocks && g_blk[i].counter_dir) continue;
          int vis = BlkVis(g_blk[i]);
          bool dead = (vis == 4);
+         // v2.59 display only: a hidden block is DELETED, not skipped - skipping
+         // would strand its last rectangle on the chart (cf. A-15 / A-18 and
+         // InpShowDeadH4POI). The record itself is untouched.
+         if((dead && !InpShowDeadM5Blocks) || (blk_from > 0 && g_blk[i].origin_time < blk_from))
+           {
+            if(g_blk[i].vis != -2) { OM_DeleteName(OM_Name(TT_BLK, g_blk[i].id, 0)); g_blk[i].vis = -2; }
+            continue;
+           }
          if(dead && g_blk[i].vis == vis) continue;
          StyleZone bst = BlockStyleOf(g_blk[i]);
          datetime t2 = dead ? (g_blk[i].invalid_time > 0 ? g_blk[i].invalid_time : redge) : redge;
@@ -1000,13 +1027,23 @@ void OM_SyncAll()
      }
 
    //--- BPR zones ---------------------------------------------------
+   // v2.59: a live zone ends at the current (forming) M5 bar unless InpBPRExtendToEdge
+   datetime bpr_end = InpBPRExtendToEdge ? redge
+                    : (g_m5_n > 0 ? g_m5[g_m5_n - 1].time + (datetime)PeriodSeconds(PERIOD_M5) : redge);
    if(InpShowBPR && M5LayerOn())
       for(int i = 0; i < g_bpr_n; i++)
         {
          int vis = (g_bpr[i].state == ZS_INVALID ? 2 : (g_bpr[i].state == ZS_TOUCHED ? 1 : 0));
+         // v2.59 display only: broken (InpShowDeadBPR) or spent at the second touch
+         // (InpBPRHideOnRetouch) - delete the rectangle; the record is untouched
+         if((vis == 2 && !InpShowDeadBPR) || (InpBPRHideOnRetouch && g_bpr[i].retouch_time > 0))
+           {
+            if(g_bpr[i].vis != -2) { OM_DeleteName(OM_Name(TT_BPR, g_bpr[i].id, 0)); g_bpr[i].vis = -2; }
+            continue;
+           }
          if(vis == 2 && g_bpr[i].vis == vis) continue;
          StyleZone pst = BPRStyleOf(g_bpr[i]);
-         datetime t2 = (vis == 2 && g_bpr[i].invalid_time > 0 ? g_bpr[i].invalid_time : redge);
+         datetime t2 = (vis == 2 && g_bpr[i].invalid_time > 0 ? g_bpr[i].invalid_time : bpr_end);
          OM_Rect(OM_Name(TT_BPR, g_bpr[i].id, 0), g_bpr[i].formation_time, g_bpr[i].hi,
                  t2, g_bpr[i].lo, pst, m5mask);
          g_bpr[i].vis = vis;

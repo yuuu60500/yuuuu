@@ -6,7 +6,7 @@
 #ifndef HMI_DEFS_MQH
 #define HMI_DEFS_MQH
 
-#define HMI_VERSION      "2.58"
+#define HMI_VERSION      "2.59"
 #define HMI_PREFIX       "HMI"
 
 //--- direction ------------------------------------------------------
@@ -213,6 +213,11 @@ struct BPRZone
    ZoneState         state;
    datetime          touched_time;
    datetime          invalid_time;
+   // v2.59 display only: price left the zone after its first touch, and the
+   // close time of the bar that came back into it (0 = not yet). Nothing but
+   // the drawing reads these; state, invalidation and the log are unchanged.
+   bool              left_after_touch;
+   datetime          retouch_time;
    int               vis;
   };
 

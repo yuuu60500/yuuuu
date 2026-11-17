@@ -79,6 +79,8 @@ bool BPR_Check(IdentificationCycle &cy, const int n)
    z.state           = ZS_ACTIVE;
    z.touched_time    = 0;
    z.invalid_time    = 0;
+   z.left_after_touch = false;
+   z.retouch_time    = 0;
    z.vis             = -1;
    BPRPush(z);
 
@@ -113,6 +115,22 @@ void BPRLifecycle(const int n)
          g_bpr[i].state        = ZS_TOUCHED;
          g_bpr[i].touched_time = t;
          g_bpr[i].vis          = -1;
+         continue;
+        }
+      // v2.59 display only: a touched zone is spent once price has left it
+      // and comes back (the second touch). Bars that stay inside the zone
+      // after the first touch are the same touch. The state stays TOUCHED
+      // and invalidation above still applies; only the drawing reads this.
+      if(g_bpr[i].state == ZS_TOUCHED && g_bpr[i].retouch_time == 0 &&
+         g_bpr[i].touched_time < t)
+        {
+         if(!RangesIntersect(g_m5[n].low, g_m5[n].high, g_bpr[i].lo, g_bpr[i].hi))
+            g_bpr[i].left_after_touch = true;
+         else if(g_bpr[i].left_after_touch)
+           {
+            g_bpr[i].retouch_time = t;
+            g_bpr[i].vis          = -1;
+           }
         }
      }
   }

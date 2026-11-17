@@ -78,6 +78,21 @@ input bool   InpShowMSS               = true;
 input bool   InpShowBPR               = true;
 input bool   InpShowPA                = true;
 input bool   InpShowLevelLines        = true;
+// v2.59 display only (none of these is in ParamsDigest; no comment on the input
+// lines themselves, so the MT5 dialog shows the variable names):
+//   InpShowDeadM5Blocks   false: INVALID / EXPIRED M5 blocks are not drawn
+//   InpM5BlockDays        M5 blocks drawn for the last N trading days only (by
+//                         block origin, server-time days in the loaded M5 window); 0 = all
+//   InpShowDeadBPR        false: a BPR zone broken by a close is not drawn
+//   InpBPRHideOnRetouch   true: a BPR zone is removed at its second touch (price
+//                         left the zone after the first touch and came back)
+//   InpBPRExtendToEdge    false: a live BPR zone ends at the current bar;
+//                         true: v2.58r4 behaviour (to the right edge, past the last bar)
+input bool   InpShowDeadM5Blocks      = false;
+input int    InpM5BlockDays           = 2;
+input bool   InpShowDeadBPR           = false;
+input bool   InpBPRHideOnRetouch      = true;
+input bool   InpBPRExtendToEdge       = false;
 input double InpLabelStackOffsetPips  = 1.5;
 input int    InpMaxCyclesKept         = 20;
 input int    InpObjectHistoryLimit    = 500;

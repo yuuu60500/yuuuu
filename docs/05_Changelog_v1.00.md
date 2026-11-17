@@ -2306,3 +2306,24 @@ Date:     2026-11-06
           归档 r2：参数配置.txt 与归档说明改为按文字手动设置 ATR 配置（包内无 .set）
 不变      源码、EX5、版本号、工具、五日验收状态与五日证据包
 ```
+
+## v2.59 —— 图面整理：M5 块与 BPR 区只改显示（开发版，待编译）
+
+```
+Date:     2026-11-17
+来源:     用户：图上旧的 M5 块（灰色失效块、几天前的金色 ARMED 块）太乱；BPR 区不要延长到最右边，价格第二次触及后不再显示
+基线      v2.58r4 正式基线（2386f8f，EX5 4A3BB167…5DBB）不动；本版另起，MT5 里放另一个文件夹编译
+新增输入  （都在 === Display ===，都不进 ParamsDigest；输入行不带行尾注释，对话框显示变量名）
+          InpShowDeadM5Blocks = false   失效 / 到期（INVALID / EXPIRED）的 M5 块不画；true 同 v2.58r4
+          InpM5BlockDays      = 2       只画最近 N 个服务器日（按块的 origin_time，载入的 M5 窗口内数日）里产生的 M5 块；0 = 不限（同 v2.58r4）
+          InpShowDeadBPR      = false   被收盘突破的 BPR 区不画；true 同 v2.58r4
+          InpBPRHideOnRetouch = true    BPR 区第二次触及即删除：首次触及后价格离开区域（一根 M5 与区域无交集），之后再有一根 M5 与区域相交
+          InpBPRExtendToEdge  = false   有效 BPR 区右端画到当前（正在形成的）M5 K 线；true = v2.58r4 画法（最后一根之后再延长 InpLevelLineExtendBars）
+改动      HMI_ObjectManager.mqh：M5DaysKeepFrom；M5 块与 BPR 区隐藏时删除对象（不是跳过，避免残留，同 InpShowDeadH4POI）；BPR 右端
+          HMI_BPREngine.mqh / HMI_Defs.mqh：BPRZone.left_after_touch / retouch_time，只供画图读取；状态、失效规则不变
+          版本 2.58 → 2.59（HMI_VERSION、#property version）
+不变      所有识别、状态、评分、阶段、信号、警报与全部日志行（除版本号 ver=2.59）；参数摘要 461F006E / A047970C（tools/params_digest.py 复核）；
+          CISD / MSS / BPR / ARMED 文字标签仍按原规则保留（是信号历史）；H4 POI、流动性、区间线、时段线画法不变
+限制      MetaEditor 只能在用户电脑上编译，本仓库环境无编译器；逻辑在草稿脚本中核对（日数窗口跨周末：N=2 的周一 = 周一 + 上周五；
+          BPR：停留在区内仍算第一次，离开后再进入才算第二次）
+```
