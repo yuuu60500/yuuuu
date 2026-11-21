@@ -2307,7 +2307,7 @@ Date:     2026-11-06
 不变      源码、EX5、版本号、工具、五日验收状态与五日证据包
 ```
 
-## v2.59 —— 图面整理：M5 块与 BPR 区只改显示（开发版，待编译）
+## v2.59 —— 图面整理：M5 块、BPR 区与时段线只改显示（开发版，待编译）
 
 ```
 Date:     2026-11-17
@@ -2319,6 +2319,10 @@ Date:     2026-11-17
           InpShowDeadBPR      = false   被收盘突破的 BPR 区不画；true 同 v2.58r4
           InpBPRHideOnRetouch = true    BPR 区第二次触及即删除：首次触及后价格离开区域（一根 M5 与区域无交集），之后再有一根 M5 与区域相交
           InpBPRExtendToEdge  = false   有效 BPR 区右端画到当前（正在形成的）M5 K 线；true = v2.58r4 画法（最后一根之后再延长 InpLevelLineExtendBars）
+时段线    （用户 2026-11-21 追加）InpKZDays 改为按服务器日期数天：0 = 只画今天（最新 M5 所在服务器日），N = 今天 + 之前 N 个有 M5 的交易日
+          （周末无 K 线，不计）；默认 5 → 0。跨午夜的时段算在它结束的那一天。每个画出的时段都按完整时间窗统计高低点 ——
+          v2.58r4 按「最新 − (N+1)×24 小时」截断，会带上前一天的部分时段、最老的时段只用了部分 K 线（高低点可能不对）。
+          输入行去掉行尾注释，对话框显示 InpKZDays。HMI_KillZone.mqh：KZWindowDay、KZFirstDay、KZCollect
 改动      HMI_ObjectManager.mqh：M5DaysKeepFrom；M5 块与 BPR 区隐藏时删除对象（不是跳过，避免残留，同 InpShowDeadH4POI）；BPR 右端
           HMI_BPREngine.mqh / HMI_Defs.mqh：BPRZone.left_after_touch / retouch_time，只供画图读取；状态、失效规则不变
           版本 2.58 → 2.59（HMI_VERSION、#property version）

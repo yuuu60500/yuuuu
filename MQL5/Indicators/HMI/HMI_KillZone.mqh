@@ -21,7 +21,10 @@
 
 input group "=== Kill zone: general ==="
 input bool   InpShowKillZones   = true;
-input int    InpKZDays          = 5;     // how many days back to draw
+// v2.59: today (the server day of the newest M5 bar) plus this many earlier
+// trading days; 0 = today only. Every window drawn is counted in full.
+// (No comment on the input line itself: the MT5 dialog then shows the name.)
+input int    InpKZDays          = 0;
 input int    InpKZExtendBars    = 24;    // extend the levels N M5 bars to the right
 input bool   InpKZShowLabel     = true;
 input color  InpKZTextColor     = clrGainsboro;
@@ -160,6 +163,30 @@ datetime KZWindowEnd(const int z, const datetime anchor)
    return(e);
   }
 
+// v2.59: the server day a window is counted under - the day it ENDS on, so
+// a window that wraps midnight belongs to the trading day it runs into.
+datetime KZWindowDay(const int z, const datetime anchor)
+  {
+   return(KZDayAnchor(KZWindowEnd(z, anchor) - 1));
+  }
+
+// v2.59: the oldest server day drawn - the newest M5 bar's day, then back
+// InpKZDays more days that have M5 bars (weekends have none, so they do not
+// count). v2.58r4 cut at "newest - (InpKZDays + 1) x 24 h" instead, which kept
+// part of a day and drew the oldest window from only some of its bars.
+datetime KZFirstDay()
+  {
+   datetime newest = g_m5[g_m5_n - 1].time;
+   datetime day    = (datetime)((long)newest / 86400 * 86400);
+   int      left   = MathMax(0, InpKZDays);
+   for(int i = g_m5_n - 2; i >= 0 && left > 0; i--)
+     {
+      datetime d = (datetime)((long)g_m5[i].time / 86400 * 86400);
+      if(d < day) { day = d; left--; }
+     }
+   return(day);
+  }
+
 // Pure function over the CLOSED M5 series: no state is touched.
 int KZCollect(KZInst &out[])
   {
@@ -168,7 +195,9 @@ int KZCollect(KZInst &out[])
    if(g_m5_n <= 0) return(0);
 
    datetime newest = g_m5[g_m5_n - 1].time;
-   datetime oldest = newest - (datetime)((long)(InpKZDays + 1) * 86400);
+   datetime first  = KZFirstDay();
+   // a window counted under `first` may have started the day before (wrap)
+   datetime oldest = first - (datetime)86400;
 
    for(int i = g_m5_n - 1; i >= 0; i--)
      {
@@ -178,6 +207,7 @@ int KZCollect(KZInst &out[])
          if(!g_kz_on[z]) continue;
          datetime anc = 0;
          if(!KZContains(z, g_m5[i].time, anc)) continue;
+         if(KZWindowDay(z, anc) < first) continue;   // v2.59: whole windows of the drawn days only
 
          int k = -1;
          for(int j = 0; j < n; j++)
