@@ -2307,7 +2307,7 @@ Date:     2026-11-06
 不变      源码、EX5、版本号、工具、五日验收状态与五日证据包
 ```
 
-## v2.59 —— 图面整理：M5 块、BPR 区与时段线只改显示（开发版，待编译）
+## v2.59 —— 图面整理：M5 块、BPR 区、时段线与 PD 线只改显示（开发版，待编译）
 
 ```
 Date:     2026-11-17
@@ -2323,6 +2323,9 @@ Date:     2026-11-17
           （周末无 K 线，不计）；默认 5 → 0。跨午夜的时段算在它结束的那一天。每个画出的时段都按完整时间窗统计高低点 ——
           v2.58r4 按「最新 − (N+1)×24 小时」截断，会带上前一天的部分时段、最老的时段只用了部分 K 线（高低点可能不对）。
           输入行去掉行尾注释，对话框显示 InpKZDays。HMI_KillZone.mqh：KZWindowDay、KZFirstDay、KZCollect
+PD 线     （用户 2026-11-21 追加）InpPLFromExtreme = true：PDH / PDL / PWH / PWL / PMH / PML 线从打出该高 / 低点的那根 K 线开始画
+          （载入的 M5 窗口里有就用 M5 那根，否则用 H4 那根；都对不上时退回周期起点）；false = v2.58r4（从今天 / 本周 / 本月起点画）。
+          PeriodLevel.draw_from 只供画图；扫荡 / 突破判断仍从周期起点（from）算，对象名不变。HMI_LiquidityLevels.mqh：PLExtremeTime、PLPair
 改动      HMI_ObjectManager.mqh：M5DaysKeepFrom；M5 块与 BPR 区隐藏时删除对象（不是跳过，避免残留，同 InpShowDeadH4POI）；BPR 右端
           HMI_BPREngine.mqh / HMI_Defs.mqh：BPRZone.left_after_touch / retouch_time，只供画图读取；状态、失效规则不变
           版本 2.58 → 2.59（HMI_VERSION、#property version）

@@ -88,11 +88,14 @@ input bool   InpShowLevelLines        = true;
 //                         left the zone after the first touch and came back)
 //   InpBPRExtendToEdge    false: a live BPR zone ends at the current bar;
 //                         true: v2.58r4 behaviour (to the right edge, past the last bar)
+//   InpPLFromExtreme      true: PDH / PDL / PWH / PWL / PMH / PML lines start at the bar
+//                         that printed the level; false: v2.58r4 (start of the day / week / month)
 input bool   InpShowDeadM5Blocks      = false;
 input int    InpM5BlockDays           = 2;
 input bool   InpShowDeadBPR           = false;
 input bool   InpBPRHideOnRetouch      = true;
 input bool   InpBPRExtendToEdge       = false;
+input bool   InpPLFromExtreme         = true;
 input double InpLabelStackOffsetPips  = 1.5;
 input int    InpMaxCyclesKept         = 20;
 input int    InpObjectHistoryLimit    = 500;

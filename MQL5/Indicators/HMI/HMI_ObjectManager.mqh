@@ -853,7 +853,10 @@ void OM_SyncAll()
         }
       if(!show) continue;
       datetime t2 = (g_pl[i].event_time > 0 ? g_pl[i].event_time : redge);
-      OM_Level(OM_Name(TT_PL, owner, i * 2), g_pl[i].from, t2, g_pl[i].price, PLZone(i));
+      // v2.59: start at the bar that printed the level (InpPLFromExtreme); the
+      // owner (object name) stays the period start, so the bookkeeping is unchanged
+      datetime t1 = (InpPLFromExtreme && g_pl[i].draw_from > 0 ? g_pl[i].draw_from : g_pl[i].from);
+      OM_Level(OM_Name(TT_PL, owner, i * 2), t1, t2, g_pl[i].price, PLZone(i));
       g_pl_drawn[i] = owner;
 
       bool first = true;                       // an earlier shown level at this price owns the label

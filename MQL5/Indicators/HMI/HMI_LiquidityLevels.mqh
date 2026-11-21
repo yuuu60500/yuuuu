@@ -36,6 +36,7 @@ struct PeriodLevel
    int               lq_state;
    int               pierce_index;   // M5 bar that first went beyond, -1 if none
    datetime          event_time;     // close of the resolving bar, 0 while open
+   datetime          draw_from;      // v2.59 display only: bar that printed the level (InpPLFromExtreme)
   };
 
 struct LiqEvent
@@ -165,11 +166,39 @@ void PLSet(const int i, const int side, const double px, const datetime from)
    g_pl[i].event_time   = 0;
   }
 
-void PLPair(const int i, const bool ok, const double hi, const double lo, const datetime from)
+// v2.59 display only: open time of the first bar inside [pfrom, pto) that
+// printed `px` (side +1 its high, -1 its low) - the M5 bar when the loaded M5
+// window holds it, else the H4 bar; `fallback` (the period start, the v2.58r4
+// line start) when neither matches. Only the drawing reads the result; the
+// sweep / break judgement still runs from `from`.
+datetime PLExtremeTime(const datetime pfrom, const datetime pto, const int side,
+                       const double px, const datetime fallback)
+  {
+   for(int h = 0; h < g_h4_cursor && h < g_h4_n; h++)
+     {
+      if(g_h4[h].time < pfrom) continue;
+      if(g_h4[h].time >= pto)  break;
+      if(Pts(side > 0 ? g_h4[h].high : g_h4[h].low, px) != 0) continue;
+      datetime h_end = g_h4[h].time + (datetime)PeriodSeconds(PERIOD_H4);
+      for(int k = 0; k < g_m5_n; k++)
+        {
+         if(g_m5[k].time < g_h4[h].time) continue;
+         if(g_m5[k].time >= h_end) break;
+         if(Pts(side > 0 ? g_m5[k].high : g_m5[k].low, px) == 0) return(g_m5[k].time);
+        }
+      return(g_h4[h].time);
+     }
+   return(fallback);
+  }
+
+void PLPair(const int i, const bool ok, const double hi, const double lo, const datetime from,
+            const datetime pfrom, const datetime pto)
   {
    if(!ok) { g_pl[i].valid = false; g_pl[i+1].valid = false; return; }
    PLSet(i,     +1, hi, from);
    PLSet(i + 1, -1, lo, from);
+   g_pl[i].draw_from     = PLExtremeTime(pfrom, pto, +1, hi, from);
+   g_pl[i + 1].draw_from = PLExtremeTime(pfrom, pto, -1, lo, from);
   }
 
 // Previous TRADING day: the newest consumed H4 day before today, skipping a
@@ -204,7 +233,7 @@ void LiqLevelsRoll(const int n)
       g_pl_key[0] = d0;
       datetime pd = PrevTradingDay(d0);
       bool ok = (pd > 0 && H4PeriodHiLo(pd, pd + 86400, hi, lo));
-      PLPair(0, ok, hi, lo, d0);
+      PLPair(0, ok, hi, lo, d0, pd, pd + 86400);
      }
    datetime w0 = WeekStartOf(t);
    if(w0 != g_pl_key[1])
@@ -212,14 +241,15 @@ void LiqLevelsRoll(const int n)
       g_pl_key[1] = w0;
       datetime pw = w0 - 7 * 86400;
       bool ok = H4PeriodHiLo(pw, w0, hi, lo);
-      PLPair(2, ok, hi, lo, w0);
+      PLPair(2, ok, hi, lo, w0, pw, w0);
      }
    datetime m0 = MonthStartOf(t);
    if(m0 != g_pl_key[2])
      {
       g_pl_key[2] = m0;
-      bool ok = H4PeriodHiLo(PrevMonthStartOf(t), m0, hi, lo);
-      PLPair(4, ok, hi, lo, m0);
+      datetime pm = PrevMonthStartOf(t);
+      bool ok = H4PeriodHiLo(pm, m0, hi, lo);
+      PLPair(4, ok, hi, lo, m0, pm, m0);
      }
   }
 
